@@ -51,6 +51,8 @@ Lang lang_from_notify(onion_notify_language_t language) {
     return Lang::Ru;
   case ONION_NOTIFY_LANG_PL:
     return Lang::Pl;
+  case ONION_NOTIFY_LANG_TH:
+    return Lang::Th;
   case ONION_NOTIFY_LANG_EN:
   default:
     return Lang::En;
@@ -83,6 +85,8 @@ onion_notify_language_t notify_from_lang(Lang lang) {
     return ONION_NOTIFY_LANG_RU;
   case Lang::Pl:
     return ONION_NOTIFY_LANG_PL;
+  case Lang::Th:
+    return ONION_NOTIFY_LANG_TH;
   case Lang::En:
   default:
     return ONION_NOTIFY_LANG_EN;
@@ -115,6 +119,8 @@ Lang lang_from_ui_value(int ui_lang) {
     return Lang::Ru;
   case 13:
     return Lang::Pl;
+  case 14:
+    return Lang::Th;
   case 1:
   default:
     return Lang::ZhHans;
@@ -147,6 +153,8 @@ const char *locale_id_for_lang(Lang lang) {
     return "ru";
   case Lang::Pl:
     return "pl";
+  case Lang::Th:
+    return "th";
   case Lang::En:
   default:
     return "en";
@@ -192,6 +200,8 @@ int active_ui_lang_value() {
     return 12;
   case Lang::Pl:
     return 13;
+  case Lang::Th:
+    return 14;
   case Lang::ZhHans:
   default:
     return 1;
@@ -200,7 +210,7 @@ int active_ui_lang_value() {
 
 void set_lang(Lang lang) {
   if (static_cast<int>(lang) < static_cast<int>(Lang::ZhHans) ||
-      lang > Lang::Pl)
+      lang > Lang::Th)
     lang = Lang::ZhHans;
   onion_notify_set_language(notify_from_lang(lang));
 }

@@ -637,7 +637,8 @@ void append_toolbox_preferences_group(ps5ui::Group& g) {
                .item("id_ui_lang_pt_br", toolbox_i18n::tr("lang.pt_br"), "10")
                .item("id_ui_lang_pl", toolbox_i18n::tr("lang.pl"), "13")
                .item("id_ui_lang_ru", toolbox_i18n::tr("lang.ru"), "12")
-               .item("id_ui_lang_ar", toolbox_i18n::tr("lang.ar"), "3");
+               .item("id_ui_lang_ar", toolbox_i18n::tr("lang.ar"), "3")
+               .item("id_ui_lang_th", toolbox_i18n::tr("lang.th"), "14");
          },
          toolbox_i18n::tr("lang.list.sub"), toolbox_val("id_ui_lang", "0"))
       .list("id_cheats_shortcut", toolbox_i18n::tr("sc.cheats"),

@@ -25,6 +25,7 @@ enum class Lang : int {
   It = 10,
   Ru = 11,
   Pl = 12,
+  Th = 13,
 };
 
 /** Active language for tr() (from settings or explicit set). */
@@ -36,14 +37,14 @@ int active_ui_lang_value();
 /**
  * Apply an explicit UI language setting value.
  * 1=zh-Hans, 2=en, 3=ar, 4=zh-Hant, 5=ja, 6=fr, 7=de, 8=ko, 9=es,
- * 10=pt-BR, 11=it, 12=ru, 13=pl. Invalid values fall back to zh-Hans.
+ * 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th. Invalid values fall back to zh-Hans.
  */
 void apply_ui_lang(int ui_lang);
 
 /**
  * Apply the stored UI language setting.
  * 0=system, 1=zh-Hans, 2=en, 3=ar, 4=zh-Hant, 5=ja, 6=fr, 7=de, 8=ko,
- * 9=es, 10=pt-BR, 11=it, 12=ru, 13=pl. This is a configuration
+ * 9=es, 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th. This is a configuration
  * boundary: system is queried here once, then XML and notifications
  * reuse the resolved language.
  */

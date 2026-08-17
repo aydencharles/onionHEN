@@ -88,7 +88,7 @@ static OnPressResult id_custom_game_opts(OnPressContext &ctx) {
 
 static OnPressResult id_ui_lang(OnPressContext &ctx) {
   int v = atoi(ctx.value.c_str());
-  if (v < onion::kUiLanguageSystem || v > onion::kUiLanguagePl)
+  if (v < onion::kUiLanguageSystem || v > onion::kUiLanguageTh)
     v = onion::kUiLanguageSystem;
   if (v == g_settings.ui_lang)
     return OnPressResult::EarlyReturn;

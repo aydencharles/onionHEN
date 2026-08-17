@@ -224,6 +224,17 @@ static int test_pl(void) {
   return 0;
 }
 
+static int test_th(void) {
+  set_lang(Lang::Th);
+  TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★OnionHEN Toolbox") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("cheats.link"), "สูตรโกง") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("rest.group"), "โหมดพักเครื่อง") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("lang.th"), "ไทย") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("cheats.enable_fmt"),
+                               "เปิด/ปิด %s สำหรับ %s") == 0);
+  return 0;
+}
+
 static int test_apply_ui_lang(void) {
   apply_ui_lang(2);
   TEST_ASSERT_TRUE(active_lang() == Lang::En);
@@ -264,6 +275,9 @@ static int test_apply_ui_lang(void) {
   apply_ui_lang(13);
   TEST_ASSERT_TRUE(active_lang() == Lang::Pl);
   TEST_ASSERT_EQ_INT(13, active_ui_lang_value());
+  apply_ui_lang(14);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Th);
+  TEST_ASSERT_EQ_INT(14, active_ui_lang_value());
   apply_ui_lang(99); /* invalid → zh */
   TEST_ASSERT_TRUE(active_lang() == Lang::ZhHans);
   return 0;
@@ -324,6 +338,9 @@ static int test_format(void) {
   set_lang(Lang::Pl);
   TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
                    "Dla Game: włącz/wyłącz God");
+  set_lang(Lang::Th);
+  TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
+                   "เปิด/ปิด Game สำหรับ God");
   return 0;
 }
 
@@ -342,6 +359,7 @@ extern "C" int test_toolbox_i18n_suite(void) {
   fails += onion_test_run("i18n.it", test_it);
   fails += onion_test_run("i18n.ru", test_ru);
   fails += onion_test_run("i18n.pl", test_pl);
+  fails += onion_test_run("i18n.th", test_th);
   fails += onion_test_run("i18n.apply_ui_lang", test_apply_ui_lang);
   fails += onion_test_run("i18n.system_lang_host_fallback",
                           test_system_lang_host_fallback);

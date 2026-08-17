@@ -74,6 +74,8 @@ static int test_notify_language_resolution(void) {
                      onion_notify_resolve_language(12, 1));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_PL,
                      onion_notify_resolve_language(13, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_TH,
+                     onion_notify_resolve_language(14, 1));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_AR,
                      onion_notify_resolve_language(0, 21));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_JA,
@@ -106,6 +108,8 @@ static int test_notify_language_resolution(void) {
                      onion_notify_resolve_language(0, 8));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_PL,
                      onion_notify_resolve_language(0, 16));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_TH,
+                     onion_notify_resolve_language(0, 27));
   return 0;
 }
 
@@ -151,6 +155,9 @@ static int test_notify_format_localized(void) {
   onion_notify_set_language(ONION_NOTIFY_LANG_PL);
   format_msg(out, sizeof(out), 1, "notify.priv.unable");
   TEST_ASSERT_STREQ("[OnionHEN] Nie udało się podnieść uprawnień", out);
+  onion_notify_set_language(ONION_NOTIFY_LANG_TH);
+  format_msg(out, sizeof(out), 1, "notify.priv.unable");
+  TEST_ASSERT_STREQ("[OnionHEN] ไม่สามารถยกระดับสิทธิ์ได้", out);
   return 0;
 }
 

@@ -13,7 +13,7 @@ static atomic_int gLanguage = ATOMIC_VAR_INIT(ONION_NOTIFY_LANG_EN);
 
 static int language_is_known(onion_notify_language_t language) {
   return language >= ONION_NOTIFY_LANG_ZH_HANS &&
-         language <= ONION_NOTIFY_LANG_PL;
+         language <= ONION_NOTIFY_LANG_TH;
 }
 
 static const char *locale_id_for_language(onion_notify_language_t language) {
@@ -42,6 +42,8 @@ static const char *locale_id_for_language(onion_notify_language_t language) {
     return "ru";
   case ONION_NOTIFY_LANG_PL:
     return "pl";
+  case ONION_NOTIFY_LANG_TH:
+    return "th";
   case ONION_NOTIFY_LANG_EN:
   default:
     return "en";
@@ -99,6 +101,8 @@ onion_notify_language_t onion_notify_resolve_language(int ui_language,
     return ONION_NOTIFY_LANG_RU;
   case 13:
     return ONION_NOTIFY_LANG_PL;
+  case 14:
+    return ONION_NOTIFY_LANG_TH;
   default:
     break;
   }
@@ -132,6 +136,8 @@ onion_notify_language_t onion_notify_resolve_language(int ui_language,
     return ONION_NOTIFY_LANG_PL;
   case 21: /* Arabic */
     return ONION_NOTIFY_LANG_AR;
+  case 27: /* Thai */
+    return ONION_NOTIFY_LANG_TH;
   default:
     return ONION_NOTIFY_LANG_EN;
   }

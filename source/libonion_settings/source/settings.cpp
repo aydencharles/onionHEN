@@ -162,6 +162,10 @@ int parse_language(const char *s, int def) {
       streq_ci(s, "polski")) {
     return kUiLanguagePl;
   }
+  if (streq_ci(s, "th") || streq_ci(s, "thai") ||
+      streq_ci(s, "th-TH") || streq_ci(s, "th_th")) {
+    return kUiLanguageTh;
+  }
   return def;
 }
 
@@ -195,6 +199,8 @@ const char *language_name(int v) {
     return "ru";
   case kUiLanguagePl:
     return "pl";
+  case kUiLanguageTh:
+    return "th";
   case kUiLanguageSystem:
   default:
     return "system";

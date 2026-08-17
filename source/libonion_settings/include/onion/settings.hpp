@@ -65,6 +65,7 @@ inline constexpr int kUiLanguagePtBr = 10;
 inline constexpr int kUiLanguageIt = 11;
 inline constexpr int kUiLanguageRu = 12;
 inline constexpr int kUiLanguagePl = 13;
+inline constexpr int kUiLanguageTh = 14;
 
 inline constexpr int kStartupOpenNone = 0;
 inline constexpr int kStartupOpenHomeMenu = 1;

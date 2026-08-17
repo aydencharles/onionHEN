@@ -433,6 +433,7 @@ static int test_language_new_locales_roundtrip(void) {
       {onion::kUiLanguageIt, "it", "italiano"},
       {onion::kUiLanguageRu, "ru", "ru-RU"},
       {onion::kUiLanguagePl, "pl", "polski"},
+      {onion::kUiLanguageTh, "th", "thai"},
   };
 
   for (const auto &c : cases) {

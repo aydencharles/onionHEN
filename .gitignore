@@ -8,6 +8,7 @@
 # Build trees / final artifacts (default: repo-root build/)
 /build/
 /.cache/
+/.docker/
 source/build/
 source/util/build/
 source/**/CMakeFiles/

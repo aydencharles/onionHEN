@@ -42,6 +42,11 @@ show_onionhen_options=true
 # Available values: 0 or a positive number of seconds.
 resume_reinject_delay_seconds=10
 
+[network]
+# ftp controls the FTP server on port 1337.
+# Available values: true, false
+ftp=true
+
 [cheats]
 # memory_backend selects the cheat memory access implementation.
 # Available values: default, libhijacker

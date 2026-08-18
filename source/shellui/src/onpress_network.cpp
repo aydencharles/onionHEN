@@ -13,8 +13,19 @@ static OnPressResult id_disp_titleids(OnPressContext &ctx) {
   return OnPressResult::Handled;
 }
 
+static OnPressResult id_ftp_server(OnPressContext &ctx) {
+  const bool enabled = atol(ctx.value.c_str()) != 0;
+  if (enabled == g_settings.ftp_server)
+    return OnPressResult::EarlyReturn;
+
+  g_settings.ftp_server = enabled;
+  ctx.reload_util = true;
+  return OnPressResult::Handled;
+}
+
 static const OnPressExactEntry kExact[] = {
     {"id_disp_titleids", id_disp_titleids},
+    {"id_ftp_server", id_ftp_server},
 };
 
 const OnPressExactEntry *onpress_network_exact(size_t *count) {

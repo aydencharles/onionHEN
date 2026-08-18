@@ -1,0 +1,20 @@
+services:
+  onionhen-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - ./.docker/pacbrew:/opt/ps5-payload-sdk/target/user/homebrew:ro
+    command: >
+      /bin/bash -lc "git -C /workspace submodule update --init --recursive ; python3 -c \"from pathlib import Path; files=list(Path('/workspace').rglob('*.sh'))+list(Path('/workspace').rglob('*.bash')); [p.write_bytes(p.read_bytes().replace(bytes([13]), bytes())) for p in files]\" ; export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk && export LLVM_CONFIG=/usr/lib/llvm-18/bin/llvm-config && export PATH=/usr/lib/llvm-18/bin:$${PS5_PAYLOAD_SDK}/bin:$${PATH} && ./scripts/build.sh --jobs 8"
+    environment:
+      PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+      BUILD_TYPE: Debug
+      JOBS: "8"
+      KEYSTONE_PREFIX: /usr/local
+      LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-18/bin:/opt/ps5-payload-sdk/bin
+    stdin_open: true
+    tty: true

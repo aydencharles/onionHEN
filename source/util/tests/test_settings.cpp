@@ -36,6 +36,8 @@ static int test_defaults_and_serialize_keys(void) {
                    std::string::npos);
   TEST_ASSERT_TRUE(text.find("resume_reinject_delay_seconds=10") !=
                    std::string::npos);
+  TEST_ASSERT_TRUE(text.find("[network]\n") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("ftp=true") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("stop_utility_daemon_on_entry") ==
                    std::string::npos);
   TEST_ASSERT_TRUE(text.find("close_running_game_on_entry") ==
@@ -67,6 +69,7 @@ static int test_roundtrip_file(void) {
   in.fan_threshold = 55;
   in.cheats_shortcut_opt = 2;
   in.rest_mode_delay_seconds = 7;
+  in.ftp_server = false;
   in.startup_open_after_load = onion::kStartupOpenHomeMenu;
   in.ui_lang = onion::kUiLanguageEn;
   in.log_level = onion::kLogLevelDebug;
@@ -79,6 +82,7 @@ static int test_roundtrip_file(void) {
   TEST_ASSERT_EQ_INT(55, out.fan_threshold);
   TEST_ASSERT_EQ_INT(2, out.cheats_shortcut_opt);
   TEST_ASSERT_EQ_U64(7, out.rest_mode_delay_seconds);
+  TEST_ASSERT_TRUE(!out.ftp_server);
   TEST_ASSERT_EQ_INT(onion::kStartupOpenHomeMenu,
                      out.startup_open_after_load);
   TEST_ASSERT_EQ_INT(onion::kUiLanguageEn, out.ui_lang);

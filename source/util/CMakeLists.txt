@@ -53,6 +53,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   "${PROJECT_ROOT}/libonion_platform/include"
   "${PROJECT_ROOT}/libonion_payload/include"
   "${PROJECT_ROOT}/libonion_elfldr/include"
+  "${PROJECT_ROOT}/libSelfDecryptor/include"
   "${PROJECT_ROOT}/include"
 )
 # CBC for MC4 / ShnExt AES
@@ -84,7 +85,7 @@ target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONION_CURL_ROOT}/lib"
   "${PS5_PAYLOAD_SDK}/target/lib"
 )
-add_dependencies(${PROJECT_NAME} hijacker onion_settings onion_ipc onion_proc onion_platform onion_payload onion_ready onion_elfldr)
+add_dependencies(${PROJECT_NAME} hijacker onion_settings onion_ipc onion_proc onion_platform onion_payload onion_ready onion_elfldr SelfDecryptor)
 # keystone: ShnExt ASM only
 target_link_libraries(${PROJECT_NAME} PUBLIC
     onion_ipc
@@ -94,6 +95,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     onion_payload
     onion_ready
     onion_elfldr
+    SelfDecryptor
     keystone
     hijacker
     SceSystemService

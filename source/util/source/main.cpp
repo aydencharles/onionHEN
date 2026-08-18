@@ -61,6 +61,7 @@ onion::SettingsStore g_settings;
 void start_ip_thread(void);
 void* IPC_loop(void* args);
 bool shellui_patch(void);
+extern "C" void ftp_server_apply(bool enabled);
 
 jmp_buf g_catch_buf;
 uintptr_t kernel_base = 0;
@@ -92,6 +93,7 @@ bool LoadSettings() {
     }
 
     g_settings.store(s);
+    ftp_server_apply(s.ftp_server);
     int system_language = 1;
     if (s.ui_lang == onion::kUiLanguageSystem)
         (void)sceSystemServiceParamGetInt(1, &system_language);

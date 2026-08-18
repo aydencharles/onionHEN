@@ -559,6 +559,15 @@ void append_toolbox_system_group(ps5ui::Group& g) {
                          toolbox_val("id_rest_1", ""));
           },
           toolbox_i18n::tr("rest.group.sub"), kIconRestMode, "id_rest_1")
+      .group(
+          "id_network", toolbox_i18n::tr("network.group"),
+          [](ps5ui::Group& n) {
+            n.toggle("id_ftp_server", toolbox_i18n::tr("network.ftp"),
+                     toolbox_on("id_ftp_server"),
+                     toolbox_i18n::tr("network.ftp.sub"));
+          },
+          toolbox_i18n::tr("network.group.sub"), kIconSettings,
+          "id_ftp_server")
       .link("id_external_hdd", toolbox_i18n::tr("hdd.external"),
             "DebugSettings/data/debug_settings_external_hdd.xml",
             toolbox_i18n::tr("hdd.external.sub"), kIconHardDrive)

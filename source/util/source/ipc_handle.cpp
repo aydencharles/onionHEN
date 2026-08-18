@@ -34,6 +34,8 @@ extern "C" {
 
 extern bool is_handler_enabled;
 
+extern "C" void ftp_server_apply(bool enabled);
+
 void reply(int sender_socket, bool error, std::string out_var = "Nothing");
 extern "C" {
 bool load_payload(const char *path);
@@ -74,10 +76,24 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false);
     break;
   }
-  case BREW_UTIL_UNUSED_FTP:
+  case BREW_UTIL_TOGGLE_FTP: {
+    const bool enabled = onion_cjson::bool_item(my_json.get(), "enabled");
+    onion::Settings settings{};
+    (void)onion::settings_load(&settings);
+    settings.ftp_server = enabled;
+    if (!onion::settings_save(settings)) {
+      LOG_ERROR("FTP toggle: failed to persist settings");
+      reply(sender_app, true);
+      break;
+    }
+    LOG_INFO("FTP toggle -> %s", enabled ? "on" : "off");
+    ftp_server_apply(enabled);
+    reply(sender_app, false);
+    break;
+  }
   case BREW_UTIL_UNUSED_KLOG:
   case BREW_UTIL_UNUSED_DPI:
-    /* FTP (1337), Klog (9081), and DirectPKGInstaller removed; ordinals kept for IPC compat. */
+    /* Klog (9081) and DirectPKGInstaller remain removed; ordinals are kept for IPC compat. */
     LOG_WARN("Removed-service toggle: unsupported (cmd=%u)", static_cast<unsigned>(command));
     reply(sender_app, true);
     break;

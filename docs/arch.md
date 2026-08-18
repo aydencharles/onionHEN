@@ -163,8 +163,9 @@ OnionHEN/
 |------|-------------|------|
 | Cheats | IPC | flat-file cheat engine（flat `TITLE_VERSION.ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | ShellCore / ShellUI 补丁 | — | 休息模式恢复、toolbox 激活等 |
+| FTP | TCP 1337 | Servidor FTP opcional, controlado desde Toolbox o `network.ftp` |
 
-> **已移除：** FTP（1337）、Klog 网络服务（9081）、Legacy CMD（9028）。  
+> **已移除：** Klog 网络服务（9081）、Legacy CMD（9028）。
 > 注意：代码里仍使用 `ps5/klog.h` 的 `klog_printf` / `klog_puts`，那是内核日志 API，不是 9081 服务。
 
 ### 2.5 `shellui` → `shellui.elf`（Toolbox UI）
@@ -326,7 +327,7 @@ struct IPCMessage {
 - `BREW_UTIL_UNUSED_LEGACY_CMD_SERVER`（原 TOGGLE_LEGACY_CMD_SERVER / TCP 9028 已移除）
 - `BREW_UNUSED_DECRYPT_DIR`（原 DECRYPT_DIR，SELF 目录解密已移除）
 - `BREW_UNUSED_TESTKIT_CHECK`（原 TESTKIT_CHECK；客户端改为本地探测）
-- `BREW_UTIL_UNUSED_FTP`（原 TOGGLE_FTP）
+- `BREW_UTIL_TOGGLE_FTP`（FTP 服务，端口 1337；`BREW_UTIL_UNUSED_FTP` 保留为兼容别名）
 - `BREW_UTIL_UNUSED_KLOG`（原 TOGGLE_KLOG）
 - `BREW_UTIL_LAUNCH_ELFLDR`（旧手动启动命令；内置 9020 由 bootstrapper 管理）
 
@@ -386,13 +387,13 @@ struct IPCMessage {
 | 能力 | 说明 |
 |------|------|
 | 内嵌 9021 elfldr | 改为内置私有 9020 loader；9021 只作为外部首次引导 / 9020 恢复通道 |
-| FTP 1337 | 服务与 Toolbox 开关已移除 |
+| FTP 1337 | util 提供服务，Toolbox 可启停 |
 | Legacy CMD 9028 | util TCP hijacker 协议与 Toolbox 开关已移除；app JB 仅 FIFO |
 | Klog server 9081 | 服务与 Toolbox 开关已移除 |
 | ps5debug / app-dumper | 不再内嵌 |
 | Byepervisor / hen.bin | 1.xx–2.xx HV 路径不打包 |
 | Discord RPC | 已移除 |
-| libSelfDecryptor | 已移除；SELF 目录解密 IPC 亦已移除 |
+| libSelfDecryptor | FTP 服务使用的本地 SELF 解密库 |
 | 沙盒内 `/data` 可见性补丁 | 仅路径可见，非越狱，已移除 |
 
 ---

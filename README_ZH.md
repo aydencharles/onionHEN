@@ -66,6 +66,7 @@ OnionHEN 面向已越狱的 PS5，提供一套能日常使用、也方便维护�
 - **Payload 管理** — 启动和停止普通 `.elf` payload，可选自动启动
 - **游戏监控条** — 游戏中显示 FPS、CPU、GPU、内存、温度和网络信息
 - **金手指** — 本地 JSON、SHN、MC4、ShnExt 文件，运行中即可开关
+- **FTP 服务** — 可选的 TCP **1337** FTP 服务，可从工具箱或 `network.ftp` 控制
 - **主机工具** — 休息模式、账号激活、外接硬盘、Title ID、风扇、快捷键和游戏选项
 - **应用越狱** — 白名单自制软件可通过守护进程沙盒 FIFO 申请提权
 - **可恢复运行时** — 关键守护进程和工具守护进程分开；主进程可以拉起工具进程
@@ -125,6 +126,16 @@ OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstu
 
 `DOWNLOAD_CHEATS` 会通过 HTTPS 下载金手指仓库 ZIP，只解压 `cheats/` 子树，再 flatten 进上述目录；同步完成后会清理临时 ZIP。镜像由 `[cheats] mirror` 控制：`auto` 时简体中文走 cnb.cool，其它地区走 GitHub。
 
+### FTP
+
+可选 FTP 服务监听 TCP **1337** 端口。可以在工具箱的 Network 分组中开关，
+也可以在 `config.ini` 中设置：
+
+```ini
+[network]
+ftp=true
+```
+
 <br>
 
 # 构建
@@ -149,6 +160,21 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 ```
 
 脚本会配置项目、拉取外部依赖，并按所需顺序构建整条嵌入链。
+
+### Docker 构建
+
+仓库包含预装 PS5 SDK 和构建依赖的 Dockerfile 与 Compose 服务。
+如果存在本地 `.docker/pacbrew` SDK overlay，Compose 会以只读方式挂载它。
+
+```shell
+docker compose up --build
+```
+
+如果已经有构建好的镜像、不需要重新构建：
+
+```shell
+docker compose up
+```
 
 ### 常用选项
 
@@ -212,6 +238,7 @@ OnionHEN 在下面两处读写同一份配置：
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
 | `game_menu.show_onionhen_options` | `true` | `true`, `false` |
 | `rest_mode.resume_reinject_delay_seconds` | `0` | 秒数 |
+| `network.ftp` | `true` | `true`, `false` |
 | `rest_mode.stop_utility_daemon_on_entry` | `false` | `true`, `false` |
 | `rest_mode.close_running_game_on_entry` | `false` | `true`, `false` |
 | `cheats.memory_backend` | `default` | `default`, `libhijacker` |

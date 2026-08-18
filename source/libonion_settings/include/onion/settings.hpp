@@ -118,6 +118,9 @@ struct Settings {
   // [rest_mode]
   uint64_t rest_mode_delay_seconds = 10;
 
+  // [network]
+  bool ftp_server = true;
+
   // [cheats], [app_jailbreak]
   bool libhijacker_cheats = false;
   int cheats_mirror = kCheatsMirrorAuto;

@@ -67,6 +67,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **Payload manager** — start and stop plain `.elf` payloads, with optional auto-start
 - **Game overlay** — an in-game bar for FPS, CPU, GPU, RAM, temperatures, and network info
 - **Cheat engine** — local JSON, SHN, MC4, and ShnExt files that can be toggled at runtime
+- **FTP server** — optional FTP service on TCP port **1337**, controlled from the Toolbox or `network.ftp`
 - **Console tools** — Rest Mode, account activation, external HDD, Title IDs, fan control, shortcuts, and game options
 - **App jailbreak** — allowlisted homebrew can ask the daemon for extra privileges through a sandbox FIFO
 - **Resilient runtime** — the critical daemon and utility daemon run apart; the main daemon can restart the utility
@@ -127,6 +128,16 @@ Cheats load from disk. If a file changes, OnionHEN reloads it without restarting
 
 `DOWNLOAD_CHEATS` downloads a cheat catalog ZIP over HTTPS (GitHub or cnb.cool), extracts only its `cheats/` tree, and flattens it into this directory. `[cheats] mirror=auto` uses cnb.cool when the UI/system language is Simplified Chinese, otherwise GitHub.
 
+### FTP
+
+The optional FTP server listens on TCP port **1337**. Enable or disable it from
+the Toolbox Network group, or set this value in `config.ini`:
+
+```ini
+[network]
+ftp=true
+```
+
 <br>
 
 # Build
@@ -152,6 +163,22 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 
 The script configures the project, fetches external dependencies, and builds
 the embed chain in the required order.
+
+### Docker build
+
+The repository includes a Dockerfile and Compose service with the PS5 SDK and
+build dependencies prepared. The local `.docker/pacbrew` SDK overlay is mounted
+read-only when available.
+
+```shell
+docker compose up --build
+```
+
+To use an already-built image without rebuilding it:
+
+```shell
+docker compose up
+```
 
 ### Common options
 
@@ -217,6 +244,7 @@ default from [`config.ini.example`](config.ini.example).
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
 | `game_menu.show_onionhen_options` | `true` | `true`, `false` |
 | `rest_mode.resume_reinject_delay_seconds` | `0` | seconds |
+| `network.ftp` | `true` | `true`, `false` |
 | `rest_mode.stop_utility_daemon_on_entry` | `false` | `true`, `false` |
 | `rest_mode.close_running_game_on_entry` | `false` | `true`, `false` |
 | `cheats.memory_backend` | `default` | `default`, `libhijacker` |

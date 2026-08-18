@@ -544,6 +544,8 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->rest_mode_delay_seconds = parse_u64(
       ini_get(parser, "rest_mode.resume_reinject_delay_seconds"),
       out->rest_mode_delay_seconds);
+    out->ftp_server =
+      parse_bool(ini_get(parser, "network.ftp"), out->ftp_server);
   out->libhijacker_cheats = parse_libhijacker_backend(
       ini_get(parser, "cheats.memory_backend"), out->libhijacker_cheats);
   out->cheats_mirror = parse_cheats_mirror(ini_get(parser, "cheats.mirror"),
@@ -688,6 +690,11 @@ std::string settings_serialize(const Settings &in) {
        std::to_string(static_cast<unsigned long long>(in.rest_mode_delay_seconds)) +
        "\n";
   b += "\n";
+    b += "[network]\n";
+    b += "# ftp controls the FTP server on port 1337.\n";
+    b += "# Available values: true, false\n";
+    b += "ftp=" + bool_text(in.ftp_server) + "\n";
+    b += "\n";
   b += "[cheats]\n";
   b += "# memory_backend selects the cheat memory access implementation.\n";
   b += "# Available values: default, libhijacker\n";

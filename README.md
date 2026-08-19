@@ -167,8 +167,8 @@ the embed chain in the required order.
 ### Docker build
 
 The repository includes a Dockerfile and Compose service with the PS5 SDK and
-build dependencies prepared. The local `.docker/pacbrew` SDK overlay is mounted
-read-only when available.
+build dependencies prepared. The build runs from a temporary container copy so
+the bind-mounted checkout is not rewritten.
 
 ```shell
 docker compose up --build

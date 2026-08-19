@@ -11,18 +11,21 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
 #include "common_utils.h"
 #include <unistd.h>
 
 
-bool ftp_started = false;
+_Atomic bool ftp_started = false;
 
 
 int close(int fd);
@@ -40,6 +43,7 @@ int sceNetCtlGetInfo(int size, SceNetCtlInfo *info);
 #define FILE_BUF_SIZE 8192
 #define DEFAULT_PATH "/"
 #define DEFAULT_PORT 1337
+#define FTP_ROOT "/data/OnionHEN/ftp"
 #define SCE_NET_SOCKET_ABORT_FLAG_RCV_PRESERVATION 0x00000001
 #define SCE_NET_SOCKET_ABORT_FLAG_SND_PRESERVATION 0x00000002
 #define SCE_NET_SO_REUSEADDR 0x00000004
@@ -284,30 +288,7 @@ static struct ftp_command *ftp_commands; // Points to available FTP commands
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <sys/elf_common.h>
-#include <sys/elf64.h>
-#include <sys/elf32.h>
-#include <sys/mman.h>
-
-#define SELF_PROSPERO_MAGIC     0xEEF51454
-
-typedef struct elf32_hdr_new {
-    unsigned char    e_ident[EI_NIDENT];
-    uint16_t         e_type;
-    uint16_t         e_machine;
-    uint32_t         e_version;
-    uint32_t         e_entry;  /* Entry point */
-    uint32_t         e_phoff;
-    uint32_t         e_shoff;
-    uint32_t         e_flags;
-    uint16_t         e_ehsize;
-    uint16_t         e_phentsize;
-    uint16_t         e_phnum;
-    uint16_t         e_shentsize;
-    uint16_t         e_shnum;
-    uint16_t         e_shstrndx;
-} Elf32_Ehdr_new;
-
+#include "SelfDecryptor.h"
 
 // Checks if a file or path exists on the FTP server.
 // Used in FTP commands LIST and RNFR.
@@ -317,193 +298,8 @@ static int ftp_file_exists(const char *path) {
 }
 
 
-typedef struct elf64_hdr_new {
-    unsigned char	 e_ident[EI_NIDENT]; /* ELF "magic number" */
-    uint16_t         e_type;
-    uint16_t         e_machine;
-    uint32_t         e_version;
-    uint64_t         e_entry;            /* Entry point virtual address */
-    uint64_t         e_phoff;            /* Program header table file offset */
-    uint64_t         e_shoff;            /* Section header table file offset */
-    uint32_t         e_flags;
-    uint16_t         e_ehsize;
-    uint16_t         e_phentsize;
-    uint16_t         e_phnum;
-    uint16_t         e_shentsize;
-    uint16_t         e_shnum;
-    uint16_t         e_shstrndx;
-} Elf64_Ehdr_new;
-
-typedef struct elf32_phdr_new {
-    uint32_t         p_type;
-    uint32_t         p_offset;
-    uint32_t         p_vaddr;
-    uint32_t         p_paddr;
-    uint32_t         p_filesz;
-    uint32_t         p_memsz;
-    uint32_t         p_flags;
-    uint32_t         p_align;
-} Elf32_Phdr_new;
-
-typedef struct elf64_phdr_new {
-    uint32_t         p_type;
-    uint32_t         p_flags;
-    uint64_t         p_offset;      /* Segment file offset */
-    uint64_t         p_vaddr;       /* Segment virtual address */
-    uint64_t         p_paddr;       /* Segment physical address */
-    uint64_t         p_filesz;      /* Segment size in file */
-    uint64_t         p_memsz;       /* Segment size in memory */
-    uint64_t         p_align;       /* Segment alignment, file & memory */
-} Elf64_Phdr_new;
-
-
-struct sce_self_header
-{
-    uint32_t magic;             // 0x00
-    uint8_t version;            // 0x04
-    uint8_t mode;               // 0x05
-    uint8_t endian;             // 0x06
-    uint8_t attributes;         // 0x07
-    uint32_t key_type;          // 0x08
-    uint16_t header_size;       // 0x0C
-    uint16_t metadata_size;     // 0x0E
-    uint64_t file_size;         // 0x10
-    uint16_t segment_count;     // 0x18
-    uint16_t flags;             // 0x1A
-    char pad_2[0x4];            // 0x1C
-}; // Size: 0x20
-
-struct sce_self_segment_header {
-    uint64_t flags;             // 0x00
-    uint64_t offset;            // 0x08
-    uint64_t compressed_size;   // 0x10
-    uint64_t uncompressed_size; // 0x18
-}; // Size: 0x20
-
-
-int decrypt_self_path(const char* path, const char* out_path) {
-    int self_fd;
-    uint64_t final_file_size;
-    struct elf64_hdr_new* elf_header;
-    struct elf64_phdr_new* start_phdrs;
-    struct elf64_phdr_new* cur_phdr;
-    struct sce_self_header* header;
-    char* self_file_data;
-    char* out_file_data;
-    void* segment_data;
-    char note_buf[0x1000];
-
-    LOG_INFO("decrypt_self: path=[%s]", path);
-
-    // Open SELF file
-    self_fd = open(path, O_RDONLY);
-    if (self_fd < 0) {
-        LOG_INFO("Failed to open SELF file: %s", strerror(errno));
-        return self_fd;
-    }
-
-    self_file_data = (char *) mmap(NULL, 0x1000, PROT_READ, MAP_SHARED, self_fd, 0);
-    if (self_file_data == MAP_FAILED) {
-        LOG_INFO("Failed to map self file errno: %d : %s", errno, strerror(errno));
-        close(self_fd);
-        return -ENOMEM;
-    }
-
-    header = (struct sce_self_header*)self_file_data;
-
-    // Get ELF headers
-    elf_header = (struct elf64_hdr_new*)(
-        (char*)self_file_data + sizeof(struct sce_self_header) +
-        (sizeof(struct sce_self_segment_header) * header->segment_count)
-        );
-    start_phdrs = (struct elf64_phdr_new*)((char*)(elf_header)+sizeof(struct elf64_hdr_new));
-
-    // Allocate backing buffer for output file data. We'll get size by finding the NOTE program header which should be
-    // in most SELFs
-    cur_phdr = start_phdrs;
-    final_file_size = 0;
-    for (int i = 0; i < elf_header->e_phnum; i++) {
-        final_file_size = MAX(final_file_size, cur_phdr->p_offset + cur_phdr->p_filesz);
-        cur_phdr++;
-    }
-
-    if (final_file_size == 0) {
-        munmap(self_file_data, 0x1000);
-        close(self_fd);
-        return -EINVAL;
-    }
-
-    // Map buffer for output data
-    out_file_data = (char *) mmap(NULL, final_file_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-    if (out_file_data == MAP_FAILED) {
-        LOG_INFO("Failed to map out_file_data errno: %d : %s", errno, strerror(errno));
-        munmap(self_file_data, 0x1000);
-        close(self_fd);
-        return -12;
-    }
-
-    // Copy ELF headers over
-    memcpy(out_file_data, elf_header, sizeof(struct elf64_hdr_new));
-    memcpy(out_file_data + sizeof(struct elf64_hdr_new), start_phdrs, elf_header->e_phnum * sizeof(struct elf64_phdr_new));
-
-    // Decrypt and copy segments
-    cur_phdr = start_phdrs;
-    for (uint64_t i = 0; i < elf_header->e_phnum; i++) {
-        if (cur_phdr->p_type == PT_LOAD || cur_phdr->p_type == 0x61000000) {
-            //LOG_INFO("decrypt_self: seg=0x%lx", i);
-            segment_data = mmap(NULL, cur_phdr->p_filesz, PROT_READ, MAP_SHARED | 0x80000, self_fd, (i << 32));
-            if (segment_data == MAP_FAILED) {
-                LOG_INFO("Failed to map segment_data errno: %d : %s", errno, strerror(errno));
-                munmap(self_file_data, 0x1000);
-                close(self_fd);
-                return -EIO;
-            }
-
-            //LOG_INFO("decrypt_self: copying %p (size = 0x%lx)", segment_data, cur_phdr->p_filesz);
-            //DumpHex(segment_data, 0x100);
-            memcpy(out_file_data + cur_phdr->p_offset, segment_data, cur_phdr->p_filesz);
-            //LOG_INFO("decrypt_self: unmap %p", segment_data);
-            munmap(segment_data, cur_phdr->p_filesz);
-            //LOG_INFO("decrypt_self: done");
-        }
-
-        if (cur_phdr->p_type == 0x6FFFFF00) {
-            lseek(self_fd, cur_phdr->p_offset, SEEK_SET);
-            read(self_fd, &note_buf, cur_phdr->p_filesz);
-            memcpy(out_file_data + cur_phdr->p_offset, note_buf, cur_phdr->p_filesz);
-        }
-        cur_phdr++;
-    }
-
-    munmap(self_file_data, 0x1000);
-    close(self_fd);
-
-    // Write decrypted SELF to the specified USB path
-    int out_fd = open(out_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
-    if (out_fd < 0) {
-        munmap(out_file_data, final_file_size);
-        LOG_INFO("Failed to open output file: %s", strerror(errno));
-        return -EIO;
-    }
-
-    ssize_t written_bytes = write(out_fd, out_file_data, final_file_size);
-    if (written_bytes != final_file_size) {
-        munmap(out_file_data, final_file_size);
-        close(out_fd);
-        LOG_INFO("Failed to write entire output file: %s", strerror(errno));
-        return -EIO;
-    }
-
-    munmap(out_file_data, final_file_size);
-    close(out_fd);
-
-    LOG_INFO("Successfully decrypted and saved to %s", out_path);
-    return 0;
-}
-
-
 #define SELF_PROSPERO_MAGIC     0xEEF51454
-#define SELF_ORBIS_MAGIC        0x4F153D1D
+#define SELF_ORBIS_MAGIC        0x1D3D154F
 
  bool Check_ELF_Magic(const char* path, uint32_t FILE_MAGIC) {
   // Check for empty or pure whitespace path
@@ -515,27 +311,16 @@ int decrypt_self_path(const char* path, const char* out_path) {
   }
 
   // Check if it's a Prospero SELF
-  read(file_fd, (void * ) & magic, sizeof(magic));
+  ssize_t bytes_read = read(file_fd, (void *) &magic, sizeof(magic));
 
   close(file_fd);
-  return magic == FILE_MAGIC;
+  return bytes_read == sizeof(magic) && magic == (int)FILE_MAGIC;
 
 }
 
 bool is_self(const char * path){
   return Check_ELF_Magic(path, SELF_PROSPERO_MAGIC) || Check_ELF_Magic(path, SELF_ORBIS_MAGIC);
 }
-typedef struct
-{
-    uint64_t pad0;
-    char version_str[0x1C];
-    uint32_t version;
-    uint64_t pad1;
-} OrbisKernelSwVersion;
-
-bool is_2xx = false;
-int sceKernelGetProsperoSystemSwVersion(OrbisKernelSwVersion* sw);
-int decrypt_self_ftp(const char* input_file_path, const char* output_file_path);
 /// Reimplementation of missing functions --------------------------------------
 static int decrypt_temp(struct client_info *client, char *file_path, char *buf,
     size_t bufsize)
@@ -558,18 +343,26 @@ static int decrypt_temp(struct client_info *client, char *file_path, char *buf,
     }
     while (-ftp_file_exists(temp_path) && strlen(temp_path) + 1 < bufsize) {
         LOG_INFO("Temporary file \"%s\" already exists.", temp_path);
-        strcat(temp_path, "_");
+      size_t path_len = strlen(temp_path);
+      if (path_len + 1 >= bufsize)
+        return -1;
+      temp_path[path_len] = '_';
+      temp_path[path_len + 1] = '\0';
     }
 
     LOG_INFO("Decrypting file \"%s\", using temporary file \"%s\"...",
         file_path, temp_path);
 
-    if (is_2xx) 
-       decrypt_self_path(file_path, temp_path);
-    else
-        decrypt_self_ftp(file_path, temp_path);
+    int decrypt_result = decrypt_self_ftp(file_path, temp_path);
+    if (decrypt_result != 0) {
+      unlink(temp_path);
+      return decrypt_result;
+    }
 
-    strcpy(buf, temp_path);
+    if (snprintf(buf, bufsize, "%s", temp_path) >= (int)bufsize) {
+      unlink(temp_path);
+      return -1;
+    }
 
     return 0;
 }
@@ -614,6 +407,7 @@ static int decrypt_rnps(struct client_info *client, char *file_path, char *buf,
     int fd_in = -1, fd_out = -1;
     unsigned char* file_buf = NULL;
     int result = 0;
+    bool temp_created = false;
 
     // Open the input file for reading
     fd_in = open(file_path, O_RDONLY);
@@ -622,21 +416,30 @@ static int decrypt_rnps(struct client_info *client, char *file_path, char *buf,
         return -1;
     }
 
-    // Allocate buffer (e.g., 16 MB buffer)
-    const size_t BUFFER_SIZE = 0x10000000; // 16 MB
-    file_buf = (unsigned char*)malloc(BUFFER_SIZE);
+    struct stat input_stat;
+    if (fstat(fd_in, &input_stat) < 0 || input_stat.st_size < 0 ||
+      (uintmax_t)input_stat.st_size > INT_MAX) {
+      result = -2;
+      goto cleanup;
+    }
+    const size_t buffer_size = (size_t)input_stat.st_size;
+    file_buf = (unsigned char*)malloc(buffer_size ? buffer_size : 1);
     if (!file_buf) {
-        LOG_INFO("Failed to allocate memory %d", BUFFER_SIZE);
+      LOG_INFO("Failed to allocate memory %zu", buffer_size);
         result = -2;
         goto cleanup;
     }
 
-    // Read the input file into the buffer
-    ssize_t bytes_read = read(fd_in, file_buf, BUFFER_SIZE);
-    if (bytes_read < 0) {
-        perror("Failed to read from input file");
+    ssize_t bytes_read = 0;
+    while ((size_t)bytes_read < buffer_size) {
+      ssize_t current = read(fd_in, file_buf + bytes_read,
+                   buffer_size - (size_t)bytes_read);
+      if (current <= 0) {
+        LOG_INFO("Failed to read complete input file");
         result = -3;
         goto cleanup;
+      }
+      bytes_read += current;
     }
 
     // Decrypt the data
@@ -667,6 +470,7 @@ static int decrypt_rnps(struct client_info *client, char *file_path, char *buf,
         result = -5;
         goto cleanup;
     }
+      temp_created = true;
 
     // Write the decrypted data to the output file
     ssize_t bytes_written = write(fd_out, file_buf, bytes_read);
@@ -676,13 +480,17 @@ static int decrypt_rnps(struct client_info *client, char *file_path, char *buf,
         goto cleanup;
     }
 
-    strcpy(buf, temp_path);
+    if (snprintf(buf, bufsize, "%s", temp_path) >= (int)bufsize) {
+      result = -7;
+      goto cleanup;
+    }
 
 cleanup:
     // Clean up resources
     if (fd_in >= 0) close(fd_in);
     if (fd_out >= 0) close(fd_out);
     if (file_buf) free(file_buf);
+    if (result != 0 && temp_created) unlink(temp_path);
 
     return result;
 }
@@ -823,10 +631,16 @@ static int gen_ftp_path(char *buf, size_t buf_size, struct client_info *client,
                         char *pathname) {
   int n;
 
+  if (pathname && (strcmp(pathname, "..") == 0 ||
+      strncmp(pathname, "../", 3) == 0 ||
+      strstr(pathname, "/../") != NULL ||
+      (strlen(pathname) >= 3 && strcmp(pathname + strlen(pathname) - 3, "/..") == 0)))
+    return -1;
+
   if (pathname == NULL)
     n = snprintf(buf, buf_size, "%s", client->cur_path);
-  else if (pathname[0] == '/') // Path is already absolute.
-    n = snprintf(buf, buf_size, "%s", pathname);
+  else if (pathname[0] == '/')
+    n = snprintf(buf, buf_size, "%s%s", FTP_ROOT, pathname);
   else // Concatenate both paths.
     n = snprintf(buf, buf_size, "%s%s%s", client->cur_path,
                  client->cur_path[1] == '\0' ? "" : "/", pathname);
@@ -952,6 +766,9 @@ static int dir_up(struct client_info *client) {
 #ifdef PS4 // Does not have the function access().
   char *slash = strrchr(client->cur_path, '/');
   if (slash == NULL)
+    return -1;
+
+  if (slash < client->cur_path + strlen(FTP_ROOT))
     return -1;
 
   if (slash == client->cur_path)
@@ -1664,6 +1481,8 @@ static void cmd_PORT(struct client_info *client) {
   unsigned short data_port;
   char ip_str[16];
   struct in_addr data_addr;
+  struct sockaddr_in peer_addr = {0};
+  socklen_t peer_len = sizeof(peer_addr);
   int n;
 
   n = sscanf(client->cmd_args, "%hhu,%hhu,%hhu,%hhu,%hhu,%hhu", &data_ip[0],
@@ -1674,11 +1493,21 @@ static void cmd_PORT(struct client_info *client) {
   }
 
   data_port = portlo + porthi * 256;
-  sprintf(ip_str, "%d.%d.%d.%d", data_ip[0], data_ip[1], data_ip[2],
-          data_ip[3]);
-  inet_pton(AF_INET, ip_str, &data_addr);
+  if (data_port == 0 || snprintf(ip_str, sizeof(ip_str), "%d.%d.%d.%d",
+      data_ip[0], data_ip[1], data_ip[2], data_ip[3]) >= (int)sizeof(ip_str) ||
+      inet_pton(AF_INET, ip_str, &data_addr) != 1 ||
+      getpeername(client->ctrl_sockfd, (struct sockaddr *)&peer_addr,
+                  &peer_len) < 0 || data_addr.s_addr != peer_addr.sin_addr.s_addr) {
+    send_ctrl_msg(client, RC_501);
+    return;
+  }
   client->data_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (client->data_sockfd < 0) {
+    send_ctrl_msg(client, RC_451);
+    return;
+  }
 
+  memset(&client->data_sockaddr, 0, sizeof(client->data_sockaddr));
 #ifdef PS4
   client->data_sockaddr.sin_len = sizeof(client->data_sockaddr);
 #endif
@@ -1896,7 +1725,7 @@ static void cmd_SIZE(struct client_info *client) {
   }
 
   // If file is a SELF, decrypt it to retrieve the correct file size.
-  if (is_2xx && is_self(path)) {
+  if (is_self(path)) {
       if (decrypt_temp(client, path, temp_path, sizeof(temp_path))) {
           send_ctrl_msg(client, RC_451);
           return;
@@ -1904,12 +1733,12 @@ static void cmd_SIZE(struct client_info *client) {
       debug_func(stat(temp_path, &s));
       debug_func(unlink(temp_path));
   }
-  else if (strstr(path, ".ps.bundle") != NULL || strstr(path, ".jsbundle") != NULL) {
-         if ( decrypt_rnps(client, path, temp_path, sizeof(temp_path))) {
+    else if (strstr(path, ".ps.bundle") != NULL || strstr(path, ".jsbundle") != NULL) {
+      if (decrypt_rnps(client, path, temp_path, sizeof(temp_path))) {
             send_ctrl_msg(client, RC_451);
             return;
         }
-        send_file(client, temp_path);
+     debug_func(stat(temp_path, &s));
         debug_func(unlink(temp_path));
     }
 
@@ -2261,7 +2090,7 @@ static void *client_thread(void *arg) {
       char *cmd_end = strrchr(client->cmd_line, '\n');
       if (cmd_end) {
         *cmd_end = '\0';
-        if (*--cmd_end == '\r') // Some FTP clients only use ''.
+        if (cmd_end > client->cmd_line && *--cmd_end == '\r')
           *cmd_end = '\0';
       } else {
         if (n == sizeof(client->cmd_line) - 1) {
@@ -2342,10 +2171,11 @@ static void *server_thread(void *arg) {
 
   // Create server socket.
   server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if(!server_sockfd) {
+  if(server_sockfd < 0) {
     onion_notify(true, "notify.ftp.failed", strerror(errno));
     LOG_INFO("FTP failed to start! Error %s", strerror(errno));
     run = 0; // On error, trigger server shutdown.
+    ftp_started = false;
     return NULL;
   }
   int option_value = 1;
@@ -2356,7 +2186,7 @@ static void *server_thread(void *arg) {
              sizeof(option_value));
 
   // Fill in the server's IPv4 socket address.
-  struct sockaddr_in serveraddr;
+  struct sockaddr_in serveraddr = {0};
 #ifdef PS4
   serveraddr.sin_len = sizeof(serveraddr); // This member only exists on PS4.
 #endif
@@ -2370,6 +2200,8 @@ static void *server_thread(void *arg) {
     onion_notify(true, "notify.ftp.failed", strerror(errno));
     LOG_INFO("Port %u already in use", server_port);
     run = 0; // On error, trigger server shutdown.
+    debug_func(SOCKETCLOSE(server_sockfd));
+    ftp_started = false;
     return NULL;
   }
 
@@ -2378,6 +2210,8 @@ static void *server_thread(void *arg) {
     onion_notify(true, "notify.ftp.failed", strerror(errno));
     LOG_ERROR("FTP failed to start! Error %s", strerror(errno));
     run = 0; // On error, trigger server shutdown.
+    debug_func(SOCKETCLOSE(server_sockfd));
+    ftp_started = false;
     return NULL;
   }
 
@@ -2484,10 +2318,6 @@ void fini(void) {
 
 bool StartFTP(void) {
 
-  OrbisKernelSwVersion sw;
-  sceKernelGetProsperoSystemSwVersion(&sw);
-  is_2xx = (sw.version < 0x3000000);
-
   srand(time(NULL) ^ getpid());
   ftp_started = false;
   char ftp_ip[ONION_NET_IP_ADDRESS_SIZE] = {};
@@ -2497,15 +2327,15 @@ bool StartFTP(void) {
     return false;
   }
 
-  return (ftp_started = init(ftp_ip, 1337, "/") == 0);
+  mkdir(FTP_ROOT, 0777);
+  return init(ftp_ip, 1337, FTP_ROOT) == 0;
 }
 void ShutdownFTP(void) {
-   if(!ftp_started){
+  if(!ftp_started){
       LOG_INFO("[FTP Module] FTP server not started");
       return;
    }
 	 fini(); 
-   ftp_started = false;
 }
 void check_ftp_addr_change(void) {
   static char last_ftp_ip[ONION_NET_IP_ADDRESS_SIZE] = {};
@@ -2514,8 +2344,10 @@ void check_ftp_addr_change(void) {
     return;
 
   if (strcmp(last_ftp_ip, func_ip_address) != 0) {
-    LOG_INFO("[FTP] IP Address changed, restarting FTP server");
     strncpy(last_ftp_ip, func_ip_address, sizeof(last_ftp_ip) - 1);
+    if (!ftp_started)
+      return;
+    LOG_INFO("[FTP] IP Address changed, restarting FTP server");
     ShutdownFTP();
     StartFTP();
   }

@@ -4,17 +4,24 @@
 
 
 #include <sys/types.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #ifdef LOG_TO_SOCKET
 #define SOCK_LOG(sock, format, ...)                                          \
-{                                                                            \
+do {                                                                         \
     char _macro_printfbuf[512];                                              \
-    int _macro_size = sprintf(_macro_printfbuf, format, ##__VA_ARGS__);      \
-    write(sock, _macro_printfbuf, _macro_size);                             \
-} while(0);
+    int _macro_size = snprintf(_macro_printfbuf, sizeof(_macro_printfbuf),   \
+                               format, ##__VA_ARGS__);                       \
+    if (_macro_size > 0) {                                                   \
+        if ((size_t)_macro_size >= sizeof(_macro_printfbuf))                 \
+            _macro_size = (int)sizeof(_macro_printfbuf) - 1;                \
+        (void)write(sock, _macro_printfbuf, (size_t)_macro_size);            \
+    }                                                                        \
+} while (0)
 #else
 #define SOCK_LOG(sock, format, ...) \
-    do { printf(format, ##__VA_ARGS__); } while(0);
+    do { (void)(sock); printf(format, ##__VA_ARGS__); } while (0)
 #endif
 
 struct sbl_msg_header

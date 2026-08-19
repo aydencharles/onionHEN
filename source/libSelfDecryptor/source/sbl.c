@@ -29,16 +29,21 @@ void DumpHex(int sock, const void* data, size_t size) {
     char hexbuf[0x4000];
     (void)memset(hexbuf, 0, sizeof(hexbuf));
     char *cur = hexbuf;
+    char *end = hexbuf + sizeof(hexbuf);
+#define HEX_APPEND(...) do { \
+        if (cur >= end - 1) goto dump_done; \
+        int append_len = snprintf(cur, (size_t)(end - cur), __VA_ARGS__); \
+        if (append_len < 0) goto dump_done; \
+        cur += append_len < end - cur ? append_len : (end - cur - 1); \
+    } while (0)
 
-    sprintf(cur, "hex:\n");
-    cur += strlen(cur);
+    HEX_APPEND("hex:\n");
 
     char ascii[17];
     size_t i, j;
     ascii[16] = '\0';
     for (i = 0; i < size; ++i) {
-        sprintf(cur, "%02X ", ((unsigned char*)data)[i]);
-        cur += strlen(cur);
+        HEX_APPEND("%02X ", ((unsigned char*)data)[i]);
 
         if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
             ascii[i % 16] = ((unsigned char*)data)[i];
@@ -46,29 +51,26 @@ void DumpHex(int sock, const void* data, size_t size) {
             ascii[i % 16] = '.';
         }
         if ((i+1) % 8 == 0 || i+1 == size) {
-            sprintf(cur, " ");
-            cur += strlen(cur);
+            HEX_APPEND(" ");
 
             if ((i+1) % 16 == 0) {
-                sprintf(cur, "|  %s \n", ascii);
-                cur += strlen(cur);
+                HEX_APPEND("|  %s \n", ascii);
             } else if (i+1 == size) {
                 ascii[(i+1) % 16] = '\0';
                 if ((i+1) % 16 <= 8) {
-                    sprintf(cur, " ");
-                    cur += strlen(cur);
+                    HEX_APPEND(" ");
                 }
                 for (j = (i+1) % 16; j < 16; ++j) {
-                    sprintf(cur, "   ");
-                    cur += strlen(cur);
+                    HEX_APPEND("   ");
                 }
-                sprintf(cur, "|  %s \n", ascii);
-                cur += strlen(cur);
+                HEX_APPEND("|  %s \n", ascii);
             }
         }
     }
 
+dump_done:
     sock_print(sock, hexbuf);
+#undef HEX_APPEND
 #endif
 }
 
@@ -222,17 +224,17 @@ int sceSblServiceRequest(int sock, struct sbl_msg_header *msg_header, void *in_b
 
     if (res_after == res_before) {
         SOCK_LOG(sock, "sceSblServiceRequest: request timed out\n");
+        kernel_copyout(g_sbl_kernel_data_base + g_sbl_kernel_offset_mailbox_flags, &mailbox_to_bitmap, sizeof(mailbox_to_bitmap));
+        mailbox_to_bitmap &= (~(1 << MAILBOX_NUM));
+        kernel_copyin(&mailbox_to_bitmap, g_sbl_kernel_data_base + g_sbl_kernel_offset_mailbox_flags, sizeof(mailbox_to_bitmap));
         return -1;
     }
 
 #if DEBUG
     char msg_out[0x98] = {};
-    for (int i = 0; i < 1; i++) {
-        SOCK_LOG(sock, "----- SBL response msg -----\n", i);
-        kernel_copyout(mailbox_addr, &msg_out, sizeof(msg_out));
-
-        DumpHex(sock, &msg_out, sizeof(msg_out));
-    }
+    SOCK_LOG(sock, "----- SBL response msg -----\n");
+    kernel_copyout(mailbox_addr, &msg_out, sizeof(msg_out));
+    DumpHex(sock, &msg_out, sizeof(msg_out));
 #endif
 
     kernel_copyout(mailbox_addr + 0x18, out_buf, msg_header->recv_len);
@@ -348,19 +350,16 @@ int sceSblDriverSendMsg(int sock, struct sbl_msg_header *msg_header, void *in_bu
     kernel_copyin(&mailbox_pa, mmio_space + 0x10568, sizeof(int));
     kernel_copyin(&cmd, mmio_space + 0x10564, sizeof(int));
 
-    do {
+    for (int i = 0; i < 500; i++) {
         kernel_copyout(mmio_space + 0x10564, &status, sizeof(status));
 
         if ((status & 1) != 0) {
-            break;
+            return (int) ((uint32_t) (status << 0x1E) >> 0x1F) & 0xfffffffb;
         }
 
         usleep(1000);
-    } while (1);
+    }
 
-#if DEBUG
-    SOCK_LOG(sock, "sceSblDriverSendMsg: status = 0x%08x\n", status);
-#endif
-
-    return (int) ((uint32_t) (status << 0x1E) >> 0x1F) & 0xfffffffb;
+    SOCK_LOG(sock, "sceSblDriverSendMsg: status poll timed out\n");
+    return -1;
 }

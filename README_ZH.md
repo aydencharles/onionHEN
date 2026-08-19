@@ -164,7 +164,7 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 ### Docker 构建
 
 仓库包含预装 PS5 SDK 和构建依赖的 Dockerfile 与 Compose 服务。
-如果存在本地 `.docker/pacbrew` SDK overlay，Compose 会以只读方式挂载它。
+构建会在容器内的临时副本中运行，不会改写绑定挂载的工作区。
 
 ```shell
 docker compose up --build

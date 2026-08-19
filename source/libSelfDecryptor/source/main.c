@@ -30,9 +30,12 @@ static void mkdirs(const char *dir) {
     char *p = NULL;
     size_t len;
 
+    if (!dir || dir[0] == '\0')
+        return;
+
     snprintf(tmp, sizeof(tmp), "%s", dir);
     len = strlen(tmp);
-    if (tmp[len - 1] == '/')
+    if (len > 0 && tmp[len - 1] == '/')
         tmp[len - 1] = 0;
     for (p = tmp + 1; *p; p++)
         if (*p == '/') {
@@ -112,6 +115,12 @@ int decrypt_self_by_path(const char *input_file_path, const char *output_file_pa
     if (last_slash) {
         char output_dir_path[PATH_MAX];
         long dir_path_len = last_slash - output_file_path;
+        if (dir_path_len >= (long)sizeof(output_dir_path)) {
+            printf_notification("Output path too long: %s", output_file_path);
+            munmap(out_data, output_file_size);
+            if (num_failed) (*num_failed)++;
+            return -1;
+        }
         strncpy(output_dir_path, output_file_path, dir_path_len);
         output_dir_path[dir_path_len] = '\0';
         mkdirs(output_dir_path);
@@ -201,8 +210,8 @@ static int decrypt_all_selfs_in_directory(const char *input_dir_path, const char
 int decrypt_all(const char* src_game, const char* dst_game) {
     int num_success = 0;
     int num_failed = 0;
-    decrypt_all_selfs_in_directory("/mnt/sandbox/pfsmnt", dst_game, 1, &num_success, &num_failed);
+    decrypt_all_selfs_in_directory(src_game, dst_game, 1, &num_success, &num_failed);
 
     printf_notification("Decryption Done. Success: %d, Failed: %d", num_success, num_failed);
-    return num_failed == 0;
+    return num_failed == 0 ? 0 : -1;
 }

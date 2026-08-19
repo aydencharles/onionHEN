@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -218,6 +219,11 @@ void *mmap_self(void *addr, size_t len, int prot, int flags, int fd, off_t offse
 }
 
 void *map_self_segment(int fd, Elf64_Phdr *phdr, int segment_index) {
+    int init_res = init();
+    if (init_res != 0) {
+        errno = init_res;
+        return MAP_FAILED;
+    }
     off_t offset = ((uint64_t)segment_index) << 32;
     if (fwver >= 0x900) {
         // for example, for this segment:
@@ -264,17 +270,29 @@ int decrypt_self(int input_file_fd, char **out_data, uint64_t *out_size) {
         LOG_ERROR("Failed to find ELF header offset\n");
         return DECRYPT_ERROR_INTERNAL;
     }
-    Elf64_Phdr phdrs[elf_header.e_phnum];
-    int phdrs_size = elf_header.e_phnum * sizeof(Elf64_Phdr);
+    if (elf_header.e_phnum == 0 || elf_header.e_phnum > 256) {
+        LOG_ERROR("Unexpected program header count: %u\n", elf_header.e_phnum);
+        return DECRYPT_ERROR_INPUT_NOT_SELF;
+    }
+    size_t phdrs_size = (size_t) elf_header.e_phnum * sizeof(Elf64_Phdr);
+    Elf64_Phdr *phdrs = malloc(phdrs_size);
+    if (!phdrs)
+        return DECRYPT_ERROR_INTERNAL;
     int self_elf_phdrs_offset = self_elf_header_offset + sizeof(elf_header);
-    if (pread(input_file_fd, phdrs, phdrs_size, self_elf_phdrs_offset) != phdrs_size) {
+    if (pread(input_file_fd, phdrs, phdrs_size, self_elf_phdrs_offset) != (ssize_t) phdrs_size) {
         LOG_ERROR("Failed to read program headers\n");
+        free(phdrs);
         return DECRYPT_ERROR_IO;
     }
     uint64_t output_file_size = 0;
     int version_segment_index = -1;
     for (int i = 0; i < elf_header.e_phnum; i++) {
         Elf64_Phdr *phdr = &phdrs[i];
+        if (phdr->p_offset > UINT64_MAX - phdr->p_filesz) {
+            LOG_ERROR("Program header %d has an out-of-range extent\n", i);
+            free(phdrs);
+            return DECRYPT_ERROR_INPUT_NOT_SELF;
+        }
         if (phdr->p_offset + phdr->p_filesz > output_file_size) {
             output_file_size = phdr->p_offset + phdr->p_filesz;
         }
@@ -284,11 +302,13 @@ int decrypt_self(int input_file_fd, char **out_data, uint64_t *out_size) {
     }
     if (output_file_size == 0) {
         LOG_ERROR("Output file size is zero\n");
+        free(phdrs);
         return DECRYPT_ERROR_INTERNAL;
     }
     void *out_buf = mmap(NULL, output_file_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (out_buf == MAP_FAILED) {
         LOG_ERROR("Failed to mmap output buffer | errno: %d (%s)\n", errno, strerror(errno));
+        free(phdrs);
         return DECRYPT_ERROR_INTERNAL;
     }
     for (int i = 0; i < elf_header.e_phnum; i++) {
@@ -296,14 +316,23 @@ int decrypt_self(int input_file_fd, char **out_data, uint64_t *out_size) {
         if ((phdr->p_type != PT_LOAD && phdr->p_type != PT_SCE_DYNLIBDATA && phdr->p_type != PT_SCE_RELRO && phdr->p_type != PT_SCE_COMMENT) || phdr->p_filesz == 0) {
             continue;
         }
+        if (phdr->p_offset > output_file_size ||
+            phdr->p_filesz > output_file_size - phdr->p_offset) {
+            LOG_ERROR("Segment %d does not fit the output buffer\n", i);
+            free(phdrs);
+            munmap(out_buf, output_file_size);
+            return DECRYPT_ERROR_INTERNAL;
+        }
         void *mapped_segment = map_self_segment(input_file_fd, phdr, i);
         if (mapped_segment == MAP_FAILED) {
             if (errno == ENOSYS) {
                 LOG_ERROR("Unsupported firmware version\n");
+                free(phdrs);
                 munmap(out_buf, output_file_size);
                 return DECRYPT_ERROR_UNSUPPORTED_FW;
             }
             LOG_ERROR("Failed to mmap_self segment %d | errno: %d (%s)\n", i, errno, strerror(errno));
+            free(phdrs);
             munmap(out_buf, output_file_size);
             return DECRYPT_ERROR_INTERNAL;
         }
@@ -311,6 +340,7 @@ int decrypt_self(int input_file_fd, char **out_data, uint64_t *out_size) {
         if (mlock(mapped_segment, phdr->p_filesz)) {
             LOG_ERROR("Failed to decrypt segment data | segment %d\n", i);
             munmap(mapped_segment, phdr->p_filesz);
+            free(phdrs);
             munmap(out_buf, output_file_size);
             return DECRYPT_ERROR_FAILED_TO_DECRYPT_SEGMENT_DATA;
         }
@@ -325,14 +355,29 @@ int decrypt_self(int input_file_fd, char **out_data, uint64_t *out_size) {
         struct stat input_file_stat;
         if (fstat(input_file_fd, &input_file_stat)) {
             LOG_ERROR("Failed to stat input file\n");
+            free(phdrs);
             munmap(out_buf, output_file_size);
             return DECRYPT_ERROR_IO;
         }
 
-        int version_segment_self_offset = input_file_stat.st_size - phdr->p_filesz;
-        int version_segment_elf_offset = phdr->p_offset;
+        if (phdr->p_filesz > (uint64_t) input_file_stat.st_size) {
+            LOG_ERROR("Version segment does not fit the input file\n");
+            free(phdrs);
+            munmap(out_buf, output_file_size);
+            return DECRYPT_ERROR_INPUT_NOT_SELF;
+        }
+        off_t version_segment_self_offset = input_file_stat.st_size - (off_t) phdr->p_filesz;
+        uint64_t version_segment_elf_offset = phdr->p_offset;
+        if (version_segment_elf_offset > output_file_size ||
+            phdr->p_filesz > output_file_size - version_segment_elf_offset) {
+            LOG_ERROR("Version segment does not fit the output buffer\n");
+            free(phdrs);
+            munmap(out_buf, output_file_size);
+            return DECRYPT_ERROR_INTERNAL;
+        }
         if (pread(input_file_fd, out_buf + version_segment_elf_offset, phdr->p_filesz, version_segment_self_offset) != (ssize_t)phdr->p_filesz) {
             LOG_ERROR("Failed to read version segment from input file\n");
+            free(phdrs);
             munmap(out_buf, output_file_size);
             return DECRYPT_ERROR_IO;
         }
@@ -340,6 +385,7 @@ int decrypt_self(int input_file_fd, char **out_data, uint64_t *out_size) {
     // copy elf header
     memcpy(out_buf, &elf_header, sizeof(elf_header));
     memcpy(out_buf + sizeof(elf_header), phdrs, phdrs_size);
+    free(phdrs);
 
     *out_data = out_buf;
     *out_size = output_file_size;

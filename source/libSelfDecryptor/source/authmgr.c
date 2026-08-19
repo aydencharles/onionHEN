@@ -20,7 +20,7 @@ int _sceSblAuthMgrSmFinalize(int sock, int authmgr_handle, int context_id)
     msg.to_ret        = authmgr_handle;
 
     finalize.function = SBL_FUNC_AUTHMGR_FINALIZE;
-    finalize.context_id = 0;
+    finalize.context_id = (uint32_t) context_id;
 
     return sceSblServiceRequest(sock, &msg, &finalize, &finalize);
 }
@@ -46,6 +46,9 @@ int _sceSblAuthMgrVerifyHeader(int sock, int authmgr_handle, uint64_t header_pa,
     if (err != 0)
         return err;
 
+    if (verify.res != 0)
+        return (int) verify.res;
+
     return (int) verify.service_id;
 }
 
@@ -65,8 +68,12 @@ int _sceSblAuthMgrSmLoadSelfSegment(int sock, int authmgr_handle, int service_id
     load.segment_index      = segment_index;
     load.is_block_table     = 0x01;
     load.service_id         = service_id;
+    load.res                = -1;
 
-    return sceSblServiceRequest(sock, &msg, &load, &load);
+    int res = sceSblServiceRequest(sock, &msg, &load, &load);
+    if (res == 0 && load.res != 0)
+        res = (int) load.res;
+    return res;
 }
 
 int _sceSblAuthMgrSmLoadSelfBlock(
@@ -84,6 +91,15 @@ int _sceSblAuthMgrSmLoadSelfBlock(
     struct sbl_authmgr_load_block load = {};
     uint64_t size_one;
     uint64_t size_two;
+
+    if (!segment || !block_segment || !block_segment->extents ||
+        !block_segment->digests || block_idx < 0 ||
+        (uint64_t) block_idx >= block_segment->block_count ||
+        !SELF_SEGMENT_HAS_DIGESTS(segment) ||
+        !SELF_SEGMENT_HAS_BLOCKINFO(segment) ||
+        !block_segment->extents[block_idx] ||
+        !block_segment->digests[block_idx])
+        return -1;
 
     msg.cmd                 = 6;
     msg.query_len           = 0x80;
@@ -103,12 +119,12 @@ int _sceSblAuthMgrSmLoadSelfBlock(
         size_one = block_segment->extents[block_idx]->len & ~0xF;
         size_two = size_one - (block_segment->extents[block_idx]->len & 0xF);
     } else {
-        // size_one = size_two = SELF_SEGMENT_BLOCK_SIZE(segment);
-        // if (segment->uncompressed_size - SELF_SEGMENT_BLOCK_SIZE(segment) < SELF_SEGMENT_BLOCK_SIZE(segment)) {
-        //     size_one = size_two = segment->uncompressed_size - SELF_SEGMENT_BLOCK_SIZE(segment);
-        // }
-
-        size_one = size_two = block_segment->extents[block_idx]->len;
+        size_one = size_two = SELF_SEGMENT_BLOCK_SIZE(segment);
+        uint64_t block_offset = (uint64_t) block_idx * SELF_SEGMENT_BLOCK_SIZE(segment);
+        if (block_offset >= segment->uncompressed_size)
+            return -1;
+        if (segment->uncompressed_size - block_offset < size_one)
+            size_one = size_two = segment->uncompressed_size - block_offset;
     }
 
     load.aligned_size       = size_two;

@@ -30,11 +30,21 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 	$<$<COMPILE_LANGUAGE:C>:${C_DEFS} ${C_FLAGS}>
 )
 
-set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS_MARCH} ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_POSIX_SOURCE -D_POSIX_C_SOURCE=200112 -D__BSD_VISIBLE=1 -D__XSI_VISIBLE=500")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-builtin -nostdlib -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -gfull -O3 -march=znver2 -Wall -Werror")
+target_compile_options(${PROJECT_NAME} PRIVATE
+  ${ONION_PS5_TARGET_FLAGS}
+  -D_POSIX_SOURCE
+  -D_POSIX_C_SOURCE=200112
+  -D__BSD_VISIBLE=1
+  -D__XSI_VISIBLE=500
+  -fno-builtin
+  -fPIC
+  -gfull
+  -O3
+  -Wall
+  -Werror
+)
+
+onion_target_debug_define(${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
   "${D_CWD}/include"

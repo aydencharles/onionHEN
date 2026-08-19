@@ -163,7 +163,7 @@ OnionHEN/
 |------|-------------|------|
 | Cheats | IPC | flat-file cheat engine（flat `TITLE_VERSION.ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | ShellCore / ShellUI 补丁 | — | 休息模式恢复、toolbox 激活等 |
-| FTP | TCP 1337 | Servidor FTP opcional, controlado desde Toolbox o `network.ftp` |
+| FTP | TCP 1337 | 可选 FTP 服务，可通过 Toolbox 或 `network.ftp` 控制 |
 
 > **已移除：** Klog 网络服务（9081）、Legacy CMD（9028）。
 > 注意：代码里仍使用 `ps5/klog.h` 的 `klog_printf` / `klog_puts`，那是内核日志 API，不是 9081 服务。
@@ -318,6 +318,7 @@ struct IPCMessage {
 - `BREW_UTIL_LAUNCH_PAYLOAD`
 - `BREW_UTIL_GET_GAME_VER` / `BREW_UTIL_GET_GAME_CHEAT` / `BREW_UTIL_TOGGLE_CHEAT`
 - `BREW_UTIL_DOWNLOAD_CHEATS` / `BREW_UTIL_CHEAT_SYNC_STATUS`（git catalog 同步；`RELOAD_CHEATS` 已移除，热重载靠文件签名）
+- `BREW_UTIL_TOGGLE_FTP`（FTP 服务，端口 1337；`BREW_UTIL_UNUSED_FTP` 保留为兼容别名）
 - `BREW_UTIL_UNUSED_DOWNLOAD_KSTUFF`
 - `BREW_UTIL_SHELLUI_ON_STANDBY`
 
@@ -327,7 +328,6 @@ struct IPCMessage {
 - `BREW_UTIL_UNUSED_LEGACY_CMD_SERVER`（原 TOGGLE_LEGACY_CMD_SERVER / TCP 9028 已移除）
 - `BREW_UNUSED_DECRYPT_DIR`（原 DECRYPT_DIR，SELF 目录解密已移除）
 - `BREW_UNUSED_TESTKIT_CHECK`（原 TESTKIT_CHECK；客户端改为本地探测）
-- `BREW_UTIL_TOGGLE_FTP`（FTP 服务，端口 1337；`BREW_UTIL_UNUSED_FTP` 保留为兼容别名）
 - `BREW_UTIL_UNUSED_KLOG`（原 TOGGLE_KLOG）
 - `BREW_UTIL_LAUNCH_ELFLDR`（旧手动启动命令；内置 9020 由 bootstrapper 管理）
 
@@ -376,6 +376,7 @@ struct IPCMessage {
 ### 4.3 网络服务
 
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
+- 可选 FTP 服务监听 TCP 1337，由 `BREW_UTIL_TOGGLE_FTP` 和 `network.ftp` 控制
 
 ### 4.4 扩展
 
@@ -387,7 +388,6 @@ struct IPCMessage {
 | 能力 | 说明 |
 |------|------|
 | 内嵌 9021 elfldr | 改为内置私有 9020 loader；9021 只作为外部首次引导 / 9020 恢复通道 |
-| FTP 1337 | util 提供服务，Toolbox 可启停 |
 | Legacy CMD 9028 | util TCP hijacker 协议与 Toolbox 开关已移除；app JB 仅 FIFO |
 | Klog server 9081 | 服务与 Toolbox 开关已移除 |
 | ps5debug / app-dumper | 不再内嵌 |

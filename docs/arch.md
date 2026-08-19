@@ -167,6 +167,9 @@ OnionHEN/
 | FTP | TCP 2121 | 内嵌 `ftpsrv`，由 Toolbox 网络菜单实时启停 |
 | ShadowMountPlus | util IPC / embedded ELF | 扫描并挂载配置的 PS5 游戏来源 |
 
+ShadowMountPlus 使用 [Drakmor 的项目](https://github.com/drakmor/ShadowMountPlus)，
+其发展源自 VoidWhisper 的 ShadowMount；OnionHEN 嵌入并按启动顺序拉起该 payload。
+
 > **已移除：** Klog 网络服务（9081）、Legacy CMD（9028）。
 > 注意：代码里仍使用 `ps5/klog.h` 的 `klog_printf` / `klog_puts`，那是内核日志 API，不是 9081 服务。
 

@@ -795,7 +795,11 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                   .label("id_project_10",
                     "ftpsrv (drakmor) — "
                     "https://github.com/drakmor/ftpsrv/tree/nexgen",
-                    ps5ui::Style::Center);
+                    ps5ui::Style::Center)
+                  .label("id_project_11",
+                      "ShadowMountPlus (Drakmor / VoidWhisper) — "
+                      "https://github.com/drakmor/ShadowMountPlus",
+                      ps5ui::Style::Center);
           },
           toolbox_i18n::tr("about.projects.sub"), kIconProject);
 }

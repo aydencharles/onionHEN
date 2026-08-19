@@ -13,6 +13,9 @@
 #ifndef ONIONHEN_FTPSRV_ELF
 #define ONIONHEN_FTPSRV_ELF "../assets/ftpsrv-ps5.elf"
 #endif
+#ifndef ONIONHEN_SHADOWMOUNT_ELF
+#define ONIONHEN_SHADOWMOUNT_ELF "../assets/shadowmountplus.elf"
+#endif
 #ifndef ONIONHEN_ICON_ASSET_DIR
 #define ONIONHEN_ICON_ASSET_DIR "../assets"
 #endif
@@ -94,4 +97,16 @@ __asm__(".intel_syntax noprefix\n"
     ".align  4\n"
     "ftpsrv_size:\n"
     ".int    ftpsrv_end - ftpsrv_start\n"
+
+    ".global shadowmount_start\n"
+    ".type   shadowmount_start, @object\n"
+    ".align  16\n"
+    "shadowmount_start:\n"
+    ".incbin \"" ONIONHEN_SHADOWMOUNT_ELF "\"\n"
+    "shadowmount_end:\n"
+    ".global shadowmount_size\n"
+    ".type   shadowmount_size, @object\n"
+    ".align  4\n"
+    "shadowmount_size:\n"
+    ".int    shadowmount_end - shadowmount_start\n"
 );

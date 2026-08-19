@@ -79,6 +79,8 @@ along with this program; see the file COPYING. If not, see
  extern const unsigned int kstuff_size;
  extern uint8_t ftpsrv_start[];
  extern const unsigned int ftpsrv_size;
+ extern uint8_t shadowmount_start[];
+ extern const unsigned int shadowmount_size;
 
  }
 
@@ -784,6 +786,23 @@ static int launch_chain(const OrbisKernelSwVersion &sys_ver) {
     }
   } else {
     LOG_DEBUG("FTP server disabled (ftp.autoload=false)");
+  }
+
+  kill_by_name("shadowmountplus.elf", "shadowmountplus");
+  if (boot_settings.shadowmount_autoload) {
+    LOG_DEBUG("Loading ShadowMount+ via %u ...", g_payload_loader_port);
+    uint8_t *override_elf = nullptr;
+    size_t override_size = 0;
+    if (if_exists("/data/OnionHEN/shadowmountplus.elf"))
+      override_elf = onion_payload_read_file(
+          "/data/OnionHEN/shadowmountplus.elf", &override_size);
+    const uint8_t *self = override_elf ? override_elf : shadowmount_start;
+    const size_t self_size = override_elf ? override_size : (size_t)shadowmount_size;
+    if (!launch_blob(self, self_size, "shadowmountplus", "shadowmountplus.elf"))
+      LOG_WARN("failed to launch ShadowMount+; continuing without it");
+    free(override_elf);
+  } else {
+    LOG_DEBUG("ShadowMount+ disabled (shadowmount.autoload=false)");
   }
 
   LOG_DEBUG("Starting daemon via %u (toolbox inject) ...",

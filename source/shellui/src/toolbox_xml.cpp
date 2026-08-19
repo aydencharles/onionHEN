@@ -474,7 +474,25 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
                         std::nullopt, toolbox_i18n::tr("kstuff.delete.desc"));
           },
           toolbox_i18n::tr("kstuff.group.sub"), kIconKstuff,
-          "id_kstuff_autoload");
+            "id_kstuff_autoload")
+          .group(
+            "id_shadowmount_opts", toolbox_i18n::tr("shadowmount.group"),
+            [](ps5ui::Group& shadowmount) {
+            shadowmount
+              .toggle("id_shadowmount_autoload",
+                  toolbox_i18n::tr("shadowmount.autoload"),
+                  toolbox_on("id_shadowmount_autoload"),
+                  toolbox_i18n::tr("shadowmount.autoload.sub"))
+              .button("id_shadowmount_scan",
+                  toolbox_i18n::tr("shadowmount.scan"), std::nullopt,
+                  toolbox_i18n::tr("shadowmount.scan.sub"))
+              .button("id_shadowmount_remove_external",
+                  toolbox_i18n::tr("shadowmount.remove_external"),
+                  std::nullopt,
+                  toolbox_i18n::tr("shadowmount.remove_external.desc"));
+            },
+            toolbox_i18n::tr("shadowmount.group.sub"), kIconKstuff,
+            "id_shadowmount_autoload");
 }
 
 void append_toolbox_game_group(ps5ui::Group& g) {

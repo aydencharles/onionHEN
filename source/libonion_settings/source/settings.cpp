@@ -601,6 +601,8 @@ bool apply_parser(IniParser *parser, Settings *out) {
       parse_bool(ini_get(parser, "kstuff.autoload"), out->kstuff_autoload);
   out->ftp_autoload =
       parse_bool(ini_get(parser, "ftp.autoload"), out->ftp_autoload);
+    out->shadowmount_autoload = parse_bool(
+      ini_get(parser, "shadowmount.autoload"), out->shadowmount_autoload);
   return true;
 }
 
@@ -777,6 +779,10 @@ std::string settings_serialize(const Settings &in) {
   b += "# autoload loads the embedded PS5 ftpsrv payload when OnionHEN starts.\n";
   b += "# Available values: true, false\n";
   b += "autoload=" + bool_text(in.ftp_autoload) + "\n";
+  b += "\n[shadowmount]\n";
+  b += "# autoload launches ShadowMountPlus when OnionHEN starts.\n";
+  b += "# Available values: true, false\n";
+  b += "autoload=" + bool_text(in.shadowmount_autoload) + "\n";
   return b;
 }
 

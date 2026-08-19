@@ -4,7 +4,7 @@
 # Phases:
 #   1) configure (prospero-cmake / PS5 payload SDK)
 #   2) build libs + shellui
-#   3) stage external dependency blob (kstuff)
+#   3) stage external dependency blobs (kstuff, ftpsrv, ShadowMountPlus)
 #   4) build daemon + util
 #   5) build bootstrapper  (-> bin/bootstrapper.elf + .lzma)
 #   6) build unpacker / OnionHEN.elf   (embeds bootstrapper.elf.lzma)
@@ -90,7 +90,8 @@ Third-party (git submodules under third_party/ + release downloads):
   See third_party/README.md and scripts/sync_dependencies.sh
 
   kstuff.elf              <- EchoStretch/kstuff-lite
-  ftpsrv-ps5.elf          <- drakmor/ftpsrv (nexgen)
+  ftpsrv-ps5.elf          <- drakmor/ftpsrv (nexgen), staged by sync_dependencies.sh
+  shadowmountplus.elf     <- drakmor/ShadowMountPlus (pinned commit), staged by sync_dependencies.sh
 
   External elfldr @ 9021 is required for initial bootstrap but is not vendored.
   OnionHEN embeds its private runtime loader as onion_elfldr.elf @ 9020.
@@ -269,23 +270,6 @@ stage_dependencies() {
     "${ROOT}/scripts/sync_dependencies.sh" "${args[@]+"${args[@]}"}"
 }
 
-stage_ftpsrv() {
-  local source_dir="${ROOT}/third_party/ftpsrv"
-  local source_elf="${source_dir}/ftpsrv-ps5.elf"
-  local dest="${CACHE}/ftpsrv-ps5.elf"
-
-  [[ -d "${source_dir}" ]] || die "missing ftpsrv submodule: ${source_dir}"
-  [[ -f "${source_dir}/Makefile.ps5" ]] || die "missing ftpsrv PS5 Makefile"
-
-  log "Building ftpsrv PS5 payload"
-  make -C "${source_dir}" -f Makefile.ps5 clean all \
-    PS5_PAYLOAD_SDK="${PS5_PAYLOAD_SDK}"
-  [[ -f "${source_elf}" ]] || die "ftpsrv build did not produce ${source_elf}"
-  mkdir -p "${CACHE}"
-  cp -f "${source_elf}" "${dest}"
-  ok "ftpsrv-ps5.elf staged -> ${dest}"
-}
-
 # ---------------------------------------------------------------------------
 # Configure
 # ---------------------------------------------------------------------------
@@ -319,6 +303,7 @@ configure() {
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DONIONHEN_KSTUFF_ELF="${CACHE}/kstuff.elf" \
     -DONIONHEN_FTPSRV_ELF="${CACHE}/ftpsrv-ps5.elf" \
+    -DONIONHEN_SHADOWMOUNT_ELF="${CACHE}/shadowmountplus.elf" \
     -DPS5_PAYLOAD_SDK="${PS5_PAYLOAD_SDK}"
   ok "configured -> ${BUILD}"
 }
@@ -344,7 +329,6 @@ main() {
   clean_build_artifacts
   ensure_sdk_libcxx
   stage_dependencies
-  stage_ftpsrv
   configure
 
   if [[ "${CONFIGURE_ONLY}" -eq 1 ]]; then
@@ -368,16 +352,16 @@ main() {
   fi
 
   # Phase 2 — daemons
-  log "Phase 2/4: util + daemon"
+  log "Phase 2/5: util + daemon"
   build_targets util daemon
 
   for f in daemon.elf util.elf; do
-    [[ -f "${BIN}/${f}" ]] || die "missing ${BIN}/${f} after phase 3"
+    [[ -f "${BIN}/${f}" ]] || die "missing ${BIN}/${f} after phase 2"
     ok "built ${f}"
   done
 
-  # Phase 3 — bootstrapper (embeds daemon/util + kstuff + ftpsrv + assets)
-  log "Phase 3/4: bootstrapper"
+  # Phase 3 — bootstrapper (embeds daemon/util + kstuff + ftpsrv + ShadowMountPlus + assets)
+  log "Phase 3/5: bootstrapper"
   build_targets bootstrapper bootstrapper_packed
 
   # CMake declares bootstrapper.elf.lzma as an output and compresses it from

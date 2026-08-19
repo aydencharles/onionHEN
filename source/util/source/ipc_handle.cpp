@@ -3,6 +3,7 @@
  * Transport (listen/accept/thread) stays in msg.cpp.
  */
 #include <onion/platform.h>
+#include <onion/payload.h>
 #include "ipc.hpp"
 #include "rest_mode.hpp"
 #include <msg.hpp>
@@ -36,6 +37,8 @@ extern "C" {
 extern bool is_handler_enabled;
 extern uint8_t ftpsrv_start[];
 extern const unsigned int ftpsrv_size;
+extern uint8_t shadowmount_start[];
+extern const unsigned int shadowmount_size;
 
 void reply(int sender_socket, bool error, std::string out_var = "Nothing");
 extern "C" {
@@ -46,6 +49,28 @@ std::string GetPS5Version(const std::string &jsonpath);
 std::vector<uint8_t> readFile(std::string filename);
 
 namespace {
+
+bool launch_shadowmount() {
+  constexpr const char *kExternalPath =
+      "/data/OnionHEN/shadowmountplus.elf";
+
+  if (access(kExternalPath, R_OK) == 0) {
+    LOG_INFO("Launching external ShadowMount+ from %s", kExternalPath);
+    if (load_payload(kExternalPath))
+      return true;
+    LOG_WARN("External ShadowMount+ failed validation or launch: %s",
+             kExternalPath);
+  }
+
+  if (!onion_payload_is_elf(shadowmount_start, shadowmount_size)) {
+    LOG_ERROR("Embedded ShadowMount+ ELF is missing or invalid");
+    return false;
+  }
+
+  const pid_t pid = onion_payload_launch_elfldr(
+      "shadowmountplus", shadowmount_start, shadowmount_size);
+  return pid > 1;
+}
 
 std::string make_state_json(const char *state, uint32_t task_id = 0) {
   cJSON *root = cJSON_CreateObject();
@@ -129,6 +154,9 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false);
     break;
   }
+  case BREW_UTIL_LAUNCH_SHADOWMOUNT:
+    reply(sender_app, !launch_shadowmount());
+    break;
   case BREW_UTIL_UNUSED_KLOG:
   case BREW_UTIL_UNUSED_DPI:
     /* Klog (9081) and DirectPKGInstaller remain removed; ordinals stay stable. */

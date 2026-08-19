@@ -5,3 +5,7 @@
 	path = third_party/ftpsrv
 	url = https://github.com/drakmor/ftpsrv.git
 	branch = nexgen
+[submodule "third_party/ShadowMountPlus"]
+	path = third_party/ShadowMountPlus
+	url = https://github.com/drakmor/ShadowMountPlus.git
+	branch = main

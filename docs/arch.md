@@ -48,10 +48,11 @@ OnionHEN 是 PS5 的 All-in-One Homebrew Enabler，基于 **etaHEN**（Lightning
   Unix IPC                       ShellUI monitor bar
 ```
 
-**启动顺序有意串行化：** util → kstuff → daemon。
+**启动顺序有意串行化：** util → kstuff → ftpsrv → ShadowMountPlus → daemon。
 
 - util 先提供网络/IPC 等服务
 - kstuff 需先完成 ShellUI 补丁
+- ftpsrv 与 ShadowMountPlus 在 bootstrapper 中按配置启动
 - daemon 再注入 Toolbox
 
 若并行 ptrace 同一进程，容易导致 Toolbox 超时或崩溃。
@@ -164,6 +165,7 @@ OnionHEN/
 | Cheats | IPC | flat-file cheat engine（flat `TITLE_VERSION.ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | ShellCore / ShellUI 补丁 | — | 休息模式恢复、toolbox 激活等 |
 | FTP | TCP 2121 | 内嵌 `ftpsrv`，由 Toolbox 网络菜单实时启停 |
+| ShadowMountPlus | util IPC / embedded ELF | 扫描并挂载配置的 PS5 游戏来源 |
 
 > **已移除：** Klog 网络服务（9081）、Legacy CMD（9028）。
 > 注意：代码里仍使用 `ps5/klog.h` 的 `klog_printf` / `klog_puts`，那是内核日志 API，不是 9081 服务。
@@ -384,6 +386,7 @@ struct IPCMessage {
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
 - **FTP**：内嵌 `ftpsrv`，通过 `BREW_UTIL_TOGGLE_FTP` 从 Toolbox 实时启停，监听 TCP **2121**
 - **Remote Play**：ShellUI 直接调用 PS5 原生 Remote Play API 完成 PIN 生成和客户端注册确认，不实现独立串流协议
+- **ShadowMountPlus**：ShellUI 通过 util IPC 选择外部覆盖 ELF 或内嵌 ELF，并经私有 9020 loader 启动 `shadowmountplus.elf`；其 release 为 `1.6beta16`，ShadowMountPlus 自己负责扫描与挂载，OnionHEN 不增加另一层配置系统
 
 ### 4.4 扩展
 

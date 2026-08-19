@@ -368,6 +368,17 @@ IPC_Ret IPC_Client::LaunchPayload(std::string payload_path, std::string tid) {
   return IPC_Ret::NO_ERROR;
 }
 
+bool IPC_Client::LaunchShadowMount() {
+  if (!require_util("LaunchShadowMount"))
+    return false;
+  std::string reply_text;
+  if (!IPCSendCommand(BREW_UTIL_LAUNCH_SHADOWMOUNT, reply_text, "{}")) {
+    LOG_ERROR("Failed to launch ShadowMount+");
+    return false;
+  }
+  return true;
+}
+
 bool IPC_Client::GameVerFromTid(std::string tid, std::string &out_ver) {
   if (!require_util("GameVerFromTid")) {
     return false;

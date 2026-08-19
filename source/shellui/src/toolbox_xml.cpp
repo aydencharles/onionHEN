@@ -490,7 +490,9 @@ void append_toolbox_game_group(ps5ui::Group& g) {
 void append_toolbox_network_group(ps5ui::Group& g) {
   g.toggle("id_ftp_autoload", toolbox_i18n::tr("ftp.autoload"),
            toolbox_on("id_ftp_autoload"),
-           toolbox_i18n::tr("ftp.autoload.sub"));
+           toolbox_i18n::tr("ftp.autoload.sub"))
+      .link("id_remote_play", toolbox_i18n::tr("remote_play.title"),
+            "remote_play.xml", toolbox_i18n::tr("remote_play.sub"));
 }
 
 void append_toolbox_display_group(ps5ui::Group& g) {

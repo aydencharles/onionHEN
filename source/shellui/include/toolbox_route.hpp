@@ -22,6 +22,7 @@ enum class Page : unsigned char {
   Account,
   Plapps,
   CheatProgress,
+  RemotePlay,
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
 };
@@ -69,6 +70,8 @@ inline constexpr std::string_view kPlappsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.plapps.xml";
 inline constexpr std::string_view kCheatProgressXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.cheat_progress.xml";
+inline constexpr std::string_view kRemotePlayXml =
+  "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.remote_play.xml";
 inline constexpr std::string_view kSuperuserXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.superuser.xml";
 inline constexpr std::string_view kOgDebugXml =

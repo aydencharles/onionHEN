@@ -42,6 +42,8 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::Plapps;
   } else if (out.flags.is_cheat_progress) {
     out.page = Page::CheatProgress;
+  } else if (in.resource == kRemotePlayXml) {
+    out.page = Page::RemotePlay;
   } else if (out.flags.is_su_menu) {
     out.page = Page::SuperuserPass;
   } else {

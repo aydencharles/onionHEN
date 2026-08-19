@@ -508,6 +508,12 @@ extern  int (*sceKernelJitMapSharedMemory)(int handle, int protection, void **de
 extern int(*ioctl)(int, int, void*);
 extern int (*sceRegMgrGetInt)(long, int*);
 
+/* ====================================== Dynamic Remote Play Symbols ===================================*/
+extern int (*sceRemoteplayInitialize)(void*, size_t);
+extern int (*sceRemoteplayGeneratePinCode)(uint32_t*);
+extern int (*sceRemoteplayConfirmDeviceRegist)(int*, int*);
+extern int (*sceRemoteplayNotifyPinCodeError)(int);
+
 
 /* ====================================== Dynamic Mono Symbols ===================================*/
 extern MonoArray* (*mono_array_new)(MonoDomain* domain, MonoClass* eclass, uint32_t size);

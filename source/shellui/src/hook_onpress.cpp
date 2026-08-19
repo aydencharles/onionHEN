@@ -75,6 +75,9 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
     break;
   case toolbox::OnPressDomain::Progress:
     break;
+  case toolbox::OnPressDomain::RemotePlay:
+    run_exact(onpress_network_exact);
+    break;
   case toolbox::OnPressDomain::PassThrough:
     break;
   }

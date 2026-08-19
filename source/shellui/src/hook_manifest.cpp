@@ -21,6 +21,7 @@ void generate_toolbox_xml(std::string &new_xml);
 void generate_cheats_xml(std::string &new_xml, std::string &not_open_tid,
                          bool running_as_debug_settings,
                          bool show_while_not_open);
+void generate_remote_play_xml(std::string &new_xml);
 
 static MonoDomain *current_mono_domain() {
   MonoDomain *domain = (mono_domain_get ? mono_domain_get() : nullptr);
@@ -127,6 +128,9 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     break;
   case toolbox::Page::CheatProgress:
     generate_cheat_progress_xml(new_xml_string);
+    break;
+  case toolbox::Page::RemotePlay:
+    generate_remote_play_xml(new_xml_string);
     break;
   default:
     return GetManifestResourceStream_Original(inst, FileName);

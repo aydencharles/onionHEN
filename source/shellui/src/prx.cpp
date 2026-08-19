@@ -260,6 +260,18 @@ bool resolve_native_symbols(pid_t pid, void*& out_sceAppInstUtilInstallByPackage
   int reg = get_module_handle(pid, "libSceRegMgr.sprx");
   KERNEL_DLSYM(reg, sceRegMgrGetInt);
 
+  int remoteplay = get_module_handle(pid, "libSceRemoteplay.sprx");
+  LOG_DEBUG("Remote Play module handle: %d", remoteplay);
+  KERNEL_DLSYM(remoteplay, sceRemoteplayInitialize);
+  KERNEL_DLSYM(remoteplay, sceRemoteplayGeneratePinCode);
+  KERNEL_DLSYM(remoteplay, sceRemoteplayConfirmDeviceRegist);
+  KERNEL_DLSYM(remoteplay, sceRemoteplayNotifyPinCodeError);
+  LOG_DEBUG("Remote Play symbols: init=%p pin=%p confirm=%p invalidate=%p",
+            reinterpret_cast<void *>(sceRemoteplayInitialize),
+            reinterpret_cast<void *>(sceRemoteplayGeneratePinCode),
+            reinterpret_cast<void *>(sceRemoteplayConfirmDeviceRegist),
+            reinterpret_cast<void *>(sceRemoteplayNotifyPinCodeError));
+
   return true;
 }
 

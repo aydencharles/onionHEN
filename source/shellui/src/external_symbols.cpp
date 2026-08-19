@@ -98,6 +98,10 @@ MonoObject* (*mono_vtable_get_static_field_data)(MonoVTable* vt) = nullptr;
 void* (*mono_object_unbox)(MonoObject* obj) = nullptr;
 int(*ioctl)(int, int, void*) = nullptr;
 int (*sceRegMgrGetInt)(long, int*) = nullptr;
+int (*sceRemoteplayInitialize)(void*, size_t) = nullptr;
+int (*sceRemoteplayGeneratePinCode)(uint32_t*) = nullptr;
+int (*sceRemoteplayConfirmDeviceRegist)(int*, int*) = nullptr;
+int (*sceRemoteplayNotifyPinCodeError)(int) = nullptr;
 
 int (*sceShellUIUtilInitialize)(void) = nullptr;
 int (*sceShellUIUtilLaunchByUri)(const char* uri, SceShellUIUtilLaunchByUriParam* Param) = nullptr;

@@ -19,6 +19,7 @@ enum class OnPressDomain : unsigned char {
   Account,
   Plapps,
   Progress,
+  RemotePlay,
 };
 
 /**
@@ -41,6 +42,8 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
     return OnPressDomain::Plapps;
   case Page::CheatProgress:
     return OnPressDomain::Progress;
+  case Page::RemotePlay:
+    return OnPressDomain::RemotePlay;
   case Page::None:
   case Page::SuperuserPass:
   case Page::RedirectOgDebug:

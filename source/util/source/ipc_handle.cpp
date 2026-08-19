@@ -18,6 +18,7 @@ extern "C" {
 #include <sys/ioctl.h>
 }
 #include "onion_cjson.hpp"
+#include <elfldr_remote.h>
 #include "cheats/cheat_service.hpp"
 #include "cheats/runtime.h"
 #include "cheats/sync/cheat_sync_service.hpp"
@@ -33,6 +34,8 @@ extern "C" {
 #include <vector>
 
 extern bool is_handler_enabled;
+extern uint8_t ftpsrv_start[];
+extern const unsigned int ftpsrv_size;
 
 void reply(int sender_socket, bool error, std::string out_var = "Nothing");
 extern "C" {
@@ -108,10 +111,27 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false);
     break;
   }
-  case BREW_UTIL_UNUSED_FTP:
+  case BREW_UTIL_TOGGLE_FTP: {
+    const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
+                                                            "toggle");
+    const bool enabled = toggle && cJSON_IsNumber(toggle) && toggle->valueint;
+    if (enabled) {
+      onion_payload_stop_by_title("ftpsrv");
+      if (!elfldr_remote_send_bytes_to(ONION_ELFLDR_PORT, ftpsrv_start,
+                                       (size_t)ftpsrv_size)) {
+        LOG_ERROR("Failed to start embedded ftpsrv");
+        reply(sender_app, true);
+        break;
+      }
+    } else {
+      onion_payload_stop_by_title("ftpsrv");
+    }
+    reply(sender_app, false);
+    break;
+  }
   case BREW_UTIL_UNUSED_KLOG:
   case BREW_UTIL_UNUSED_DPI:
-    /* FTP (1337), Klog (9081), and DirectPKGInstaller removed; ordinals kept for IPC compat. */
+    /* Klog (9081) and DirectPKGInstaller remain removed; ordinals stay stable. */
     LOG_WARN("Removed-service toggle: unsupported (cmd=%u)", static_cast<unsigned>(command));
     reply(sender_app, true);
     break;

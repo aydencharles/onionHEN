@@ -1,3 +1,7 @@
 [submodule "third_party/kstuff-lite"]
 	path = third_party/kstuff-lite
 	url = https://github.com/EchoStretch/kstuff-lite.git
+[submodule "third_party/ftpsrv"]
+	path = third_party/ftpsrv
+	url = https://github.com/drakmor/ftpsrv.git
+	branch = nexgen

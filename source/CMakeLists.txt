@@ -12,6 +12,8 @@ set(ONIONHEN_COMMON_DIR "${PROJECT_ROOT}/common")
 set(ONIONHEN_PS5_STUB_DIR "${PROJECT_ROOT}/platform/ps5/stubs")
 set(ONIONHEN_KSTUFF_ELF "${ONIONHEN_ROOT}/.cache/dependencies/kstuff.elf"
 	CACHE FILEPATH "Path to the kstuff ELF embedded by the bootstrapper")
+set(ONIONHEN_FTPSRV_ELF "${ONIONHEN_ROOT}/.cache/dependencies/ftpsrv-ps5.elf"
+	CACHE FILEPATH "Path to the PS5 ftpsrv ELF embedded by the bootstrapper")
 set(ONIONHEN_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/include")
 set(ONIONHEN_VERSION_HEADER
 	"${ONIONHEN_GENERATED_INCLUDE_DIR}/onion/version.h")

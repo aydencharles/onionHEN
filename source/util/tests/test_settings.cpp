@@ -56,6 +56,7 @@ static int test_defaults_and_serialize_keys(void) {
   TEST_ASSERT_TRUE(text.find("mirror=auto") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[kstuff]\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("autoload=true") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("[ftp]\n") != std::string::npos);
   return 0;
 }
 

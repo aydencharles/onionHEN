@@ -77,6 +77,8 @@ along with this program; see the file COPYING. If not, see
 
  extern uint8_t kstuff_start[];
  extern const unsigned int kstuff_size;
+ extern uint8_t ftpsrv_start[];
+ extern const unsigned int ftpsrv_size;
 
  }
 
@@ -352,6 +354,7 @@ static void cleanup(void);
 
     return startup_icon_ready;
 }
+
 
 static void notify_starting(bool custom_icon_ready) {
   if (!custom_icon_ready) {
@@ -770,6 +773,17 @@ static int launch_chain(const OrbisKernelSwVersion &sys_ver) {
     }
   } else {
     onion_ready_signal(ONION_READY_KSTUFF);
+  }
+
+  kill_by_name("ftpsrv.elf", "ftpsrv");
+  if (boot_settings.ftp_autoload) {
+    LOG_DEBUG("Loading ftpsrv via %u ...", g_payload_loader_port);
+    if (!launch_blob(ftpsrv_start, (size_t)ftpsrv_size, "ftpsrv",
+                     "ftpsrv.elf")) {
+      LOG_WARN("failed to launch ftpsrv; continuing without FTP service");
+    }
+  } else {
+    LOG_DEBUG("FTP server disabled (ftp.autoload=false)");
   }
 
   LOG_DEBUG("Starting daemon via %u (toolbox inject) ...",

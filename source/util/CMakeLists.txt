@@ -69,6 +69,7 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
 	CURL_STATICLIB
 	ONION_CURL_CA_BUNDLE="${ONION_CURL_CA_BUNDLE}"
+  ONIONHEN_FTPSRV_ELF="${ONIONHEN_FTPSRV_ELF}"
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 	"${ONION_CURL_ROOT}/include")
@@ -77,6 +78,10 @@ target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 set_source_files_properties(
 	"${D_SRC}/cheats/sync/http_transport_ps5.cpp"
 	PROPERTIES OBJECT_DEPENDS "${ONION_CURL_CA_BUNDLE}"
+)
+set_source_files_properties(
+  "${D_SRC}/ftpsrv_payload.c"
+  PROPERTIES OBJECT_DEPENDS "${ONIONHEN_FTPSRV_ELF}"
 )
 target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONIONHEN_PS5_STUB_DIR}"

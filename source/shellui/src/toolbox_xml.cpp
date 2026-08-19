@@ -402,6 +402,8 @@ constexpr const char* kIconAccount =
     "/user/data/OnionHEN/assets/icon_xml_account.png";
 constexpr const char* kIconSettings =
     "/user/data/OnionHEN/assets/icon_xml_settings.png";
+constexpr const char* kIconNetwork =
+  "/user/data/OnionHEN/assets/icon_xml_network.png";
 constexpr const char* kIconShortcuts =
     "/user/data/OnionHEN/assets/icon_xml_shortcuts.png";
 constexpr const char* kIconDebug =
@@ -483,6 +485,12 @@ void append_toolbox_game_group(ps5ui::Group& g) {
               std::nullopt, ps5ui::Style::None,
               toolbox_i18n::tr("cheats.repo.download.confirm"),
               toolbox_i18n::tr("cheats.repo.download.confirm_phrase"));
+}
+
+void append_toolbox_network_group(ps5ui::Group& g) {
+  g.toggle("id_ftp_autoload", toolbox_i18n::tr("ftp.autoload"),
+           toolbox_on("id_ftp_autoload"),
+           toolbox_i18n::tr("ftp.autoload.sub"));
 }
 
 void append_toolbox_display_group(ps5ui::Group& g) {
@@ -787,6 +795,11 @@ void generate_toolbox_xml(std::string& new_xml) {
           "id_group_game", toolbox_i18n::tr("group.game"),
           [](ps5ui::Group& g) { append_toolbox_game_group(g); },
           toolbox_i18n::tr("group.game.sub"), kIconGame, "id_cheats")
+        .group(
+          "id_group_network", toolbox_i18n::tr("group.network"),
+          [](ps5ui::Group& g) { append_toolbox_network_group(g); },
+          toolbox_i18n::tr("group.network.sub"), kIconNetwork,
+          "id_ftp_autoload")
       .group(
           "id_group_display", toolbox_i18n::tr("group.display"),
           [](ps5ui::Group& g) { append_toolbox_display_group(g); },

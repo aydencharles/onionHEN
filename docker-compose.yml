@@ -1,0 +1,23 @@
+services:
+  onionhen-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - ./.docker/pacbrew-ps5:/opt/ps5-payload-sdk/target/user/homebrew:ro
+    command: >
+      /bin/bash -lc "set -euo pipefail; rm -rf /tmp/onionhen-build; cp -a /workspace/. /tmp/onionhen-build; python3 -c \"from pathlib import Path; files=list(Path('/tmp/onionhen-build').rglob('*.sh'))+list(Path('/tmp/onionhen-build').rglob('*.bash')); [p.write_bytes(p.read_bytes().replace(bytes([13]), bytes())) for p in files]\"; git -C /tmp/onionhen-build submodule update --init --recursive; cd /tmp/onionhen-build; export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk; export LLVM_CONFIG=/usr/lib/llvm-18/bin/llvm-config; export PATH=/usr/lib/llvm-18/bin:$${PS5_PAYLOAD_SDK}/bin:$${PATH}; ./scripts/build.sh --jobs 8; rm -rf /workspace/build; cp -a /tmp/onionhen-build/build /workspace/build"
+    environment:
+      PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+      BUILD_TYPE: Debug
+      JOBS: "8"
+      KEYSTONE_PREFIX: /usr/local
+      LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-18/bin:/opt/ps5-payload-sdk/bin
+    stdin_open: true
+    tty: true

@@ -47,6 +47,8 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.overlay_ram); }},
     {"id_kstuff_autoload",
      +[]() -> std::string { return bool_str(g_settings.kstuff_autoload); }},
+    {"id_ftp_autoload",
+     +[]() -> std::string { return bool_str(g_settings.ftp_autoload); }},
     {"id_disp_titleids",
      +[]() -> std::string { return bool_str(g_settings.display_tids); }},
     {"id_enable_fan_speed",

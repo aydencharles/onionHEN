@@ -122,7 +122,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-error
 
 target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles})
 # .incbin in daemon.c is invisible to the compiler dependency scanner.
-# Without OBJECT_DEPENDS, daemon/util/kstuff rebuilds do not re-embed into bootstrapper.
+# Without OBJECT_DEPENDS, embedded payload rebuilds do not re-embed into bootstrapper.
 if(DEFINED ONIONHEN_OUT_BIN)
 	set(_onion_daemon_elf "${ONIONHEN_OUT_BIN}/daemon.elf")
 	set(_onion_util_elf "${ONIONHEN_OUT_BIN}/util.elf")
@@ -135,13 +135,14 @@ endif()
 set_source_files_properties(
 	${D_SRC}/daemon.c
 	PROPERTIES OBJECT_DEPENDS
-		"${_onion_daemon_elf};${_onion_util_elf};${_onion_elfldr_elf};${ONIONHEN_KSTUFF_ELF};${D_CWD}/assets/onionhen_sicon.png;${_generated_icon_files}"
+		"${_onion_daemon_elf};${_onion_util_elf};${_onion_elfldr_elf};${ONIONHEN_KSTUFF_ELF};${ONIONHEN_FTPSRV_ELF};${D_CWD}/assets/onionhen_sicon.png;${_generated_icon_files}"
 )
 target_compile_definitions(${PROJECT_NAME} PRIVATE
 	ONIONHEN_DAEMON_ELF="${_onion_daemon_elf}"
 	ONIONHEN_UTIL_ELF="${_onion_util_elf}"
 	ONIONHEN_ELFLDR_ELF="${_onion_elfldr_elf}"
 	ONIONHEN_KSTUFF_ELF="${ONIONHEN_KSTUFF_ELF}"
+	ONIONHEN_FTPSRV_ELF="${ONIONHEN_FTPSRV_ELF}"
 	ONIONHEN_ICON_ASSET_DIR="${_icon_output_dir}"
 )
 # elfldr_raise_privileges from libonion_elfldr; launches go via elfldr_remote.c.

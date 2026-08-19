@@ -64,6 +64,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **ShellUI Toolbox** — a settings page injected into the PS5 ShellUI
 - **System preparation** — raise privileges, remount filesystems, and block the update partition
 - **fSELF / fPKG** — bundled kstuff for homebrew SELF / PKG; loads by default, can be turned off in the Toolbox
+- **PS5 FTP server** — embedded `ftpsrv` from the `nexgen` branch; controlled live from the Network section on port `2121`
 - **Payload manager** — start and stop plain `.elf` payloads, with optional auto-start
 - **Game overlay** — an in-game bar for FPS, CPU, GPU, RAM, temperatures, and network info
 - **Cheat engine** — local JSON, SHN, MC4, and ShnExt files that can be toggled at runtime
@@ -98,6 +99,12 @@ Startup is sequential. After the first hop, OnionHEN uses its own
 ```text
 OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstuff.elf → daemon.elf → Toolbox
 ```
+
+### FTP server
+
+The embedded PS5 FTP server is available from **Toolbox → Network → FTP server**.
+The server listens on port `2121` and includes the upstream `ftpsrv` commands
+such as `KILL`, `SELF`, `SCHK`, `MTRW`, and `AUTHID` where supported.
 
 ### Payloads
 
@@ -141,6 +148,9 @@ Cheats load from disk. If a file changes, OnionHEN reloads it without restarting
 | `lzma` or `xz` | Compress the bootstrapper |
 | Git and `curl` or `wget` | Initialize submodules and fetch external payload inputs |
 
+The build also initializes the [`drakmor/ftpsrv`](https://github.com/drakmor/ftpsrv)
+submodule on branch `nexgen` and builds its PS5 payload with `Makefile.ps5`.
+
 ### Full build
 
 ```shell
@@ -152,6 +162,13 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 
 The script configures the project, fetches external dependencies, and builds
 the embed chain in the required order.
+
+For the reproducible Docker build:
+
+```shell
+docker compose build onionhen-build
+docker compose run --rm onionhen-build
+```
 
 ### Common options
 
@@ -232,6 +249,7 @@ default from [`config.ini.example`](config.ini.example).
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
+| `ftp.autoload` | `true` | `true`, `false` |
 
 ### Runtime data
 
@@ -241,6 +259,7 @@ default from [`config.ini.example`](config.ini.example).
 | `/data/OnionHEN/cheats/` | Cheat files |
 | `/data/OnionHEN/cheats_tmp/` | Temporary HTTPS ZIP and extraction files (removed after sync) |
 | `/data/OnionHEN/kstuff.elf` | Optional replacement for the embedded `kstuff` |
+| `ftpsrv` | Embedded PS5 FTP payload; no user-visible ELF file is created |
 | `/data/OnionHEN/OnionHEN.log` | Main runtime log |
 | `/data/OnionHEN/OnionHEN_util_daemon.log` | Utility daemon log |
 
@@ -333,6 +352,7 @@ OnionHEN exists because of the PS5 homebrew and reverse-engineering community.
 - [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) — Prospero toolchain and headers
 - [elfldr](https://github.com/ps5-payload-dev/elfldr) — first-hop loader on port 9021; not shipped in the payload
 - [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) — EchoStretch, sleirsgoevy, and contributors; optional `kstuff.elf`
+- [ftpsrv](https://github.com/drakmor/ftpsrv) — drakmor and upstream contributors; embedded PS5 FTP server from `nexgen`
 - [libhijacker](https://github.com/astrelsky/libhijacker) — astrelsky; process hijack and kernel R/W
 - [NineS](https://github.com/buzzer-re/NineS) — buzzer-re; ShellUI injection
 - [cJSON](https://github.com/DaveGamble/cJSON) — JSON parsing

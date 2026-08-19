@@ -63,6 +63,7 @@ OnionHEN 面向已越狱的 PS5，提供一套能日常使用、也方便维护�
 - **ShellUI 工具箱** — 注入 PS5 ShellUI 的设置页
 - **系统准备** — 提权、重新挂载文件系统、阻断系统更新分区
 - **fSELF / fPKG** — 内嵌 kstuff，用来跑自制 SELF / PKG；默认加载，可在工具箱关掉
+- **PS5 FTP 服务器** — 内嵌 `nexgen` 分支的 `ftpsrv`，可在网络菜单中实时开关，端口为 `2121`
 - **Payload 管理** — 启动和停止普通 `.elf` payload，可选自动启动
 - **游戏监控条** — 游戏中显示 FPS、CPU、GPU、内存、温度和网络信息
 - **金手指** — 本地 JSON、SHN、MC4、ShnExt 文件，运行中即可开关
@@ -96,6 +97,12 @@ OnionHEN 不内置内核漏洞。第一次引导仍需要外部 **9021** 上的 
 ```text
 OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstuff.elf → daemon.elf → Toolbox
 ```
+
+### FTP 服务器
+
+内嵌的 PS5 FTP 服务器位于 **工具箱 → 网络 → FTP 服务器**。
+服务器监听 `2121` 端口，并包含上游 `ftpsrv` 的 `KILL`、`SELF`、`SCHK`、
+`MTRW`、`AUTHID` 等命令（具体取决于固件支持）。
 
 ### Payload
 
@@ -139,6 +146,9 @@ OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstu
 | `lzma` 或 `xz` | 压缩 bootstrapper |
 | Git 与 `curl` 或 `wget` | 初始化 submodule 并获取外部 payload 输入 |
 
+构建时还会初始化 [`drakmor/ftpsrv`](https://github.com/drakmor/ftpsrv)
+的 `nexgen` 分支，并使用 `Makefile.ps5` 构建 PS5 payload。
+
 ### 完整构建
 
 ```shell
@@ -149,6 +159,13 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 ```
 
 脚本会配置项目、拉取外部依赖，并按所需顺序构建整条嵌入链。
+
+使用 Docker 进行可复现构建：
+
+```shell
+docker compose build onionhen-build
+docker compose run --rm onionhen-build
+```
 
 ### 常用选项
 
@@ -227,6 +244,7 @@ OnionHEN 在下面两处读写同一份配置：
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
+| `ftp.autoload` | `true` | `true`, `false` |
 
 ### 运行时数据
 
@@ -236,6 +254,7 @@ OnionHEN 在下面两处读写同一份配置：
 | `/data/OnionHEN/cheats/` | 金手指文件 |
 | `/data/OnionHEN/cheats_tmp/` | HTTPS ZIP 与解压临时文件（同步后清理） |
 | `/data/OnionHEN/kstuff.elf` | 可选，用来替换内嵌的 `kstuff` |
+| `ftpsrv` | 内嵌的 PS5 FTP payload；不会创建用户可见的 ELF 文件 |
 | `/data/OnionHEN/OnionHEN.log` | 主运行日志 |
 | `/data/OnionHEN/OnionHEN_util_daemon.log` | Utility daemon 日志 |
 
@@ -328,6 +347,7 @@ OnionHEN 离不开 PS5 自制软件与逆向工程社区。
 - [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) — Prospero 工具链与头文件
 - [elfldr](https://github.com/ps5-payload-dev/elfldr) — 端口 9021 的首次引导加载器；不打进 payload
 - [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) — EchoStretch、sleirsgoevy 与贡献者；可选的 `kstuff.elf`
+- [ftpsrv](https://github.com/drakmor/ftpsrv) — drakmor 与上游贡献者；来自 `nexgen` 的内嵌 PS5 FTP 服务器
 - [libhijacker](https://github.com/astrelsky/libhijacker) — astrelsky；进程劫持与内核读写
 - [NineS](https://github.com/buzzer-re/NineS) — buzzer-re；注入 ShellUI
 - [cJSON](https://github.com/DaveGamble/cJSON) — JSON 解析

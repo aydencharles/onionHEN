@@ -117,3 +117,8 @@ autoload=true
 # autoload controls the embedded PS5 FTP server at runtime and on startup.
 # Available values: true, false
 autoload=true
+
+[shadowmount]
+# autoload controls the embedded ShadowMountPlus payload at runtime and on startup.
+# Available values: true, false
+autoload=true

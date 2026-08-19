@@ -42,7 +42,6 @@ extern const unsigned int shadowmount_size;
 
 void reply(int sender_socket, bool error, std::string out_var = "Nothing");
 extern "C" {
-bool load_payload(const char *path);
 int launchApp(const char *titleId);
 }
 std::string GetPS5Version(const std::string &jsonpath);
@@ -56,7 +55,10 @@ bool launch_shadowmount() {
 
   if (access(kExternalPath, R_OK) == 0) {
     LOG_INFO("Launching external ShadowMount+ from %s", kExternalPath);
-    if (load_payload(kExternalPath))
+    const std::vector<uint8_t> external = readFile(kExternalPath);
+    if (onion_payload_is_elf(external.data(), external.size()) &&
+        elfldr_remote_send_bytes_to(ONION_ELFLDR_PORT, external.data(),
+                                    external.size()))
       return true;
     LOG_WARN("External ShadowMount+ failed validation or launch: %s",
              kExternalPath);
@@ -67,9 +69,8 @@ bool launch_shadowmount() {
     return false;
   }
 
-  const pid_t pid = onion_payload_launch_elfldr(
-      "shadowmountplus", shadowmount_start, shadowmount_size);
-  return pid > 1;
+  return elfldr_remote_send_bytes_to(ONION_ELFLDR_PORT, shadowmount_start,
+                                     shadowmount_size);
 }
 
 std::string make_state_json(const char *state, uint32_t task_id = 0) {

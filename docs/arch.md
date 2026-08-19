@@ -163,8 +163,9 @@ OnionHEN/
 |------|-------------|------|
 | Cheats | IPC | flat-file cheat engine（flat `TITLE_VERSION.ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | ShellCore / ShellUI 补丁 | — | 休息模式恢复、toolbox 激活等 |
+| FTP | TCP 2121 | 内嵌 `ftpsrv`，由 Toolbox 网络菜单实时启停 |
 
-> **已移除：** FTP（1337）、Klog 网络服务（9081）、Legacy CMD（9028）。  
+> **已移除：** Klog 网络服务（9081）、Legacy CMD（9028）。
 > 注意：代码里仍使用 `ps5/klog.h` 的 `klog_printf` / `klog_puts`，那是内核日志 API，不是 9081 服务。
 
 ### 2.5 `shellui` → `shellui.elf`（Toolbox UI）
@@ -181,8 +182,14 @@ OnionHEN/
 - 监控与显示（ShellUI 监控条、Title ID）
 - 账号激活
 - 系统与硬件（风扇、休息模式、外置 HDD、BD 激活）
+- 网络服务（FTP 服务器、Remote Play 配对）
 - 操作偏好（工具箱语言、手柄快捷键）
 - 高级调试 / 关于
+
+Remote Play 由 `remote_play.cpp` 负责：通过 `libSceRemoteplay.sprx` 解析
+原生 `sceRemoteplay*` API，启用 Remote Play 注册表设置，生成 PIN，并在后台
+确认客户端注册。视频串流与客户端传输仍由 PS5 原生 Remote Play 服务处理；
+OnionHEN 只负责配对和设备注册。配对信息可从网络页面保存到 USB。
 
 注入路径详见 [shellui-injection.md](shellui-injection.md)。
 
@@ -375,6 +382,8 @@ struct IPCMessage {
 ### 4.3 网络服务
 
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
+- **FTP**：内嵌 `ftpsrv`，通过 `BREW_UTIL_TOGGLE_FTP` 从 Toolbox 实时启停，监听 TCP **2121**
+- **Remote Play**：ShellUI 直接调用 PS5 原生 Remote Play API 完成 PIN 生成和客户端注册确认，不实现独立串流协议
 
 ### 4.4 扩展
 
@@ -386,7 +395,6 @@ struct IPCMessage {
 | 能力 | 说明 |
 |------|------|
 | 内嵌 9021 elfldr | 改为内置私有 9020 loader；9021 只作为外部首次引导 / 9020 恢复通道 |
-| FTP 1337 | 服务与 Toolbox 开关已移除 |
 | Legacy CMD 9028 | util TCP hijacker 协议与 Toolbox 开关已移除；app JB 仅 FIFO |
 | Klog server 9081 | 服务与 Toolbox 开关已移除 |
 | ps5debug / app-dumper | 不再内嵌 |

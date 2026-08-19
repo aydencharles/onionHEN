@@ -65,6 +65,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **System preparation** — raise privileges, remount filesystems, and block the update partition
 - **fSELF / fPKG** — bundled kstuff for homebrew SELF / PKG; loads by default, can be turned off in the Toolbox
 - **PS5 FTP server** — embedded `ftpsrv` from the `nexgen` branch; controlled live from the Network section on port `2121`
+- **Remote Play pairing** — enable the native PS5 Remote Play service, generate a pairing PIN, and register a client from the Network section
 - **Payload manager** — start and stop plain `.elf` payloads, with optional auto-start
 - **Game overlay** — an in-game bar for FPS, CPU, GPU, RAM, temperatures, and network info
 - **Cheat engine** — local JSON, SHN, MC4, and ShnExt files that can be toggled at runtime
@@ -105,6 +106,17 @@ OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstu
 The embedded PS5 FTP server is available from **Toolbox → Network → FTP server**.
 The server listens on port `2121` and includes the upstream `ftpsrv` commands
 such as `KILL`, `SELF`, `SCHK`, `MTRW`, and `AUTHID` where supported.
+
+### Remote Play
+
+Remote Play pairing is available from **Toolbox → Network → Remote Play**.
+On first use, OnionHEN enables the Remote Play registry setting, activates the
+current offline account when needed, and displays the pairing PIN. Enter that
+PIN in the official Remote Play client while the page is open; OnionHEN uses
+the native PS5 Remote Play service to confirm the registered device.
+
+The feature provides pairing and registration only. Video streaming and client
+transport remain handled by Sony's native Remote Play service.
 
 ### Payloads
 

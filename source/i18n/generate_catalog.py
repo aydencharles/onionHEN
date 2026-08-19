@@ -22,6 +22,26 @@ PRINTF_CONVERSION = re.compile(
     r"%(?:\d+\$)?[-+ #0']*(?:\*|\d+)?(?:\.(?:\*|\d+))?"
     r"(?:hh|h|ll|l|j|z|t|L)?([diuoxXfFeEgGaAcspn%])"
 )
+DUPLICATED_INTERNAL_SPACE = re.compile(r"\S {2,}\S")
+
+REQUIRED_TOKENS = {
+    "toolbox": {
+        "group.payloads.sub": ("Kstuff", "ShadowMount+"),
+        "ftp.autoload": ("FTP",),
+    },
+    "notifications": {
+        "notify.kstuff.loading": ("Kstuff",),
+        "notify.kstuff.load_failed": ("Kstuff",),
+        "notify.kstuff.load_elfldr_failed": ("Kstuff",),
+        "notify.kstuff.deleted": ("Kstuff",),
+        "notify.shadowmount.scan_started": ("ShadowMount+",),
+        "notify.shadowmount.launch_failed": ("ShadowMount+",),
+        "notify.shadowmount.external_removed": ("ShadowMount+",),
+        "notify.shadowmount.remove_failed": ("ShadowMount+",),
+        "notify.shadowmount.next_boot_on": ("ShadowMount+",),
+        "notify.shadowmount.next_boot_off": ("ShadowMount+",),
+    },
+}
 
 FILENAME_IDS = {
     "en-US.json": ("en", True),
@@ -164,6 +184,29 @@ def validate_locales(locales: list[dict[str, Any]]) -> None:
                         f"error: printf conversions differ for {section} "
                         f"{key!r} in {locale['path'].name}: "
                         f"{got} != {expected_conv}"
+                    )
+
+    for locale in locales:
+        for section, required_keys in REQUIRED_TOKENS.items():
+            for key, tokens in required_keys.items():
+                value = locale[section].get(key)
+                if value is None:
+                    raise SystemExit(
+                        f"error: required consistency key {section}.{key} "
+                        f"is missing in {locale['path'].name}"
+                    )
+                missing = [token for token in tokens if token not in value]
+                if missing:
+                    raise SystemExit(
+                        f"error: {section}.{key} in {locale['path'].name} "
+                        f"is missing required token(s): {', '.join(missing)}"
+                    )
+        for section in SECTIONS:
+            for key, value in locale[section].items():
+                if DUPLICATED_INTERNAL_SPACE.search(value):
+                    raise SystemExit(
+                        f"error: duplicated internal space in {section}.{key} "
+                        f"in {locale['path'].name}"
                     )
 
 

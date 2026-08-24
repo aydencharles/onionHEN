@@ -100,14 +100,16 @@ int test_process_name_has_priority() {
   return 0;
 }
 
-int test_alias_is_not_used_for_other_processes() {
+int test_source_id_generic_matches_processes() {
   constexpr const char *alias = "PPSA17171_01.004.000_97905f51.json";
   ScopedCheatFiles files({alias});
   TEST_ASSERT_TRUE(files.create(alias));
 
   const game_context_t game =
       makeGame("PPSA17171", "01.004.000", "worker.bin");
-  TEST_ASSERT_TRUE(CheatRepository::resolvePath(game).empty());
+  const std::string expected = ScopedCheatFiles::path(alias);
+  const std::string actual = CheatRepository::resolvePath(game);
+  TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
 
@@ -126,21 +128,65 @@ int test_multiple_hashes_pick_lexicographic() {
   return 0;
 }
 
-int test_exact_hash_wins_among_aliases() {
+int test_resolve_paths_returns_all_formats() {
+  constexpr const char *json = "PPSA17182_01.004.000_aaaaaaa1.json";
+  constexpr const char *shn = "PPSA17182_01.004.000_bbbbbbb2.shn";
+  constexpr const char *mc4 = "PPSA17182_01.004.000_ccccccc3.mc4";
+  ScopedCheatFiles files({json, shn, mc4});
+  TEST_ASSERT_TRUE(files.create(json));
+  TEST_ASSERT_TRUE(files.create(shn));
+  TEST_ASSERT_TRUE(files.create(mc4));
+
+  const std::vector<std::string> paths = CheatRepository::resolvePaths(
+      makeGame("PPSA17182", "01.004.000", "eboot.bin"));
+  const std::string json_path = ScopedCheatFiles::path(json);
+  const std::string shn_path = ScopedCheatFiles::path(shn);
+  const std::string mc4_path = ScopedCheatFiles::path(mc4);
+  TEST_ASSERT_EQ_INT(3, static_cast<int>(paths.size()));
+  TEST_ASSERT_STREQ(json_path.c_str(), paths[0].c_str());
+  TEST_ASSERT_STREQ(shn_path.c_str(), paths[1].c_str());
+  TEST_ASSERT_STREQ(mc4_path.c_str(), paths[2].c_str());
+  return 0;
+}
+
+int test_resolve_paths_keep_generic_and_matching_process() {
+  constexpr const char *generic = "PPSA17183_01.004.000_aaaaaaa1.json";
+  constexpr const char *worker = "PPSA17183_01.004.000_worker.bin_bbbbbbb2.json";
+  constexpr const char *other = "PPSA17183_01.004.000_other.bin_ccccccc3.json";
+  ScopedCheatFiles files({generic, worker, other});
+  TEST_ASSERT_TRUE(files.create(generic));
+  TEST_ASSERT_TRUE(files.create(worker));
+  TEST_ASSERT_TRUE(files.create(other));
+
+  const std::string generic_path = ScopedCheatFiles::path(generic);
+  const std::string worker_path = ScopedCheatFiles::path(worker);
+  const std::vector<std::string> eboot = CheatRepository::resolvePaths(
+      makeGame("PPSA17183", "01.004.000", "eboot.bin"));
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(eboot.size()));
+  TEST_ASSERT_STREQ(generic_path.c_str(), eboot[0].c_str());
+
+  const std::vector<std::string> worker_paths = CheatRepository::resolvePaths(
+      makeGame("PPSA17183", "01.004.000", "worker.bin"));
+  TEST_ASSERT_EQ_INT(2, static_cast<int>(worker_paths.size()));
+  TEST_ASSERT_STREQ(worker_path.c_str(), worker_paths[0].c_str());
+  TEST_ASSERT_STREQ(generic_path.c_str(), worker_paths[1].c_str());
+  return 0;
+}
+
+int test_source_ids_are_not_runtime_hashes() {
   constexpr const char *first = "PPSA17181_01.004.000_11111111.json";
   constexpr const char *second = "PPSA17181_01.004.000_22222222.json";
   ScopedCheatFiles files({first, second});
   TEST_ASSERT_TRUE(files.create(first));
   TEST_ASSERT_TRUE(files.create(second));
 
-  const std::string expected = ScopedCheatFiles::path(second);
+  const std::string expected = ScopedCheatFiles::path(first);
   const std::string actual = CheatRepository::resolvePath(
       makeGame("PPSA17181", "01.004.000", "eboot.bin", "22222222"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
-  TEST_ASSERT_TRUE(CheatRepository::resolvePath(
-                       makeGame("PPSA17181", "01.004.000", "eboot.bin",
-                                "33333333"))
-                       .empty());
+  const std::vector<std::string> paths = CheatRepository::resolvePaths(
+      makeGame("PPSA17181", "01.004.000", "eboot.bin", "33333333"));
+  TEST_ASSERT_EQ_INT(2, static_cast<int>(paths.size()));
   return 0;
 }
 
@@ -385,12 +431,16 @@ extern "C" int test_cheat_repository_suite(void) {
                              test_standard_name_has_priority);
   failures += onion_test_run("repository.process_priority",
                              test_process_name_has_priority);
-  failures += onion_test_run("repository.non_eboot_rejects_alias",
-                             test_alias_is_not_used_for_other_processes);
+  failures += onion_test_run("repository.source_id_generic_process",
+                             test_source_id_generic_matches_processes);
   failures += onion_test_run("repository.multiple_hashes_lexicographic",
                              test_multiple_hashes_pick_lexicographic);
-  failures += onion_test_run("repository.exact_hash_wins",
-                             test_exact_hash_wins_among_aliases);
+  failures += onion_test_run("repository.source_id_neutral",
+                             test_source_ids_are_not_runtime_hashes);
+  failures += onion_test_run("repository.resolve_paths_all_formats",
+                             test_resolve_paths_returns_all_formats);
+  failures += onion_test_run("repository.resolve_paths_process_filter",
+                             test_resolve_paths_keep_generic_and_matching_process);
   failures += onion_test_run("repository.deleted_cache_rescan",
                              test_deleted_cached_alias_is_rescanned);
   failures += onion_test_run("repository.thousands_standard_name",

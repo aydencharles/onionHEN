@@ -290,25 +290,13 @@ static int test_progress_page_restore_is_reusable(void) {
   return 0;
 }
 
-static int test_cheatmap_tid_reset(void) {
-  std::string tid = "A";
-  int map[kCheatMapSize]{};
-  map[1] = 1;
-  TEST_ASSERT_TRUE(reset_cheat_map_if_tid_changed(tid, map, kCheatMapSize, "B"));
-  TEST_ASSERT_STREQ("B", tid.c_str());
-  TEST_ASSERT_EQ_INT(0, map[1]);
-  TEST_ASSERT_TRUE(!reset_cheat_map_if_tid_changed(tid, map, kCheatMapSize, "B"));
-  return 0;
-}
-
-static int test_cheatmap_bounds(void) {
-  int map[kCheatMapSize]{};
-  set_cheat_enabled(map, kCheatMapSize, 0, true);
-  set_cheat_enabled(map, kCheatMapSize, -1, true);
-  set_cheat_enabled(map, kCheatMapSize, (int)kCheatMapSize, true);
-  TEST_ASSERT_TRUE(get_cheat_enabled(map, kCheatMapSize, 0));
-  TEST_ASSERT_TRUE(!get_cheat_enabled(map, kCheatMapSize, -1));
-  TEST_ASSERT_TRUE(!get_cheat_enabled(map, kCheatMapSize, (int)kCheatMapSize));
+static int test_dynamic_cheat_state(void) {
+  ToolboxUiState state;
+  state.set_cheat_enabled(511, true);
+  TEST_ASSERT_TRUE(state.get_cheat_enabled(511));
+  TEST_ASSERT_TRUE(!state.get_cheat_enabled(512));
+  TEST_ASSERT_TRUE(state.reset_cheats_if_tid_changed("CUSA00016"));
+  TEST_ASSERT_TRUE(!state.get_cheat_enabled(511));
   return 0;
 }
 
@@ -343,7 +331,6 @@ extern "C" int test_toolbox_route_suite(void) {
                           test_remote_play_cancel_wins_terminal_race);
   fails += onion_test_run("remote_play.success_wins_terminal_race",
                           test_remote_play_success_wins_terminal_race);
-  fails += onion_test_run("cheatmap.tid_reset", test_cheatmap_tid_reset);
-  fails += onion_test_run("cheatmap.bounds", test_cheatmap_bounds);
+  fails += onion_test_run("cheatmap.dynamic", test_dynamic_cheat_state);
   return fails;
 }

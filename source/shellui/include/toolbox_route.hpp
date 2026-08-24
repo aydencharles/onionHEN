@@ -5,9 +5,6 @@
  */
 #pragma once
 
-#include <cstddef>
-#include <cstring>
-#include <string>
 #include <string_view>
 
 namespace toolbox {
@@ -89,34 +86,5 @@ inline constexpr std::string_view kSuperuserXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.superuser.xml";
 inline constexpr std::string_view kOgDebugXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.og_debug.xml";
-
-// ---- Cheat map helpers (host-testable) ----
-
-constexpr std::size_t kCheatMapSize = 256;
-
-inline bool reset_cheat_map_if_tid_changed(std::string &current_tid, int *map,
-                                           std::size_t map_n,
-                                           std::string_view new_tid) {
-  if (!map || map_n == 0)
-    return false;
-  if (current_tid == new_tid)
-    return false;
-  current_tid.assign(new_tid);
-  std::memset(map, 0, map_n * sizeof(int));
-  return true;
-}
-
-inline void set_cheat_enabled(int *map, std::size_t map_n, int cheat_id,
-                              bool enabled) {
-  if (!map || cheat_id < 0 || static_cast<std::size_t>(cheat_id) >= map_n)
-    return;
-  map[cheat_id] = enabled ? 1 : 0;
-}
-
-inline bool get_cheat_enabled(const int *map, std::size_t map_n, int cheat_id) {
-  if (!map || cheat_id < 0 || static_cast<std::size_t>(cheat_id) >= map_n)
-    return false;
-  return map[cheat_id] != 0;
-}
 
 } // namespace toolbox

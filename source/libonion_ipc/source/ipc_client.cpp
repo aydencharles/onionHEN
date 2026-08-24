@@ -179,32 +179,32 @@ int IPC_Client::IPCReceiveData(IPCMessage &msg, std::string &ipc_msg) {
   }
   LOG_DEBUG("Daemon returned: %i", msg.error);
 
-  if (msg.error != 0) {
-    LOG_ERROR("Daemon returned an error: %i", msg.error);
-    return msg.error;
+  const int reply_error = msg.error;
+  if (reply_error != 0) {
+    LOG_ERROR("Daemon returned an error: %i", reply_error);
   }
 
   if (strlen(msg.msg) <= 2) {
     LOG_DEBUG("Daemon message is empty");
-    return -1;
+    return reply_error != 0 ? reply_error : -1;
   }
 
   onion_cjson::Root j(msg.msg);
   if (!j) {
     LOG_ERROR("Failed to parse json: %s",
                 cJSON_GetErrorPtr() ? cJSON_GetErrorPtr() : "unknown error");
-    return -1;
+    return reply_error != 0 ? reply_error : -1;
   }
 
   const char *var = onion_cjson::string_item(j.get(), "var");
   if (!var) {
     LOG_DEBUG("Daemon message does not contain the return obj");
-    return -1;
+    return reply_error != 0 ? reply_error : -1;
   }
 
   ipc_msg = var;
   LOG_DEBUG("Daemon IPC return obj: %s", ipc_msg.c_str());
-  return msg.error;
+  return reply_error;
 }
 
 int IPC_Client::IPCSendData(const IPCMessage &msg) {
@@ -401,12 +401,20 @@ bool IPC_Client::Remount(const char *src, const char *dest) {
 }
 
 bool IPC_Client::GetGameCheats(const std::string &tid, const std::string &ver,
-                               std::string &cheats) {
+                               std::string &cheats, int pid, int appid) {
   if (!require_util("GetGameCheats")) {
     return false;
   }
-  std::string json =
-      json_kv_string2("tid", tid.c_str(), "version", ver.c_str());
+  cJSON *request = cJSON_CreateObject();
+  cJSON_AddStringToObject(request, "tid", tid.c_str());
+  cJSON_AddStringToObject(request, "version", ver.c_str());
+  if (pid > 0) {
+    cJSON_AddNumberToObject(request, "pid", pid);
+  }
+  if (appid > 0) {
+    cJSON_AddNumberToObject(request, "appid", appid);
+  }
+  std::string json = json_object_str(request);
   if (!IPCSendCommand(BREW_UTIL_GET_GAME_CHEAT, cheats, json)) {
     LOG_ERROR("Failed to get cheats for %s", tid.c_str());
     return false;

@@ -4,8 +4,6 @@
 #include "toolbox_route.hpp"
 #include <cstring>
 
-#define MAX_CHEATS 256
-
 void ParseCheatID(const char *id, char *tid, int *cheat_id);
 
 static OnPressResult prefix_id_cheat(OnPressContext &ctx) {
@@ -41,6 +39,8 @@ static OnPressResult prefix_id_cheat(OnPressContext &ctx) {
     notify("notify.cheats.toggle_banner", cheat_name.c_str(),
            onion_notify_tr(enabled ? "notify.common.on" : "notify.common.off"));
   } else {
+    LOG_ERROR("Failed to activate cheat %d for %s: %s", cheat_id, tid,
+              cheat_name.empty() ? "no detail" : cheat_name.c_str());
     notify("notify.cheats.activate_failed", cheat_name.c_str());
   }
   // Consumed: stock SettingPage.OnPressed null-derefs unknown dynamic ids

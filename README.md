@@ -145,16 +145,24 @@ services use the same TCP port, only one can bind it.
 
 ### Cheats
 
-Put cheat files in one directory. Names are `TITLEID_VERSION`, with optional process and 8-hex hash:
+Put cheat files in one directory. Names are `TITLEID_VERSION`, with an
+optional process and 8-hex source ID:
 
 ```text
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].json
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].shn
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].mc4
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].ShnExt
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].json
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].shn
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].mc4
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].ShnExt
 ```
 
-`PROCESS` is omitted for `eboot.bin`. `HASH` is omitted when the file is not build-specific. A process-scoped file wins over a generic `TITLE_VERSION` file; json beats shn, mc4, then ShnExt.
+`PROCESS` is optional. `SOURCE_ID` is a stable physical-source discriminator.
+For a source without an explicit ID, the installer derives it as the first
+eight lowercase hex characters of `SHA256(lowercase(relative_path))`, after
+normalizing `\\` to `/`. It is not an executable/build hash and is never used
+for runtime compatibility. OnionHEN loads every compatible source for the
+title/version/process, so independent JSON, SHN, MC4 and ShnExt files can
+coexist. A source with an explicit process is only used for that process; a
+source without one is generic.
 
 Cheats load from disk. If a file changes, OnionHEN reloads it without restarting the whole stack.
 

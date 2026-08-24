@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "cheats/cheat_engine.h"
 #include "cheats/runtime.h"
@@ -35,15 +36,15 @@ struct FileSignature {
  */
 class CheatRepository {
 public:
-  /**
-   * Resolve an existing cheat file for title + version + process + optional
-   * hash. Names are TITLEID_VERSION[_PROCESS][_HASH].ext.
-   *
-   * Process-scoped files win over generic TITLE_VERSION.ext. Hashed
-   * collection names are used when no exact name exists; an exact process
-   * hash wins when game.process_hash is set.
-   */
+  /** Resolve the best compatible source for title/version/process. */
   static std::string resolvePath(const game_context_t &game);
+
+  /**
+   * Resolve every compatible physical source. The returned paths are stable
+   * and ordered by process scope, generic scope, extension, then filename.
+   * HENCC source IDs are identity discriminators, never compatibility hashes.
+   */
+  static std::vector<std::string> resolvePaths(const game_context_t &game);
 
   static bool fileExists(const std::string &path);
   static bool statSignature(const std::string &path, FileSignature &out);

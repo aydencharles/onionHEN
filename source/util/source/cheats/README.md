@@ -41,10 +41,16 @@ IPC DOWNLOAD_CHEATS
 ## Formats / paths
 
 ```text
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].{json,shn,mc4,ShnExt}
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
 ```
 
-`PROCESS` and 8-hex `HASH` are optional. Process-scoped names beat generic `TITLE_VERSION`; json → shn → mc4 → ShnExt.
+`PROCESS` and 8-hex `SOURCE_ID` are optional. `SOURCE_ID` identifies a
+physical source and is not compared with a runtime process hash. When an
+installed source has no explicit ID and is nested below the scan root, the
+flattener derives one as the first eight lowercase hex characters of
+`SHA256(lowercase(relative_path))`, after replacing `\\` with `/`. The
+repository returns all sources compatible with title/version/process; format
+priority only determines deterministic display order.
 
 ## Memory
 

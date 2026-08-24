@@ -189,7 +189,7 @@ util handleIPC ──► param.json / sfo ──► version 字符串
   │ GET_GAME_CHEAT(tid, version)
   ▼
 cheat_service_export_list
-  │  resolve /data/OnionHEN/cheats/<TID>_<VER>[_PROCESS][_HASH].{json,shn,mc4,ShnExt}
+  │  resolve all /data/OnionHEN/cheats/<TID>_<VER>[_PROCESS][_SOURCE_ID].{json,shn,mc4,ShnExt}
   │  load + parse → 写 /user/data/OnionHEN/<tid>_cheats
   ▼
 ShellUI 读列表 JSON，渲染开关
@@ -263,15 +263,15 @@ cheat_engine_runtime
 #### 路径与格式
 
 ```text
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].{json,shn,mc4,ShnExt}
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
 ```
 
-`PROCESS` 与 8 位十六进制 `HASH` 均可省略。匹配顺序：进程限定文件 → 通用 `TITLE_VERSION` → 哈希/作者 eboot 别名。  
-解析优先级：`json` → `shn` → `mc4` → `ShnExt`。
+`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。`SOURCE_ID` 只标识物理来源，不参与运行时 hash 匹配。同步 flatten 时，未带显式 ID 且位于扫描根目录下的来源，会把相对路径的 `\\` 归一化为 `/`、转小写后计算 SHA-256，取前 8 位小写十六进制字符作为 ID。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
+显示排序使用 `json` → `shn` → `mc4` → `ShnExt`，不会在独立来源之间择一。
 
 #### 热重载
 
-`cheat_service` 缓存：path + size + inode + mtime + ctime。变化则 `disable` 已启用项并重新 `onion_load_cheat_file`。
+`cheat_service` 为每个来源缓存 path + size + inode + mtime + ctime。来源集合或签名变化时，先禁用已启用项，再整体重载并重建全局 ID 映射。
 
 #### Toggle 写内存顺序（`cheat_engine_runtime`）
 
@@ -280,11 +280,12 @@ cheat_engine_runtime
 2. util_find_module(module_name) → 失败则 util_find_module_in_app
 3. 检测 PS2 模拟模块；base = sections[0].vaddr
 4. Master Code / MC 依赖偏移修正（可选）
-5. 对每个 patch：
+5. 对每个 patch 预检最终地址并以 `max(on_len, off_len)` 登记运行时占用；若与其它启用 cheat 重叠则整条拒绝
+6. 对每个 patch：
      addr = absolute|ps2 ? offset : base+offset
-     write on/off → readback verify
+     snapshot → write on/off → readback verify；后续失败时逆序回滚已写入 patch
      失败则 code_cave：pt_attach → pt_mmap 页 → mprotect → 再写
-6. 更新 entry.enabled / last_applied_pid
+7. 更新 entry.enabled / last_applied_pid
 ```
 
 #### 下载 flatten
@@ -302,7 +303,7 @@ cheat_engine_runtime
 | keystone | ShnExt 汇编（`third_party/keystone/`）；C++ runtime 由 PS5 SDK 提供 |
 | cJSON | IPC 与配置载荷 JSON 解析 |
 | AES/base64 third_party | MC4 / ShnExt 解密 |
-| miniz / sha256 | ShnExt 解压与密钥派生 |
+| miniz / sha256 | ShnExt 解压与密钥派生；flatten 也用 SHA-256 生成 HENCC source ID |
 | ftpsrv | 编译进 util 的 FTP 服务源码模块 |
 | libcurl / OpenSSL | 金手指 catalog HTTPS 下载与证书校验 |
 

@@ -10,10 +10,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "sha256.h"
-
 static const char *const k_cheat_extensions[] = {"json", "shn", "mc4",
                                                  "ShnExt"};
+/* HENCC catalog folders are json/, shn/, mc4/. ShnExt is not a catalog folder. */
+enum { k_hencc_install_folder_count = 3 };
+_Static_assert(k_hencc_install_folder_count <
+                   (int)(sizeof(k_cheat_extensions) /
+                         sizeof(k_cheat_extensions[0])),
+               "install folders must be a prefix of k_cheat_extensions");
 
 const char *onion_cheat_extension_for_rank(int rank) {
   if (rank < 0 || (size_t)rank >= sizeof(k_cheat_extensions) /
@@ -337,105 +341,6 @@ int onion_cheat_filename_compare(const onion_cheat_filename_t *lhs,
   return 0;
 }
 
-int onion_cheat_source_id_from_path(const char *relative_path, char *out,
-                                    size_t out_size) {
-  static const char hex[] = "0123456789abcdef";
-  SHA256_CTX ctx;
-  uint8_t digest[SHA256_BLOCK_SIZE];
-  size_t i;
-
-  if (out != NULL && out_size > 0) {
-    out[0] = '\0';
-  }
-  if (relative_path == NULL || relative_path[0] == '\0' || out == NULL ||
-      out_size < 9) {
-    return -1;
-  }
-  if (relative_path[0] == '/' || relative_path[0] == '\\') {
-    return -1;
-  }
-
-  sha256_init(&ctx);
-  for (i = 0; relative_path[i] != '\0'; ++i) {
-    unsigned char ch = (unsigned char)relative_path[i];
-    if (ch == '\\') {
-      ch = '/';
-    } else if (ch >= 'A' && ch <= 'Z') {
-      ch = (unsigned char)(ch - 'A' + 'a');
-    }
-    sha256_update(&ctx, &ch, 1);
-  }
-  sha256_final(&ctx, digest);
-  for (i = 0; i < 4; ++i) {
-    out[i * 2] = hex[digest[i] >> 4];
-    out[i * 2 + 1] = hex[digest[i] & 0x0f];
-  }
-  out[8] = '\0';
-  return 0;
-}
-
-static int has_path_separator(const char *path) {
-  return path != NULL && (strchr(path, '/') != NULL || strchr(path, '\\') != NULL);
-}
-
-int onion_cheat_build_flat_name_for_source(const char *filename,
-                                           const char *relative_source_path,
-                                           char *out, size_t out_size) {
-  onion_cheat_filename_t parts;
-  const char *extension;
-  const char *process;
-  char generated_source_id[ONION_CHEAT_SOURCE_ID_LEN];
-  const char *source_id;
-  int written;
-
-  memset(&parts, 0, sizeof(parts));
-  memset(generated_source_id, 0, sizeof(generated_source_id));
-  if (out == NULL || out_size == 0) {
-    return -1;
-  }
-  if (onion_cheat_parse_filename(filename, &parts) < 0) {
-    return -1;
-  }
-  extension = onion_cheat_extension_for_rank(parts.extension_rank);
-  if (extension == NULL) {
-    return -1;
-  }
-
-  /* A source already carrying an explicit ID is authoritative. For a file
-   * nested below the scan root, derive one from its original relative path so
-   * flattening cannot make two physical sources overwrite each other. */
-  source_id = parts.source_id;
-  if (source_id[0] == '\0' && has_path_separator(relative_source_path) &&
-      onion_cheat_source_id_from_path(relative_source_path,
-                                      generated_source_id,
-                                      sizeof(generated_source_id)) == 0) {
-    source_id = generated_source_id;
-  }
-
-  process = parts.process;
-  if (process[0] != '\0' && onion_cheat_is_eboot_process(process)) {
-    process = "";
-  }
-  if (process[0] != '\0' && source_id[0] != '\0') {
-    written = snprintf(out, out_size, "%s_%s_%s_%s.%s", parts.title_id,
-                       parts.version, process, source_id, extension);
-  } else if (process[0] != '\0') {
-    written = snprintf(out, out_size, "%s_%s_%s.%s", parts.title_id,
-                       parts.version, process, extension);
-  } else if (source_id[0] != '\0') {
-    written = snprintf(out, out_size, "%s_%s_%s.%s", parts.title_id,
-                       parts.version, source_id, extension);
-  } else {
-    written = snprintf(out, out_size, "%s_%s.%s", parts.title_id,
-                       parts.version, extension);
-  }
-  return written >= 0 && (size_t)written < out_size ? 0 : -1;
-}
-
-int onion_cheat_build_flat_name(const char *filename, char *out, size_t out_size) {
-  return onion_cheat_build_flat_name_for_source(filename, NULL, out, out_size);
-}
-
 static int copy_file(const char *src, const char *dst) {
   FILE *in = fopen(src, "rb");
   FILE *out = NULL;
@@ -467,153 +372,139 @@ static int flatten_cancel_requested(onion_cheat_cancel_fn should_cancel,
   return should_cancel != NULL && should_cancel(cancel_user) != 0;
 }
 
-static size_t count_flatten_files(const char *dir, const char *relative_dir,
-                                  onion_cheat_cancel_fn should_cancel,
-                                  void *cancel_user, int *cancelled) {
-  DIR *d = opendir(dir);
+static int is_installable_name(const char *name, int expected_rank) {
+  if (name == NULL || name[0] == '\0' || name[0] == '.') {
+    return 0;
+  }
+  return onion_cheat_extension_rank(name, NULL) == expected_rank;
+}
+
+static int visit_install_folder(const char *folder, int expected_rank,
+                                onion_cheat_cancel_fn should_cancel,
+                                void *cancel_user, int *cancelled,
+                                int (*on_file)(const char *src, const char *name,
+                                               void *user),
+                                void *user) {
+  DIR *directory;
   struct dirent *ent;
-  size_t count = 0;
 
   if (flatten_cancel_requested(should_cancel, cancel_user)) {
     if (cancelled != NULL) {
       *cancelled = 1;
     }
-    return 0;
+    return ONION_CHEAT_FLATTEN_CANCELLED;
   }
-  if (d == NULL) {
-    return 0;
+  directory = opendir(folder);
+  if (directory == NULL) {
+    return ONION_CHEAT_FLATTEN_OK;
   }
-  while ((ent = readdir(d)) != NULL) {
+  while ((ent = readdir(directory)) != NULL) {
     char path[512];
-    char flat[256];
-    char relative[1024];
     struct stat st;
+    int written;
 
     if (flatten_cancel_requested(should_cancel, cancel_user)) {
       if (cancelled != NULL) {
         *cancelled = 1;
       }
-      break;
-    }
-    if (ent->d_name[0] == '.') {
-      continue;
-    }
-    snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
-    if (stat(path, &st) != 0) {
-      continue;
-    }
-    if (S_ISDIR(st.st_mode)) {
-      if (relative_dir[0] == '\0') {
-        snprintf(relative, sizeof(relative), "%s", ent->d_name);
-      } else {
-        snprintf(relative, sizeof(relative), "%s/%s", relative_dir,
-                 ent->d_name);
-      }
-      count += count_flatten_files(path, relative, should_cancel, cancel_user,
-                                   cancelled);
-      if (cancelled != NULL && *cancelled) {
-        break;
-      }
-    } else if (S_ISREG(st.st_mode)) {
-      if (relative_dir[0] == '\0') {
-        snprintf(relative, sizeof(relative), "%s", ent->d_name);
-      } else {
-        snprintf(relative, sizeof(relative), "%s/%s", relative_dir,
-                 ent->d_name);
-      }
-      if (onion_cheat_build_flat_name_for_source(
-              ent->d_name, relative, flat, sizeof(flat)) == 0) {
-        ++count;
-      }
-    }
-  }
-  closedir(d);
-  return count;
-}
-
-static int walk_and_flatten(const char *dir, const char *relative_dir,
-                            int *copied, int *skipped,
-                            size_t *completed, size_t total,
-                            onion_cheat_progress_fn progress,
-                            void *progress_user,
-                            onion_cheat_cancel_fn should_cancel,
-                            void *cancel_user) {
-  DIR *d = opendir(dir);
-  struct dirent *ent;
-
-  if (flatten_cancel_requested(should_cancel, cancel_user)) {
-    return ONION_CHEAT_FLATTEN_CANCELLED;
-  }
-  if (d == NULL) {
-    return ONION_CHEAT_FLATTEN_OK;
-  }
-  while ((ent = readdir(d)) != NULL) {
-    char path[512];
-    char flat[256];
-    char dest[512];
-    char relative[1024];
-    struct stat st;
-
-    if (flatten_cancel_requested(should_cancel, cancel_user)) {
-      closedir(d);
+      closedir(directory);
       return ONION_CHEAT_FLATTEN_CANCELLED;
     }
-    if (ent->d_name[0] == '.') {
+    if (!is_installable_name(ent->d_name, expected_rank)) {
       continue;
     }
-    snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
-    if (stat(path, &st) != 0) {
+    written = snprintf(path, sizeof(path), "%s/%s", folder, ent->d_name);
+    if (written < 0 || (size_t)written >= sizeof(path)) {
       continue;
     }
-    if (S_ISDIR(st.st_mode)) {
-      if (relative_dir[0] == '\0') {
-        snprintf(relative, sizeof(relative), "%s", ent->d_name);
-      } else {
-        snprintf(relative, sizeof(relative), "%s/%s", relative_dir,
-                 ent->d_name);
-      }
-      const int result = walk_and_flatten(
-          path, relative, copied, skipped, completed, total, progress,
-          progress_user, should_cancel, cancel_user);
-      if (result == ONION_CHEAT_FLATTEN_CANCELLED) {
-        closedir(d);
-        return result;
-      }
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
       continue;
     }
-    if (!S_ISREG(st.st_mode)) {
-      continue;
-    }
-    if (relative_dir[0] == '\0') {
-      snprintf(relative, sizeof(relative), "%s", ent->d_name);
-    } else {
-      snprintf(relative, sizeof(relative), "%s/%s", relative_dir,
-               ent->d_name);
-    }
-    if (onion_cheat_build_flat_name_for_source(ent->d_name, relative, flat,
-                                               sizeof(flat)) < 0) {
-      continue;
-    }
-    snprintf(dest, sizeof(dest), ONION_CHEATS_DIR "/%s", flat);
-    if (strcmp(path, dest) == 0) {
-      ++(*completed);
-      if (progress != NULL) {
-        progress(*completed, total, progress_user);
-      }
-      continue;
-    }
-    if (copy_file(path, dest) == 0) {
-      (*copied)++;
-      LOG_TRACE("[flatten] %s -> %s", path, dest);
-    } else {
-      (*skipped)++;
-    }
-    ++(*completed);
-    if (progress != NULL) {
-      progress(*completed, total, progress_user);
+    if (on_file != NULL && on_file(path, ent->d_name, user) != 0) {
+      closedir(directory);
+      return ONION_CHEAT_FLATTEN_ERROR;
     }
   }
-  closedir(d);
+  closedir(directory);
+  return ONION_CHEAT_FLATTEN_OK;
+}
+
+static int count_install_file(const char *src, const char *name, void *user) {
+  size_t *count = (size_t *)user;
+  (void)src;
+  (void)name;
+  ++(*count);
+  return 0;
+}
+
+struct copy_install_state {
+  int *copied;
+  int *skipped;
+  size_t *completed;
+  size_t total;
+  onion_cheat_progress_fn progress;
+  void *progress_user;
+};
+
+static void note_install_progress(struct copy_install_state *state) {
+  ++(*state->completed);
+  if (state->progress != NULL) {
+    state->progress(*state->completed, state->total, state->progress_user);
+  }
+}
+
+static int copy_install_file(const char *src, const char *name, void *user) {
+  struct copy_install_state *state = (struct copy_install_state *)user;
+  char dest[512];
+  int written;
+
+  written = snprintf(dest, sizeof(dest), ONION_CHEATS_DIR "/%s", name);
+  if (written < 0 || (size_t)written >= sizeof(dest)) {
+    (*state->skipped)++;
+    note_install_progress(state);
+    return 0;
+  }
+  if (strcmp(src, dest) == 0) {
+    note_install_progress(state);
+    return 0;
+  }
+  if (copy_file(src, dest) == 0) {
+    (*state->copied)++;
+    LOG_TRACE("[flatten] %s -> %s", src, dest);
+  } else {
+    (*state->skipped)++;
+  }
+  note_install_progress(state);
+  return 0;
+}
+
+static int for_each_install_folder(const char *root,
+                                   onion_cheat_cancel_fn should_cancel,
+                                   void *cancel_user, int *cancelled,
+                                   int (*on_file)(const char *src,
+                                                  const char *name, void *user),
+                                   void *user) {
+  size_t i;
+
+  for (i = 0; i < k_hencc_install_folder_count; ++i) {
+    char folder[512];
+    int result;
+    int written;
+
+    written = snprintf(folder, sizeof(folder), "%s/%s", root,
+                       k_cheat_extensions[i]);
+    if (written < 0 || (size_t)written >= sizeof(folder)) {
+      continue;
+    }
+    result = visit_install_folder(folder, (int)i, should_cancel, cancel_user,
+                                  cancelled, on_file, user);
+    if (result != ONION_CHEAT_FLATTEN_OK) {
+      return result;
+    }
+    if (cancelled != NULL && *cancelled) {
+      return ONION_CHEAT_FLATTEN_CANCELLED;
+    }
+  }
   return ONION_CHEAT_FLATTEN_OK;
 }
 
@@ -642,10 +533,6 @@ void onion_cheat_normalize_version(const char *version, char *out,
   onion_cheat_normalize_filename_token(version, out, out_size);
 }
 
-/**
- * Walk a tree (typically after zip extract) and install flat cheat files into
- * ONION_CHEATS_DIR as TITLEID_VERSION[_PROCESS][_SOURCE_ID].ext.
- */
 int onion_cheat_flatten_install_tree_cancellable(
     const char *root, onion_cheat_progress_fn progress, void *progress_user,
     onion_cheat_cancel_fn should_cancel, void *cancel_user) {
@@ -653,7 +540,9 @@ int onion_cheat_flatten_install_tree_cancellable(
   int skipped = 0;
   int cancelled = 0;
   size_t completed = 0;
-  size_t total;
+  size_t total = 0;
+  struct copy_install_state state;
+  int result;
 
   mkdir(ONION_DATA_ROOT, 0777);
   mkdir(ONION_CHEATS_DIR, 0777);
@@ -661,16 +550,23 @@ int onion_cheat_flatten_install_tree_cancellable(
   if (root == NULL || root[0] == '\0') {
     root = ONION_CHEATS_DIR;
   }
-  total = count_flatten_files(root, "", should_cancel, cancel_user, &cancelled);
-  if (cancelled) {
+  result = for_each_install_folder(root, should_cancel, cancel_user, &cancelled,
+                                   count_install_file, &total);
+  if (result == ONION_CHEAT_FLATTEN_CANCELLED || cancelled) {
     return ONION_CHEAT_FLATTEN_CANCELLED;
   }
   if (progress != NULL) {
     progress(0, total, progress_user);
   }
-  if (walk_and_flatten(root, "", &copied, &skipped, &completed, total,
-                       progress, progress_user, should_cancel, cancel_user) ==
-      ONION_CHEAT_FLATTEN_CANCELLED) {
+  state.copied = &copied;
+  state.skipped = &skipped;
+  state.completed = &completed;
+  state.total = total;
+  state.progress = progress;
+  state.progress_user = progress_user;
+  result = for_each_install_folder(root, should_cancel, cancel_user, &cancelled,
+                                   copy_install_file, &state);
+  if (result == ONION_CHEAT_FLATTEN_CANCELLED || cancelled) {
     LOG_DEBUG("[flatten] cancelled after %zu/%zu cheat file(s)", completed,
               total);
     return ONION_CHEAT_FLATTEN_CANCELLED;

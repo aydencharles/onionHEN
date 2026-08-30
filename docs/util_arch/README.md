@@ -266,7 +266,7 @@ cheat_engine_runtime
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
 ```
 
-`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。`SOURCE_ID` 只标识物理来源。同步 flatten 时，未带显式 ID 且位于扫描根目录下的来源，会把相对路径的 `\\` 归一化为 `/`、转小写后计算 SHA-256，取前 8 位小写十六进制字符作为 ID。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
+`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。`SOURCE_ID` 只标识物理来源。同步安装把 catalog 的 `json/`、`shn/`、`mc4/` 文件按原名拷到该目录。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
 显示排序使用 `json` → `shn` → `mc4` → `ShnExt`，不会在独立来源之间择一。
 
 #### 热重载
@@ -290,7 +290,7 @@ cheat_engine_runtime
 
 #### 下载 flatten
 
-在线 `DOWNLOAD_CHEATS` 走 `onion::cheats::sync`：Catalog（仓库身份）+ Mirror（github / cnb.cool）生成 archive URL，使用 HTTPS 下载 ZIP 到临时目录，miniz 只提取 catalog 声明的 `flattenRoots`（HEN 集合为 `cheats/`），再调用现有 `onion_cheat_flatten_install_tree`，完成后清理临时文件。`[cheats] mirror=auto|github|cnb`；`auto` 时简体中文走 cnb.cool，其它地区走 GitHub。进度经 `CHEAT_SYNC_STATUS.progress` 回传 Toolbox。
+在线 `DOWNLOAD_CHEATS` 走 `onion::cheats::sync`：Catalog（仓库身份）+ Mirror（github / cnb.cool）生成 archive URL，使用 HTTPS 下载 ZIP 到临时目录，miniz 只提取 catalog 声明的 `flattenRoots`（HEN 集合为 `cheats/`），再把 `json/`、`shn/`、`mc4/` 顶层文件按原名拷到 `/data/OnionHEN/cheats/`，完成后清理临时文件。`[cheats] mirror=auto|github|cnb`；`auto` 时简体中文走 cnb.cool，其它地区走 GitHub。进度经 `CHEAT_SYNC_STATUS.progress` 回传 Toolbox。
 
 ---
 
@@ -303,7 +303,7 @@ cheat_engine_runtime
 | keystone | ShnExt 汇编（`third_party/keystone/`）；C++ runtime 由 PS5 SDK 提供 |
 | cJSON | IPC 与配置载荷 JSON 解析 |
 | AES/base64 third_party | MC4 / ShnExt 解密 |
-| miniz / sha256 | ShnExt 解压与密钥派生；flatten 也用 SHA-256 生成 HENCC source ID |
+| miniz / sha256 | ShnExt 解压与密钥派生 |
 | ftpsrv | 编译进 util 的 FTP 服务源码模块 |
 | libcurl / OpenSSL | 金手指 catalog HTTPS 下载与证书校验 |
 

@@ -156,16 +156,14 @@ optional process and 8-hex source ID:
 ```
 
 `PROCESS` is optional. `SOURCE_ID` is a stable physical-source discriminator.
-For a source without an explicit ID, the installer derives it as the first
-eight lowercase hex characters of `SHA256(lowercase(relative_path))`, after
-normalizing `\\` to `/`. OnionHEN loads every compatible source for the
-title/version/process, so independent JSON, SHN, MC4 and ShnExt files can
-coexist. A source with an explicit process is only used for that process; a
-source without one is generic.
+OnionHEN loads every compatible source for the title/version/process, so
+independent JSON, SHN, MC4 and ShnExt files can coexist. A source with an
+explicit process is only used for that process; a source without one is
+generic.
 
 Cheats load from disk. If a file changes, OnionHEN reloads it without restarting the whole stack.
 
-`DOWNLOAD_CHEATS` downloads a cheat catalog ZIP over HTTPS (GitHub or cnb.cool), extracts only its `cheats/` tree, and flattens it into this directory. `[cheats] mirror=auto` uses cnb.cool when the UI/system language is Simplified Chinese, otherwise GitHub.
+`DOWNLOAD_CHEATS` downloads a cheat catalog ZIP over HTTPS (GitHub or cnb.cool), extracts the `cheats/` tree, and copies `json/`, `shn/`, and `mc4/` files into this directory with their original names. `[cheats] mirror=auto` uses cnb.cool when the UI/system language is Simplified Chinese, otherwise GitHub.
 
 <br>
 

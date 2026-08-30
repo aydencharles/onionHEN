@@ -44,6 +44,30 @@ static int test_touch_and_exists(void) {
   return 0;
 }
 
+static int test_mkdir_tree(void) {
+  char dir[64];
+  char nested[160];
+  char too_long[1025];
+  struct stat st;
+
+  TEST_ASSERT_TRUE(!mkdir_tree(NULL));
+  TEST_ASSERT_TRUE(!mkdir_tree(""));
+  memset(too_long, 'a', sizeof(too_long) - 1);
+  too_long[sizeof(too_long) - 1] = '\0';
+  TEST_ASSERT_TRUE(!mkdir_tree(too_long));
+
+  TEST_ASSERT_EQ_INT(0, make_temp_dir(dir, sizeof(dir)));
+  snprintf(nested, sizeof(nested), "%s/a/b/c", dir);
+  TEST_ASSERT_TRUE(mkdir_tree(nested));
+  TEST_ASSERT_TRUE(if_exists(nested));
+  TEST_ASSERT_EQ_INT(0, stat(nested, &st));
+  TEST_ASSERT_TRUE(S_ISDIR(st.st_mode));
+  TEST_ASSERT_TRUE(mkdir_tree(nested));
+
+  TEST_ASSERT_TRUE(rmtree(dir));
+  return 0;
+}
+
 static int test_rmtree_nested(void) {
   char dir[64];
   char sub[128];
@@ -103,6 +127,7 @@ int test_platform_fs_suite(void) {
   int failures = 0;
   failures += onion_test_run("fs_if_exists_null_missing", test_if_exists_null_and_missing);
   failures += onion_test_run("fs_touch_and_exists", test_touch_and_exists);
+  failures += onion_test_run("fs_mkdir_tree", test_mkdir_tree);
   failures += onion_test_run("fs_rmtree_nested", test_rmtree_nested);
   failures += onion_test_run("fs_rmtree_progress", test_rmtree_progress);
   return failures;

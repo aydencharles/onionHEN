@@ -52,7 +52,7 @@ public:
   static int loadFile(const std::string &path, onion_cheat_file_t &out);
 
   static void ensureCheatsDir();
-  /** Flatten nested repo tree into ONION_CHEATS_DIR. */
+  /** Copy HENCC json/shn/mc4 files into ONION_CHEATS_DIR, keeping names. */
   static int flattenInstallTree(const std::string &root,
                                 onion_cheat_progress_fn progress,
                                 void *progress_user,

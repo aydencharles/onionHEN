@@ -30,7 +30,7 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 |-------|----------------|
 | `test_cheat_utils` | hex decode, JSON extract, braces, replace_all, load buffer, ABI layout |
 | `test_cheat_parsers` | JSON / SHN / MC4 / ShnExt via factory + real fixtures |
-| `test_cheat_flatten` | extension match, TITLE/VERSION/PROCESS/SOURCE_ID parse, HENCC path-derived source IDs, flat install names, version sanitize |
+| `test_cheat_flatten` | extension match, TITLE/VERSION/PROCESS/SOURCE_ID parse, HENCC json/shn/mc4 copy with original names, version sanitize |
 | `test_cheat_repository` | resolve every compatible TITLE_VERSION[_PROCESS][_SOURCE_ID] source, JSON/SHN/MC4 side-by-side, process vs generic |
 | `test_git_mirror_factory` | archive URL factory; zh-Hans → cnb |
 | `test_cheat_catalog` | registry + catalog layout/slug (no host URLs) |

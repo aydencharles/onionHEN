@@ -104,33 +104,6 @@ int onion_cheat_filename_compare(const onion_cheat_filename_t *lhs,
                                  const char *rhs_name);
 
 /**
- * Build a flat install name from GoldHEN/collection-style filenames.
- * Keeps a non-eboot PROCESS and an 8-hex SOURCE_ID; drops eboot.bin and
- * author aliases (e.g. CUSA05786_01.04_eboot.bin.json →
- * CUSA05786_01.04.json, PPSA17168_01.004.000_97905f51.json stays sourced).
- * Returns 0 on success, -1 if the name is not a recognized cheat file.
- */
-int onion_cheat_build_flat_name(const char *filename, char *out, size_t out_size);
-
-/**
- * Derive the HENCC source ID from a relative source path. Separators are
- * normalized to '/', ASCII letters are lowercased, and the first eight
- * lowercase hexadecimal SHA-256 characters are returned. The caller must
- * provide room for at least nine bytes (including the terminator).
- */
-int onion_cheat_source_id_from_path(const char *relative_path, char *out,
-                                    size_t out_size);
-
-/**
- * Build an install name using the source path when the input has no explicit
- * source ID. Top-level files keep the legacy name; nested files receive the
- * deterministic HENCC source ID derived from @p relative_source_path.
- */
-int onion_cheat_build_flat_name_for_source(const char *filename,
-                                           const char *relative_source_path,
-                                           char *out, size_t out_size);
-
-/**
  * Sanitize a filename token: keep ASCII alnum . _ -;
  * replace other characters with '_'. Empty/NULL → empty string.
  */
@@ -151,7 +124,10 @@ enum onion_cheat_flatten_result {
   ONION_CHEAT_FLATTEN_CANCELLED = 1,
 };
 
-/** Flatten a tree with cooperative cancellation between complete files. */
+/**
+ * Copy HENCC json/, shn/, and mc4/ files into ONION_CHEATS_DIR with original
+ * names. Not recursive. Cooperative cancellation between complete files.
+ */
 int onion_cheat_flatten_install_tree_cancellable(
     const char *root, onion_cheat_progress_fn progress, void *progress_user,
     onion_cheat_cancel_fn should_cancel, void *cancel_user);

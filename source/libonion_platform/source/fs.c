@@ -4,11 +4,12 @@
 #include <onion/log.h>
 
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 static bool is_directory_entry(const char *path, unsigned char type) {
   struct stat st;
@@ -39,6 +40,33 @@ bool touch_file(const char *path) {
     return true;
   }
   return false;
+}
+
+bool mkdir_tree(const char *path) {
+  char current[1024];
+  size_t n;
+  size_t i;
+
+  if (path == NULL || path[0] == '\0') {
+    return false;
+  }
+  n = strlen(path);
+  if (n >= sizeof(current)) {
+    return false;
+  }
+  for (i = 0; i < n; ++i) {
+    current[i] = path[i];
+    current[i + 1] = '\0';
+    if (path[i] != '/' || i == 0) {
+      continue;
+    }
+    current[i] = '\0';
+    if (current[0] != '\0' && mkdir(current, 0777) != 0 && errno != EEXIST) {
+      return false;
+    }
+    current[i] = '/';
+  }
+  return mkdir(current, 0777) == 0 || errno == EEXIST;
 }
 
 static size_t count_tree_entries(const char *path) {

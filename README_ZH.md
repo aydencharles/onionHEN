@@ -145,11 +145,11 @@ Payload。若两个 FTP 服务使用相同 TCP 端口，只有一个服务能够
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].ShnExt
 ```
 
-`SOURCE_ID` 只用于标识物理来源。没有显式 ID 时，安装器会将相对来源路径中的 `\\` 归一化为 `/`，转为小写后计算 SHA-256，并取前 8 位小写十六进制字符。没有 `PROCESS` 的文件是通用来源；带进程名的文件只匹配对应进程。相同游戏、版本和进程的多个 JSON、SHN、MC4、ShnExt 来源会同时加载。
+`SOURCE_ID` 只用于标识物理来源。没有 `PROCESS` 的文件是通用来源；带进程名的文件只匹配对应进程。相同游戏、版本和进程的多个 JSON、SHN、MC4、ShnExt 来源会同时加载。
 
 金手指从磁盘加载。文件有改动时会重新载入，不必重启整套进程。
 
-`DOWNLOAD_CHEATS` 会通过 HTTPS 下载金手指仓库 ZIP，只解压 `cheats/` 子树，再 flatten 进上述目录；同步完成后会清理临时 ZIP。镜像由 `[cheats] mirror` 控制：`auto` 时简体中文走 cnb.cool，其它地区走 GitHub。
+`DOWNLOAD_CHEATS` 会通过 HTTPS 下载金手指仓库 ZIP，解压 `cheats/` 子树，再把 `json/`、`shn/`、`mc4/` 里的文件按原名拷进上述目录；同步完成后会清理临时 ZIP。镜像由 `[cheats] mirror` 控制：`auto` 时简体中文走 cnb.cool，其它地区走 GitHub。
 
 <br>
 

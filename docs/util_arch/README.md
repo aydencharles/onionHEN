@@ -266,7 +266,7 @@ cheat_engine_runtime
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
 ```
 
-`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。`SOURCE_ID` 只标识物理来源，不参与运行时 hash 匹配。同步 flatten 时，未带显式 ID 且位于扫描根目录下的来源，会把相对路径的 `\\` 归一化为 `/`、转小写后计算 SHA-256，取前 8 位小写十六进制字符作为 ID。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
+`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。`SOURCE_ID` 只标识物理来源。同步 flatten 时，未带显式 ID 且位于扫描根目录下的来源，会把相对路径的 `\\` 归一化为 `/`、转小写后计算 SHA-256，取前 8 位小写十六进制字符作为 ID。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
 显示排序使用 `json` → `shn` → `mc4` → `ShnExt`，不会在独立来源之间择一。
 
 #### 热重载

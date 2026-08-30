@@ -22,10 +22,6 @@
 #ifndef ONION_CHEAT_SOURCE_ID_LEN
 #define ONION_CHEAT_SOURCE_ID_LEN 16
 #endif
-/* Kept for source compatibility with older callers. */
-#ifndef ONION_CHEAT_HASH_LEN
-#define ONION_CHEAT_HASH_LEN ONION_CHEAT_SOURCE_ID_LEN
-#endif
 #ifndef ONION_CHEAT_SUFFIX_LEN
 #define ONION_CHEAT_SUFFIX_LEN 128
 #endif
@@ -45,11 +41,7 @@ typedef struct onion_cheat_filename {
   char title_id[ONION_CHEAT_TITLE_ID_LEN];
   char version[ONION_CHEAT_VERSION_LEN];
   char process[ONION_CHEAT_PROCESS_LEN];
-  /* HENCC's trailing 8-hex token identifies a physical source only. */
-  union {
-    char source_id[ONION_CHEAT_SOURCE_ID_LEN];
-    char hash[ONION_CHEAT_HASH_LEN]; /* deprecated compatibility alias */
-  };
+  char source_id[ONION_CHEAT_SOURCE_ID_LEN];
   char suffix[ONION_CHEAT_SUFFIX_LEN];
   int extension_rank;
 } onion_cheat_filename_t;
@@ -83,8 +75,6 @@ int onion_cheat_parse_filename(const char *filename,
 
 /** True when @p value is an 8-digit hexadecimal source ID. */
 int onion_cheat_is_source_id(const char *value);
-/** Deprecated compatibility name for onion_cheat_is_source_id. */
-int onion_cheat_is_hex_hash(const char *value);
 
 /** True when @p process is the default eboot / eboot.bin process. */
 int onion_cheat_is_eboot_process(const char *process);
@@ -97,23 +87,21 @@ int onion_cheat_is_eboot_process(const char *process);
 int onion_cheat_is_legacy_eboot_alias(const char *suffix);
 
 /**
- * True when @p parts is a legal match for the running process. The final
- * source ID is never compared with runtime executable/process information.
+ * True when @p parts is a legal match for the running process.
+ * Compatibility uses title/version/process only; source ID is identity.
  */
 int onion_cheat_filename_compatible(const onion_cheat_filename_t *parts,
-                                    const char *process,
-                                    const char *runtime_process_hash);
+                                    const char *process);
 
 /**
  * Rank two compatible filenames. Negative if @p lhs is a better match.
  * Order: process-scoped, generic TITLE_VER, source-ID/author eboot alias;
- * then extension rank; then name. Runtime process hashes are ignored.
+ * then extension rank; then name.
  */
 int onion_cheat_filename_compare(const onion_cheat_filename_t *lhs,
                                  const char *lhs_name,
                                  const onion_cheat_filename_t *rhs,
-                                 const char *rhs_name, const char *process,
-                                 const char *runtime_process_hash);
+                                 const char *rhs_name);
 
 /**
  * Build a flat install name from GoldHEN/collection-style filenames.

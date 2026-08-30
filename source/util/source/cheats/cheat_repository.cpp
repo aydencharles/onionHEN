@@ -28,15 +28,6 @@ void uppercaseAscii(char *value) {
   }
 }
 
-void lowercaseAscii(char *value) {
-  if (value == nullptr) {
-    return;
-  }
-  for (size_t i = 0; value[i] != '\0'; ++i) {
-    value[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(value[i])));
-  }
-}
-
 int64_t statMtimeNsec(const struct stat &st) {
 #if defined(__APPLE__)
   return static_cast<int64_t>(st.st_mtimespec.tv_nsec);
@@ -104,8 +95,7 @@ struct ScannedCandidate {
 };
 
 std::vector<ScannedCandidate> scanMatchingPaths(
-    const char *title_id, const std::string &version, std::string_view process,
-    std::string_view runtime_process_hash) {
+    const char *title_id, const std::string &version, std::string_view process) {
   std::vector<ScannedCandidate> matches;
   DIR *directory = ::opendir(ONION_CHEATS_DIR);
   if (directory == nullptr) {
@@ -117,26 +107,24 @@ std::vector<ScannedCandidate> scanMatchingPaths(
     if (onion_cheat_parse_filename(entry->d_name, &parts) < 0 ||
         strcasecmp(parts.title_id, title_id) != 0 ||
         std::strcmp(parts.version, version.c_str()) != 0 ||
-        !onion_cheat_filename_compatible(&parts, process.data(),
-                                          runtime_process_hash.data()) ||
+        !onion_cheat_filename_compatible(&parts, process.data()) ||
         !isRegularEntry(ONION_CHEATS_DIR, entry)) {
       continue;
     }
     matches.push_back({parts, entry->d_name});
   }
   ::closedir(directory);
-  std::sort(matches.begin(), matches.end(), [&](const ScannedCandidate &lhs,
-                                                const ScannedCandidate &rhs) {
-    return onion_cheat_filename_compare(
-               &lhs.parts, lhs.name.c_str(), &rhs.parts, rhs.name.c_str(),
-               process.data(), runtime_process_hash.data()) < 0;
-  });
+  std::sort(matches.begin(), matches.end(),
+            [](const ScannedCandidate &lhs, const ScannedCandidate &rhs) {
+              return onion_cheat_filename_compare(&lhs.parts, lhs.name.c_str(),
+                                                  &rhs.parts,
+                                                  rhs.name.c_str()) < 0;
+            });
   return matches;
 }
 
 bool normalizeGame(const game_context_t &game, std::string &title_id,
-                   std::string &version, std::string &process,
-                   std::string &runtime_process_hash) {
+                   std::string &version, std::string &process) {
   if (game.title_id[0] == '\0' || game.version[0] == '\0' ||
       std::strcmp(game.version, "unknown") == 0) {
     return false;
@@ -144,18 +132,13 @@ bool normalizeGame(const game_context_t &game, std::string &title_id,
   char title[sizeof(game.title_id)];
   char ver[32];
   char proc[sizeof(game.process_name)];
-  char runtime_hash[sizeof(game.process_hash)];
   std::snprintf(title, sizeof(title), "%s", game.title_id);
   uppercaseAscii(title);
   onion_cheat_normalize_filename_token(game.version, ver, sizeof(ver));
   onion_cheat_normalize_filename_token(game.process_name, proc, sizeof(proc));
-  onion_cheat_normalize_filename_token(game.process_hash, runtime_hash,
-                                       sizeof(runtime_hash));
-  lowercaseAscii(runtime_hash);
   title_id = title;
   version = ver;
   process = proc;
-  runtime_process_hash = runtime_hash;
   return !title_id.empty() && !version.empty();
 }
 
@@ -174,16 +157,14 @@ std::vector<std::string> CheatRepository::resolvePaths(
   std::string title_id;
   std::string version;
   std::string process;
-  std::string runtime_process_hash;
   FileSignature directory;
-  if (!normalizeGame(game, title_id, version, process, runtime_process_hash) ||
+  if (!normalizeGame(game, title_id, version, process) ||
       !readDirectorySignature(directory)) {
     return {};
   }
 
   const std::vector<ScannedCandidate> candidates =
-      scanMatchingPaths(title_id.c_str(), version, process,
-                        runtime_process_hash);
+      scanMatchingPaths(title_id.c_str(), version, process);
   std::vector<std::string> paths;
   paths.reserve(candidates.size());
   for (const ScannedCandidate &candidate : candidates) {

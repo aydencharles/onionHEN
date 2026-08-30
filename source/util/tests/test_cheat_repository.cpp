@@ -44,12 +44,11 @@ private:
 };
 
 game_context_t makeGame(const char *title_id, const char *version,
-                        const char *process, const char *hash = "") {
+                        const char *process) {
   game_context_t game{};
   std::snprintf(game.title_id, sizeof(game.title_id), "%s", title_id);
   std::snprintf(game.version, sizeof(game.version), "%s", version);
   std::snprintf(game.process_name, sizeof(game.process_name), "%s", process);
-  std::snprintf(game.process_hash, sizeof(game.process_hash), "%s", hash);
   return game;
 }
 
@@ -113,7 +112,7 @@ int test_source_id_generic_matches_processes() {
   return 0;
 }
 
-int test_multiple_hashes_pick_lexicographic() {
+int test_multiple_source_ids_pick_lexicographic() {
   constexpr const char *first = "PPSA17172_01.004.000_11111111.json";
   constexpr const char *second = "PPSA17172_01.004.000_22222222.json";
   ScopedCheatFiles files({first, second});
@@ -173,7 +172,7 @@ int test_resolve_paths_keep_generic_and_matching_process() {
   return 0;
 }
 
-int test_source_ids_are_not_runtime_hashes() {
+int test_multiple_source_ids_all_resolve() {
   constexpr const char *first = "PPSA17181_01.004.000_11111111.json";
   constexpr const char *second = "PPSA17181_01.004.000_22222222.json";
   ScopedCheatFiles files({first, second});
@@ -182,10 +181,10 @@ int test_source_ids_are_not_runtime_hashes() {
 
   const std::string expected = ScopedCheatFiles::path(first);
   const std::string actual = CheatRepository::resolvePath(
-      makeGame("PPSA17181", "01.004.000", "eboot.bin", "22222222"));
+      makeGame("PPSA17181", "01.004.000", "eboot.bin"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   const std::vector<std::string> paths = CheatRepository::resolvePaths(
-      makeGame("PPSA17181", "01.004.000", "eboot.bin", "33333333"));
+      makeGame("PPSA17181", "01.004.000", "eboot.bin"));
   TEST_ASSERT_EQ_INT(2, static_cast<int>(paths.size()));
   return 0;
 }
@@ -325,22 +324,22 @@ int test_eboot_without_bin_suffix_uses_alias() {
   return 0;
 }
 
-int test_process_hash_matches_running_process() {
-  constexpr const char *hashed = "CUSA00018_01.21_6584f95f.json";
+int test_process_scoped_beats_generic_source_id() {
+  constexpr const char *generic = "CUSA00018_01.21_6584f95f.json";
   constexpr const char *process =
       "CUSA00018_01.21_default.elf_fc14a673.json";
-  ScopedCheatFiles files({hashed, process});
-  TEST_ASSERT_TRUE(files.create(hashed));
+  ScopedCheatFiles files({generic, process});
+  TEST_ASSERT_TRUE(files.create(generic));
   TEST_ASSERT_TRUE(files.create(process));
 
   const std::string process_path = ScopedCheatFiles::path(process);
-  const std::string hashed_path = ScopedCheatFiles::path(hashed);
+  const std::string generic_path = ScopedCheatFiles::path(generic);
   const std::string default_elf = CheatRepository::resolvePath(
       makeGame("CUSA00018", "01.21", "default.elf"));
   const std::string eboot = CheatRepository::resolvePath(
       makeGame("CUSA00018", "01.21", "eboot.bin"));
   TEST_ASSERT_STREQ(process_path.c_str(), default_elf.c_str());
-  TEST_ASSERT_STREQ(hashed_path.c_str(), eboot.c_str());
+  TEST_ASSERT_STREQ(generic_path.c_str(), eboot.c_str());
   return 0;
 }
 
@@ -374,7 +373,7 @@ int test_generic_fallback_for_unknown_process() {
   return 0;
 }
 
-int test_underscored_process_hash() {
+int test_underscored_process_source_id() {
   constexpr const char *name =
       "CUSA02343_01.00_big2-ps4_Shipping.elf_8feca873.json";
   ScopedCheatFiles files({name});
@@ -433,10 +432,10 @@ extern "C" int test_cheat_repository_suite(void) {
                              test_process_name_has_priority);
   failures += onion_test_run("repository.source_id_generic_process",
                              test_source_id_generic_matches_processes);
-  failures += onion_test_run("repository.multiple_hashes_lexicographic",
-                             test_multiple_hashes_pick_lexicographic);
-  failures += onion_test_run("repository.source_id_neutral",
-                             test_source_ids_are_not_runtime_hashes);
+  failures += onion_test_run("repository.multiple_source_ids_lexicographic",
+                             test_multiple_source_ids_pick_lexicographic);
+  failures += onion_test_run("repository.multiple_source_ids_all_resolve",
+                             test_multiple_source_ids_all_resolve);
   failures += onion_test_run("repository.resolve_paths_all_formats",
                              test_resolve_paths_returns_all_formats);
   failures += onion_test_run("repository.resolve_paths_process_filter",
@@ -458,14 +457,14 @@ extern "C" int test_cheat_repository_suite(void) {
                              test_eboot_without_bin_suffix_uses_alias);
   failures += onion_test_run("repository.file_signature",
                              test_file_signature_identity);
-  failures += onion_test_run("repository.process_hash_matches",
-                             test_process_hash_matches_running_process);
+  failures += onion_test_run("repository.process_beats_generic_source_id",
+                             test_process_scoped_beats_generic_source_id);
   failures += onion_test_run("repository.process_beats_generic",
                              test_process_scoped_beats_generic);
   failures += onion_test_run("repository.generic_fallback_process",
                              test_generic_fallback_for_unknown_process);
-  failures += onion_test_run("repository.underscored_process_hash",
-                             test_underscored_process_hash);
+  failures += onion_test_run("repository.underscored_process_source_id",
+                             test_underscored_process_source_id);
   failures += onion_test_run("repository.game_name_prefix",
                              test_game_name_prefix_resolves);
   return failures;

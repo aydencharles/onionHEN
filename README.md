@@ -158,8 +158,7 @@ optional process and 8-hex source ID:
 `PROCESS` is optional. `SOURCE_ID` is a stable physical-source discriminator.
 For a source without an explicit ID, the installer derives it as the first
 eight lowercase hex characters of `SHA256(lowercase(relative_path))`, after
-normalizing `\\` to `/`. It is not an executable/build hash and is never used
-for runtime compatibility. OnionHEN loads every compatible source for the
+normalizing `\\` to `/`. OnionHEN loads every compatible source for the
 title/version/process, so independent JSON, SHN, MC4 and ShnExt files can
 coexist. A source with an explicit process is only used for that process; a
 source without one is generic.

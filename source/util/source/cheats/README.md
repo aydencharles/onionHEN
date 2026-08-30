@@ -45,12 +45,12 @@ IPC DOWNLOAD_CHEATS
 ```
 
 `PROCESS` and 8-hex `SOURCE_ID` are optional. `SOURCE_ID` identifies a
-physical source and is not compared with a runtime process hash. When an
-installed source has no explicit ID and is nested below the scan root, the
-flattener derives one as the first eight lowercase hex characters of
-`SHA256(lowercase(relative_path))`, after replacing `\\` with `/`. The
-repository returns all sources compatible with title/version/process; format
-priority only determines deterministic display order.
+physical source. When an installed source has no explicit ID and is nested
+below the scan root, the flattener derives one as the first eight lowercase
+hex characters of `SHA256(lowercase(relative_path))`, after replacing `\\`
+with `/`. The repository returns all sources compatible with
+title/version/process; format priority only determines deterministic display
+order.
 
 ## Memory
 

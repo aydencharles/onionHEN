@@ -42,7 +42,6 @@ public:
   /**
    * Resolve every compatible physical source. The returned paths are stable
    * and ordered by process scope, generic scope, extension, then filename.
-   * HENCC source IDs are identity discriminators, never compatibility hashes.
    */
   static std::vector<std::string> resolvePaths(const game_context_t &game);
 

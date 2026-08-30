@@ -145,10 +145,6 @@ int onion_cheat_is_source_id(const char *value) {
   return 1;
 }
 
-int onion_cheat_is_hex_hash(const char *value) {
-  return onion_cheat_is_source_id(value);
-}
-
 int onion_cheat_is_eboot_process(const char *process) {
   return ascii_iequals(process, "eboot") ||
          ascii_iequals(process, "eboot.bin");
@@ -285,14 +281,10 @@ static int processes_match(const char *lhs, const char *rhs) {
 }
 
 int onion_cheat_filename_compatible(const onion_cheat_filename_t *parts,
-                                    const char *process,
-                                    const char *runtime_process_hash) {
+                                    const char *process) {
   if (parts == NULL) {
     return 0;
   }
-  /* The trailing token is a HENCC source ID, not a runtime hash. Keep the
-   * parameter for ABI compatibility, but never use it for matching. */
-  (void)runtime_process_hash;
 
   if (parts->process[0] != '\0') {
     if (onion_cheat_is_eboot_process(parts->process)) {
@@ -322,13 +314,10 @@ static int scope_rank(const onion_cheat_filename_t *parts) {
 int onion_cheat_filename_compare(const onion_cheat_filename_t *lhs,
                                  const char *lhs_name,
                                  const onion_cheat_filename_t *rhs,
-                                 const char *rhs_name, const char *process,
-                                 const char *runtime_process_hash) {
+                                 const char *rhs_name) {
   int left;
   int right;
 
-  (void)process;
-  (void)runtime_process_hash;
   if (lhs == NULL || rhs == NULL) {
     return lhs == rhs ? 0 : (lhs == NULL ? 1 : -1);
   }

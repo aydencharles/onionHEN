@@ -37,7 +37,6 @@ typedef struct {
   char version[32];
   char platform[16]; /* "ps4" / "ps5" / "unknown" */
   char process_name[64];
-  char process_hash[16]; /* optional 8-hex eboot/process hash; empty if unknown */
 } game_context_t;
 
 void util_game_platform_from_title_id(const char *title_id, char *out,

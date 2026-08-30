@@ -87,6 +87,8 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.onionhen_game_opts); }},
     {"id_overlay_change_pos",
      +[]() -> std::string { return int_str(g_settings.overlay_pos); }},
+    {"id_overlay_align",
+     +[]() -> std::string { return int_str(g_settings.overlay_align); }},
     /* Exact list id only — not id_toolbox_shortcut_N list_items. */
     {"id_toolbox_shortcut",
      +[]() -> std::string { return int_str(g_settings.toolbox_shortcut_opt); }},

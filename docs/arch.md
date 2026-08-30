@@ -164,7 +164,7 @@ OnionHEN/
 
 | 服务 | 端口 / 入口 | 说明 |
 |------|-------------|------|
-| Cheats | IPC | flat-file cheat engine（flat `TITLE_VERSION.ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
+| Cheats | IPC | flat-file cheat engine（multi-source `TITLE_VERSION[_PROCESS][_SOURCE_ID].ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | Toolbox 请求 | IPC | util 崩溃重拉后向 crit 请求 `BREW_ENABLE_TOOLBOX`；休息恢复在 daemon |
 | FTP | TCP `ftp.port`（默认 1337） | util 内部 `ftpsrv` 源码模块；插件页提供启停、自启和端口修改；待机恢复时由 util 重绑已启用监听 |
 
@@ -272,7 +272,7 @@ g_settings            daemon/util：SettingsStore；shellui：Settings（UI 线�
 LoadSettings()        统一 bool 契约：刷新 store；缺文件用默认并成功
 mtime 门控            settings_config_newest_mtime — 任一 twin 更新即失效
 运行时原子量          util rest-mode / network 标志等
-OverlayLayout         仅 shellui：由 overlay_pos 派生的像素坐标
+OverlayLayout         仅 shellui：由 overlay.edge + overlay.align 派生；纯函数在 overlay_layout.hpp
 ```
 
 ### 2.8 主机工具（`scripts/`）

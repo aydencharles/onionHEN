@@ -86,6 +86,10 @@ inline constexpr int kLogLevelInfo = 3;
 inline constexpr int kLogLevelDebug = 4;
 inline constexpr int kLogLevelTrace = 5;
 
+inline constexpr int kOverlayAlignLeft = 0;
+inline constexpr int kOverlayAlignCenter = 1;
+inline constexpr int kOverlayAlignRight = 2;
+
 inline constexpr int kFanThresholdMinCelsius = 0;
 inline constexpr int kFanThresholdMaxCelsius = 100;
 inline constexpr int kFanAutomaticThresholdCelsius = 77;
@@ -143,6 +147,8 @@ struct Settings {
   /** Per-core CPU usage mode on the overlay (id_all_cpu_usage). */
   bool all_cpu_usage = false;
   int overlay_pos = 0; // 0/1 top edge, 2/3 bottom edge
+  /** 0 left, 1 center, 2 right. Independent of overlay.edge. */
+  int overlay_align = kOverlayAlignCenter;
 
   // [shortcuts]
   int cheats_shortcut_opt = 0;

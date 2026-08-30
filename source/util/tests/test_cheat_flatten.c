@@ -44,17 +44,22 @@ static int write_text(const char *path, const char *text) {
 
 static int test_flatten_progress(void) {
   const char *source = ONION_DATA_ROOT "/flatten-progress";
-  const char *first_source = ONION_DATA_ROOT
-      "/flatten-progress/CUSA99991_01.00.json";
-  const char *second_source = ONION_DATA_ROOT
-      "/flatten-progress/CUSA99992_01.00.shn";
-  const char *ignored_source = ONION_DATA_ROOT "/flatten-progress/readme.txt";
+  const char *json_dir = ONION_DATA_ROOT "/flatten-progress/json";
+  const char *shn_dir = ONION_DATA_ROOT "/flatten-progress/shn";
+  const char *first_source =
+      ONION_DATA_ROOT "/flatten-progress/json/CUSA99991_01.00.json";
+  const char *second_source =
+      ONION_DATA_ROOT "/flatten-progress/shn/CUSA99992_01.00.shn";
+  const char *ignored_source =
+      ONION_DATA_ROOT "/flatten-progress/json/readme.txt";
   const char *first_dest = ONION_CHEATS_DIR "/CUSA99991_01.00.json";
   const char *second_dest = ONION_CHEATS_DIR "/CUSA99992_01.00.shn";
 
   (void)mkdir(ONION_DATA_ROOT, 0777);
   (void)mkdir(ONION_CHEATS_DIR, 0777);
   (void)mkdir(source, 0777);
+  (void)mkdir(json_dir, 0777);
+  (void)mkdir(shn_dir, 0777);
   TEST_ASSERT_EQ_INT(0, write_text(first_source, "{}"));
   TEST_ASSERT_EQ_INT(0, write_text(second_source, "fixture"));
   TEST_ASSERT_EQ_INT(0, write_text(ignored_source, "ignored"));
@@ -74,16 +79,20 @@ static int test_flatten_progress(void) {
   unlink(ignored_source);
   unlink(first_dest);
   unlink(second_dest);
+  rmdir(json_dir);
+  rmdir(shn_dir);
   rmdir(source);
   return 0;
 }
 
 static int test_flatten_cancel_between_files(void) {
   const char *source = ONION_DATA_ROOT "/flatten-cancel";
+  const char *json_dir = ONION_DATA_ROOT "/flatten-cancel/json";
+  const char *shn_dir = ONION_DATA_ROOT "/flatten-cancel/shn";
   const char *first_source =
-      ONION_DATA_ROOT "/flatten-cancel/CUSA99993_01.00.json";
+      ONION_DATA_ROOT "/flatten-cancel/json/CUSA99993_01.00.json";
   const char *second_source =
-      ONION_DATA_ROOT "/flatten-cancel/CUSA99994_01.00.shn";
+      ONION_DATA_ROOT "/flatten-cancel/shn/CUSA99994_01.00.shn";
   const char *first_dest = ONION_CHEATS_DIR "/CUSA99993_01.00.json";
   const char *second_dest = ONION_CHEATS_DIR "/CUSA99994_01.00.shn";
   int installed_count;
@@ -91,6 +100,8 @@ static int test_flatten_cancel_between_files(void) {
   (void)mkdir(ONION_DATA_ROOT, 0777);
   (void)mkdir(ONION_CHEATS_DIR, 0777);
   (void)mkdir(source, 0777);
+  (void)mkdir(json_dir, 0777);
+  (void)mkdir(shn_dir, 0777);
   (void)unlink(first_dest);
   (void)unlink(second_dest);
   TEST_ASSERT_EQ_INT(0, write_text(first_source, "{}"));
@@ -117,6 +128,104 @@ static int test_flatten_cancel_between_files(void) {
   unlink(second_source);
   unlink(first_dest);
   unlink(second_dest);
+  rmdir(json_dir);
+  rmdir(shn_dir);
+  rmdir(source);
+  return 0;
+}
+
+static int test_flatten_keeps_original_names(void) {
+  const char *source = ONION_DATA_ROOT "/flatten-keep";
+  const char *json_dir = ONION_DATA_ROOT "/flatten-keep/json";
+  const char *mc4_dir = ONION_DATA_ROOT "/flatten-keep/mc4";
+  const char *json_name = "CUSA00016_01.00_e4bf73bd.json";
+  const char *process_name = "CUSA00018_01.21_default_mp.elf_8624072e.json";
+  const char *mc4_name = "PPSA12345_01.000.000_9a1bc234.mc4";
+  char json_source[256];
+  char process_source[256];
+  char mc4_source[256];
+  char json_dest[256];
+  char process_dest[256];
+  char mc4_dest[256];
+
+  (void)mkdir(ONION_DATA_ROOT, 0777);
+  (void)mkdir(ONION_CHEATS_DIR, 0777);
+  (void)mkdir(source, 0777);
+  (void)mkdir(json_dir, 0777);
+  (void)mkdir(mc4_dir, 0777);
+  snprintf(json_source, sizeof(json_source), "%s/%s", json_dir, json_name);
+  snprintf(process_source, sizeof(process_source), "%s/%s", json_dir,
+           process_name);
+  snprintf(mc4_source, sizeof(mc4_source), "%s/%s", mc4_dir, mc4_name);
+  snprintf(json_dest, sizeof(json_dest), ONION_CHEATS_DIR "/%s", json_name);
+  snprintf(process_dest, sizeof(process_dest), ONION_CHEATS_DIR "/%s",
+           process_name);
+  snprintf(mc4_dest, sizeof(mc4_dest), ONION_CHEATS_DIR "/%s", mc4_name);
+  unlink(json_dest);
+  unlink(process_dest);
+  unlink(mc4_dest);
+  TEST_ASSERT_EQ_INT(0, write_text(json_source, "{}"));
+  TEST_ASSERT_EQ_INT(0, write_text(process_source, "{}"));
+  TEST_ASSERT_EQ_INT(0, write_text(mc4_source, "mc4"));
+
+  TEST_ASSERT_EQ_INT(ONION_CHEAT_FLATTEN_OK,
+                     onion_cheat_flatten_install_tree_cancellable(
+                         source, NULL, NULL, NULL, NULL));
+  TEST_ASSERT_TRUE(access(json_dest, F_OK) == 0);
+  TEST_ASSERT_TRUE(access(process_dest, F_OK) == 0);
+  TEST_ASSERT_TRUE(access(mc4_dest, F_OK) == 0);
+
+  unlink(json_source);
+  unlink(process_source);
+  unlink(mc4_source);
+  unlink(json_dest);
+  unlink(process_dest);
+  unlink(mc4_dest);
+  rmdir(json_dir);
+  rmdir(mc4_dir);
+  rmdir(source);
+  return 0;
+}
+
+static int test_flatten_ignores_nested_and_root_files(void) {
+  const char *source = ONION_DATA_ROOT "/flatten-ignore";
+  const char *json_dir = ONION_DATA_ROOT "/flatten-ignore/json";
+  const char *nested_dir = ONION_DATA_ROOT "/flatten-ignore/json/nested";
+  const char *root_source =
+      ONION_DATA_ROOT "/flatten-ignore/CUSA99990_01.00.json";
+  const char *nested_source =
+      ONION_DATA_ROOT "/flatten-ignore/json/nested/CUSA99991_01.00.json";
+  const char *kept_source =
+      ONION_DATA_ROOT "/flatten-ignore/json/CUSA99992_01.00.json";
+  const char *root_dest = ONION_CHEATS_DIR "/CUSA99990_01.00.json";
+  const char *nested_dest = ONION_CHEATS_DIR "/CUSA99991_01.00.json";
+  const char *kept_dest = ONION_CHEATS_DIR "/CUSA99992_01.00.json";
+
+  (void)mkdir(ONION_DATA_ROOT, 0777);
+  (void)mkdir(ONION_CHEATS_DIR, 0777);
+  (void)mkdir(source, 0777);
+  (void)mkdir(json_dir, 0777);
+  (void)mkdir(nested_dir, 0777);
+  unlink(root_dest);
+  unlink(nested_dest);
+  unlink(kept_dest);
+  TEST_ASSERT_EQ_INT(0, write_text(root_source, "{}"));
+  TEST_ASSERT_EQ_INT(0, write_text(nested_source, "{}"));
+  TEST_ASSERT_EQ_INT(0, write_text(kept_source, "{}"));
+
+  TEST_ASSERT_EQ_INT(ONION_CHEAT_FLATTEN_OK,
+                     onion_cheat_flatten_install_tree_cancellable(
+                         source, NULL, NULL, NULL, NULL));
+  TEST_ASSERT_TRUE(access(root_dest, F_OK) != 0);
+  TEST_ASSERT_TRUE(access(nested_dest, F_OK) != 0);
+  TEST_ASSERT_TRUE(access(kept_dest, F_OK) == 0);
+
+  unlink(root_source);
+  unlink(nested_source);
+  unlink(kept_source);
+  unlink(kept_dest);
+  rmdir(nested_dir);
+  rmdir(json_dir);
   rmdir(source);
   return 0;
 }
@@ -163,99 +272,6 @@ static int test_match_ext_reject(void) {
   return 0;
 }
 
-static int test_flat_simple(void) {
-  char out[128];
-
-  TEST_ASSERT_EQ_INT(0, onion_cheat_build_flat_name("CUSA05786_01.04.json", out,
-                                                   sizeof(out)));
-  TEST_ASSERT_STREQ("CUSA05786_01.04.json", out);
-
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name("PPSA01340_01.004.000.shn", out,
-                                    sizeof(out)));
-  TEST_ASSERT_STREQ("PPSA01340_01.004.000.shn", out);
-  return 0;
-}
-
-static int test_flat_strips_process_suffix(void) {
-  char out[128];
-
-  /* GoldHEN style: TITLE_VER_eboot.bin.json → drop default eboot segment */
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name("CUSA05786_01.04_eboot.bin.json", out,
-                                    sizeof(out)));
-  TEST_ASSERT_STREQ("CUSA05786_01.04.json", out);
-
-  /* Collection hash is part of the identity; keep it. */
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name(
-             "PPSA17168_01.004.000_97905f51.json", out, sizeof(out)));
-  TEST_ASSERT_STREQ("PPSA17168_01.004.000_97905f51.json", out);
-
-  /* Non-eboot process + hash stays process-scoped. */
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name(
-             "CUSA00018_01.21_default.elf_fc14a673.json", out, sizeof(out)));
-  TEST_ASSERT_STREQ("CUSA00018_01.21_default.elf_fc14a673.json", out);
-
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name(
-             "PPSA05686_01.002.000_tllr-boot.bin.shn", out, sizeof(out)));
-  TEST_ASSERT_STREQ("PPSA05686_01.002.000_tllr-boot.bin.shn", out);
-  return 0;
-}
-
-static int test_flat_shnext_with_tid_prefix(void) {
-  char out[128];
-
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name("PPSA07230_01.012.000_Aigars_Uze.ShnExt",
-                                    out, sizeof(out)));
-  TEST_ASSERT_STREQ("PPSA07230_01.012.000.ShnExt", out);
-
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name(
-             "Assassins-Creed-Mirage_PPSA07230_01.012.000.ShnExt", out,
-             sizeof(out)));
-  TEST_ASSERT_STREQ("PPSA07230_01.012.000.ShnExt", out);
-  return 0;
-}
-
-static int test_flat_uppercase_title(void) {
-  char out[128];
-
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name("cusa12345_1.00.json", out, sizeof(out)));
-  TEST_ASSERT_STREQ("CUSA12345_1.00.json", out);
-  return 0;
-}
-
-static int test_flat_dash_separator(void) {
-  char out[128];
-
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_build_flat_name("CUSA12345-01.00.json", out, sizeof(out)));
-  TEST_ASSERT_STREQ("CUSA12345_01.00.json", out);
-  return 0;
-}
-
-static int test_flat_reject(void) {
-  char out[128];
-
-  TEST_ASSERT_EQ_INT(-1, onion_cheat_build_flat_name("readme.txt", out,
-                                                    sizeof(out)));
-  TEST_ASSERT_EQ_INT(-1, onion_cheat_build_flat_name("nounderscore.json", out,
-                                                    sizeof(out)));
-  TEST_ASSERT_EQ_INT(-1, onion_cheat_build_flat_name("ab_01.json", out,
-                                                    sizeof(out))); /* tid < 4 */
-  TEST_ASSERT_EQ_INT(-1, onion_cheat_build_flat_name("CUSA12345_.json", out,
-                                                    sizeof(out))); /* no ver */
-  TEST_ASSERT_EQ_INT(-1, onion_cheat_build_flat_name(NULL, out, sizeof(out)));
-  TEST_ASSERT_EQ_INT(-1, onion_cheat_build_flat_name("CUSA12345_1.0.json", NULL,
-                                                    0));
-  return 0;
-}
-
 static int test_parse_filename_parts(void) {
   onion_cheat_filename_t parts;
 
@@ -264,7 +280,7 @@ static int test_parse_filename_parts(void) {
   TEST_ASSERT_STREQ("CUSA05786", parts.title_id);
   TEST_ASSERT_STREQ("01.04", parts.version);
   TEST_ASSERT_STREQ("", parts.process);
-  TEST_ASSERT_STREQ("", parts.hash);
+  TEST_ASSERT_STREQ("", parts.source_id);
   TEST_ASSERT_STREQ("", parts.suffix);
   TEST_ASSERT_EQ_INT(0, parts.extension_rank);
 
@@ -273,14 +289,14 @@ static int test_parse_filename_parts(void) {
   TEST_ASSERT_STREQ("PPSA17168", parts.title_id);
   TEST_ASSERT_STREQ("01.004.000", parts.version);
   TEST_ASSERT_STREQ("", parts.process);
-  TEST_ASSERT_STREQ("97905f51", parts.hash);
+  TEST_ASSERT_STREQ("97905f51", parts.source_id);
   TEST_ASSERT_STREQ("97905f51", parts.suffix);
   TEST_ASSERT_EQ_INT(0, parts.extension_rank);
 
   TEST_ASSERT_EQ_INT(
       0, onion_cheat_parse_filename("CUSA05786_01.04_eboot.bin.json", &parts));
   TEST_ASSERT_STREQ("eboot.bin", parts.process);
-  TEST_ASSERT_STREQ("", parts.hash);
+  TEST_ASSERT_STREQ("", parts.source_id);
   TEST_ASSERT_STREQ("eboot.bin", parts.suffix);
 
   TEST_ASSERT_EQ_INT(
@@ -296,24 +312,45 @@ static int test_parse_filename_parts(void) {
   TEST_ASSERT_STREQ("CUSA00018", parts.title_id);
   TEST_ASSERT_STREQ("01.21", parts.version);
   TEST_ASSERT_STREQ("default.elf", parts.process);
-  TEST_ASSERT_STREQ("fc14a673", parts.hash);
+  TEST_ASSERT_STREQ("fc14a673", parts.source_id);
 
   TEST_ASSERT_EQ_INT(
       0, onion_cheat_parse_filename(
              "CUSA02343_01.00_big2-ps4_Shipping.elf_8feca873.json", &parts));
   TEST_ASSERT_STREQ("big2-ps4_Shipping.elf", parts.process);
-  TEST_ASSERT_STREQ("8feca873", parts.hash);
+  TEST_ASSERT_STREQ("8feca873", parts.source_id);
 
   TEST_ASSERT_EQ_INT(0, onion_cheat_parse_filename(
                             "CUSA00025_01.00_default_mp.elf_123854e1.shn",
                             &parts));
   TEST_ASSERT_STREQ("default_mp.elf", parts.process);
-  TEST_ASSERT_STREQ("123854e1", parts.hash);
+  TEST_ASSERT_STREQ("123854e1", parts.source_id);
+
+  TEST_ASSERT_EQ_INT(
+      0, onion_cheat_parse_filename("CUSA00016_01.00_e4bf73bd.json", &parts));
+  TEST_ASSERT_STREQ("CUSA00016", parts.title_id);
+  TEST_ASSERT_STREQ("01.00", parts.version);
+  TEST_ASSERT_STREQ("", parts.process);
+  TEST_ASSERT_STREQ("e4bf73bd", parts.source_id);
+
+  TEST_ASSERT_EQ_INT(0, onion_cheat_parse_filename(
+                            "CUSA00018_01.21_default_mp.elf_8624072e.json",
+                            &parts));
+  TEST_ASSERT_STREQ("default_mp.elf", parts.process);
+  TEST_ASSERT_STREQ("8624072e", parts.source_id);
+
+  TEST_ASSERT_EQ_INT(
+      0, onion_cheat_parse_filename("PPSA12345_01.000.000_9a1bc234.mc4",
+                                    &parts));
+  TEST_ASSERT_STREQ("PPSA12345", parts.title_id);
+  TEST_ASSERT_STREQ("01.000.000", parts.version);
+  TEST_ASSERT_STREQ("9a1bc234", parts.source_id);
+  TEST_ASSERT_EQ_INT(2, parts.extension_rank);
 
   TEST_ASSERT_EQ_INT(
       0, onion_cheat_parse_filename("SLUS00551_01.00_A74D915B.json", &parts));
   TEST_ASSERT_STREQ("SLUS00551", parts.title_id);
-  TEST_ASSERT_STREQ("a74d915b", parts.hash);
+  TEST_ASSERT_STREQ("a74d915b", parts.source_id);
 
   TEST_ASSERT_EQ_INT(
       0, onion_cheat_parse_filename(
@@ -322,7 +359,7 @@ static int test_parse_filename_parts(void) {
   TEST_ASSERT_STREQ("PPSA07230", parts.title_id);
   TEST_ASSERT_STREQ("01.012.000", parts.version);
   TEST_ASSERT_STREQ("", parts.process);
-  TEST_ASSERT_STREQ("", parts.hash);
+  TEST_ASSERT_STREQ("", parts.source_id);
   TEST_ASSERT_STREQ("Aigars_Uze", parts.suffix);
   TEST_ASSERT_EQ_INT(3, parts.extension_rank);
 
@@ -334,10 +371,10 @@ static int test_parse_filename_parts(void) {
 }
 
 static int test_legacy_eboot_alias(void) {
-  TEST_ASSERT_EQ_INT(1, onion_cheat_is_hex_hash("97905f51"));
-  TEST_ASSERT_EQ_INT(1, onion_cheat_is_hex_hash("A74D915B"));
-  TEST_ASSERT_EQ_INT(0, onion_cheat_is_hex_hash("default"));
-  TEST_ASSERT_EQ_INT(0, onion_cheat_is_hex_hash("97905f5"));
+  TEST_ASSERT_EQ_INT(1, onion_cheat_is_source_id("97905f51"));
+  TEST_ASSERT_EQ_INT(1, onion_cheat_is_source_id("A74D915B"));
+  TEST_ASSERT_EQ_INT(0, onion_cheat_is_source_id("default"));
+  TEST_ASSERT_EQ_INT(0, onion_cheat_is_source_id("97905f5"));
   TEST_ASSERT_EQ_INT(1, onion_cheat_is_eboot_process("eboot"));
   TEST_ASSERT_EQ_INT(1, onion_cheat_is_eboot_process("EBOOT.BIN"));
   TEST_ASSERT_EQ_INT(0, onion_cheat_is_eboot_process("default.elf"));
@@ -364,47 +401,37 @@ static onion_cheat_filename_t parse_or_empty(const char *name) {
 static int test_filename_compatible_and_compare(void) {
   const onion_cheat_filename_t generic =
       parse_or_empty("CUSA00018_01.21.json");
-  const onion_cheat_filename_t hashed =
+  const onion_cheat_filename_t sourced =
       parse_or_empty("CUSA00018_01.21_6584f95f.json");
-  const onion_cheat_filename_t other_hash =
+  const onion_cheat_filename_t other_source =
       parse_or_empty("CUSA00018_01.21_8bb68d84.json");
-  const onion_cheat_filename_t process_hash = parse_or_empty(
+  const onion_cheat_filename_t process_source = parse_or_empty(
       "CUSA00018_01.21_default.elf_fc14a673.json");
   const onion_cheat_filename_t process_only =
       parse_or_empty("CUSA00018_01.21_default.elf.json");
 
-  TEST_ASSERT_EQ_INT(1, onion_cheat_filename_compatible(&generic, "eboot.bin",
-                                                        ""));
-  TEST_ASSERT_EQ_INT(1, onion_cheat_filename_compatible(&generic, "default.elf",
-                                                        ""));
-  TEST_ASSERT_EQ_INT(1, onion_cheat_filename_compatible(&hashed, "eboot.bin",
-                                                        ""));
-  TEST_ASSERT_EQ_INT(0, onion_cheat_filename_compatible(&hashed, "default.elf",
-                                                        ""));
-  TEST_ASSERT_EQ_INT(0, onion_cheat_filename_compatible(&hashed, "eboot.bin",
-                                                        "8bb68d84"));
-  TEST_ASSERT_EQ_INT(1, onion_cheat_filename_compatible(&hashed, "eboot.bin",
-                                                        "6584f95f"));
-  TEST_ASSERT_EQ_INT(
-      1, onion_cheat_filename_compatible(&process_hash, "default.elf", ""));
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_filename_compatible(&process_hash, "eboot.bin", ""));
-  TEST_ASSERT_EQ_INT(
-      0, onion_cheat_filename_compatible(&process_only, "worker.bin", ""));
+  TEST_ASSERT_STREQ("6584f95f", sourced.source_id);
 
+  TEST_ASSERT_EQ_INT(1, onion_cheat_filename_compatible(&generic, "eboot.bin"));
+  TEST_ASSERT_EQ_INT(1,
+                     onion_cheat_filename_compatible(&generic, "default.elf"));
+  TEST_ASSERT_EQ_INT(1, onion_cheat_filename_compatible(&sourced, "eboot.bin"));
+  TEST_ASSERT_EQ_INT(1,
+                     onion_cheat_filename_compatible(&sourced, "default.elf"));
+  TEST_ASSERT_EQ_INT(
+      1, onion_cheat_filename_compatible(&process_source, "default.elf"));
+  TEST_ASSERT_EQ_INT(
+      0, onion_cheat_filename_compatible(&process_source, "eboot.bin"));
+  TEST_ASSERT_EQ_INT(
+      0, onion_cheat_filename_compatible(&process_only, "worker.bin"));
+
+  TEST_ASSERT_TRUE(onion_cheat_filename_compare(&process_source, "proc.json",
+                                                &generic, "generic.json") < 0);
+  TEST_ASSERT_TRUE(onion_cheat_filename_compare(&generic, "generic.json",
+                                                &sourced, "sourced.json") < 0);
   TEST_ASSERT_TRUE(onion_cheat_filename_compare(
-                       &process_hash, "proc.json", &generic, "generic.json",
-                       "default.elf", "") < 0);
-  TEST_ASSERT_TRUE(onion_cheat_filename_compare(
-                       &generic, "generic.json", &hashed, "hashed.json",
-                       "eboot.bin", "") < 0);
-  TEST_ASSERT_TRUE(onion_cheat_filename_compare(
-                       &hashed, "CUSA00018_01.21_6584f95f.json", &other_hash,
-                       "CUSA00018_01.21_8bb68d84.json", "eboot.bin",
-                       "6584f95f") < 0);
-  TEST_ASSERT_TRUE(onion_cheat_filename_compare(
-                       &hashed, "CUSA00018_01.21_6584f95f.json", &other_hash,
-                       "CUSA00018_01.21_8bb68d84.json", "eboot.bin", "") < 0);
+                       &sourced, "CUSA00018_01.21_6584f95f.json", &other_source,
+                       "CUSA00018_01.21_8bb68d84.json") < 0);
   return 0;
 }
 
@@ -438,18 +465,13 @@ int test_cheat_flatten_suite(void) {
   int failures = 0;
   failures += onion_test_run("flatten.match_ext_known", test_match_ext_known);
   failures += onion_test_run("flatten.match_ext_reject", test_match_ext_reject);
-  failures += onion_test_run("flatten.flat_simple", test_flat_simple);
   failures += onion_test_run("flatten.progress", test_flatten_progress);
   failures += onion_test_run("flatten.cancel_between_files",
                              test_flatten_cancel_between_files);
-  failures += onion_test_run("flatten.flat_strips_process",
-                             test_flat_strips_process_suffix);
-  failures +=
-      onion_test_run("flatten.flat_shnext_tid", test_flat_shnext_with_tid_prefix);
-  failures +=
-      onion_test_run("flatten.flat_uppercase", test_flat_uppercase_title);
-  failures += onion_test_run("flatten.flat_dash", test_flat_dash_separator);
-  failures += onion_test_run("flatten.flat_reject", test_flat_reject);
+  failures += onion_test_run("flatten.keeps_original_names",
+                             test_flatten_keeps_original_names);
+  failures += onion_test_run("flatten.ignores_nested_and_root",
+                             test_flatten_ignores_nested_and_root_files);
   failures += onion_test_run("flatten.parse_filename", test_parse_filename_parts);
   failures +=
       onion_test_run("flatten.legacy_eboot_alias", test_legacy_eboot_alias);

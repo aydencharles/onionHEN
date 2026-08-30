@@ -145,20 +145,25 @@ services use the same TCP port, only one can bind it.
 
 ### Cheats
 
-Put cheat files in one directory. Names are `TITLEID_VERSION`, with optional process and 8-hex hash:
+Put cheat files in one directory. Names are `TITLEID_VERSION`, with an
+optional process and 8-hex source ID:
 
 ```text
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].json
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].shn
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].mc4
-/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<HASH>].ShnExt
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].json
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].shn
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].mc4
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].ShnExt
 ```
 
-`PROCESS` is omitted for `eboot.bin`. `HASH` is omitted when the file is not build-specific. A process-scoped file wins over a generic `TITLE_VERSION` file; json beats shn, mc4, then ShnExt.
+`PROCESS` is optional. `SOURCE_ID` is a stable physical-source discriminator.
+OnionHEN loads every compatible source for the title/version/process, so
+independent JSON, SHN, MC4 and ShnExt files can coexist. A source with an
+explicit process is only used for that process; a source without one is
+generic.
 
 Cheats load from disk. If a file changes, OnionHEN reloads it without restarting the whole stack.
 
-`DOWNLOAD_CHEATS` downloads a cheat catalog ZIP over HTTPS (GitHub or cnb.cool), extracts only its `cheats/` tree, and flattens it into this directory. `[cheats] mirror=auto` uses cnb.cool when the UI/system language is Simplified Chinese, otherwise GitHub.
+`DOWNLOAD_CHEATS` downloads a cheat catalog ZIP over HTTPS (GitHub or cnb.cool), extracts the `cheats/` tree, and copies `json/`, `shn/`, and `mc4/` files into this directory with their original names. `[cheats] mirror=auto` uses cnb.cool when the UI/system language is Simplified Chinese, otherwise GitHub.
 
 <br>
 
@@ -267,6 +272,7 @@ default from [`config.ini.example`](config.ini.example).
 | `overlay.enabled` | `true` | `true`, `false` |
 | `overlay.background` | `true` | `true`, `false` |
 | `overlay.edge` | `top` | `top`, `bottom` |
+| `overlay.align` | `center` | `left`, `center`, `right` |
 | `overlay.show_cpu` / `overlay.show_gpu` / `overlay.show_memory` / `overlay.show_fps` | `true` | `true`, `false` |
 | `overlay.cpu_usage_mode` | `average` | `average`, `per_core` |
 | `overlay.show_ip_address` | `false` | `true`, `false` |

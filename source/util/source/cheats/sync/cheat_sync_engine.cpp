@@ -8,7 +8,6 @@
 #include <cerrno>
 #include <cstdio>
 #include <string>
-#include <sys/stat.h>
 #include <unistd.h>
 
 namespace onion::cheats::sync {
@@ -48,27 +47,6 @@ std::string join_path(const std::string &a, const char *b) {
     out += b;
   }
   return out;
-}
-
-bool mkdir_tree(const std::string &path) {
-  if (path.empty() || path.size() >= 1024) {
-    return false;
-  }
-  std::string current;
-  current.reserve(path.size());
-  for (char ch : path) {
-    current.push_back(ch);
-    if (ch != '/' || current.size() == 1) {
-      continue;
-    }
-    current.pop_back();
-    if (!current.empty() && mkdir(current.c_str(), 0777) != 0 &&
-        errno != EEXIST) {
-      return false;
-    }
-    current.push_back('/');
-  }
-  return mkdir(current.c_str(), 0777) == 0 || errno == EEXIST;
 }
 
 struct PhaseProgress {
@@ -188,7 +166,7 @@ SyncStatus CheatSyncEngine::tryOne(const ICheatCatalog &catalog,
   if (should_cancel_ && should_cancel_(cancel_user_)) {
     return SyncStatus::Cancelled;
   }
-  if (!mkdir_tree(temp_root)) {
+  if (!mkdir_tree(temp_root.c_str())) {
     out.error = "temp directory failed";
     return SyncStatus::Io;
   }

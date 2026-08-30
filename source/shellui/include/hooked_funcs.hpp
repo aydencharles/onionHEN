@@ -151,7 +151,7 @@ int ini_parser_load(IniParser* parser, const char* filename);
 const char* ini_parser_get(IniParser* parser, const char* key, const char* default_value);
 bool LoadSettings();
 bool SaveSettings();
-/** Recompute g_overlay_layout from g_settings.overlay_pos. */
+/** Recompute g_overlay_layout from overlay edge and align. */
 void apply_overlay_layout();
 /** Apply the overlay layout using the live ShellUI logical canvas dimensions. */
 void apply_overlay_layout(float screen_w, float screen_h);

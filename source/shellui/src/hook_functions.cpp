@@ -67,9 +67,6 @@ MonoClass* MemoryStream_IO = nullptr;
 
 // UI runtime state: g_ui (shellui_state.hpp / shellui_globals.cpp)
 
-#define MAX_CHEATS 256
-
-
 // widgets → shellui_overlay_widgets.cpp
 extern "C"{
 int sceShellCoreUtilIsUsbMassStorageMounted(int num);

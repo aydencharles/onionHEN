@@ -99,5 +99,5 @@ IPC handleIPC
 cd source/util/tests && make test
 ```
 
-覆盖：utils（hex/extract/brace）、Factory 路由、JSON/SHN/MC4 合成样例、真实 fixtures（json/shn/mc4/ShnExt）、文件名 TITLE/VERSION/PROCESS/HASH 解析与 resolve。  
+覆盖：utils（hex/extract/brace）、Factory 路由、JSON/SHN/MC4 合成样例、真实 fixtures（json/shn/mc4/ShnExt）、文件名 TITLE/VERSION/PROCESS/SOURCE_ID 解析与 resolve。
 不覆盖：`CheatApplier` / 写内存（需目标机）。

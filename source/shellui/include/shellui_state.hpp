@@ -26,7 +26,8 @@ struct ToolboxUiState {
   bool is_current_game_open = true;
   std::string current_menu_tid;
   std::string current_cheat_tid;
-  int cheat_enabled_map[toolbox::kCheatMapSize]{};
+  /* Cheat sources are independent; the visible list is not capped at 256. */
+  std::vector<unsigned char> cheat_enabled_map;
 
   std::vector<PayloadEntry> payloads_list;
   std::vector<PayloadEntry> auto_payloads_list;
@@ -70,18 +71,26 @@ struct ToolboxUiState {
   }
 
   bool reset_cheats_if_tid_changed(std::string_view new_tid) {
-    return toolbox::reset_cheat_map_if_tid_changed(
-        current_cheat_tid, cheat_enabled_map, toolbox::kCheatMapSize, new_tid);
+    if (current_cheat_tid == new_tid)
+      return false;
+    current_cheat_tid = std::string(new_tid);
+    cheat_enabled_map.clear();
+    return true;
   }
 
   void set_cheat_enabled(int cheat_id, bool enabled) {
-    toolbox::set_cheat_enabled(cheat_enabled_map, toolbox::kCheatMapSize,
-                               cheat_id, enabled);
+    if (cheat_id < 0)
+      return;
+    const auto index = static_cast<std::size_t>(cheat_id);
+    if (index >= cheat_enabled_map.size())
+      cheat_enabled_map.resize(index + 1, 0);
+    cheat_enabled_map[index] = enabled ? 1 : 0;
   }
 
   bool get_cheat_enabled(int cheat_id) const {
-    return toolbox::get_cheat_enabled(cheat_enabled_map, toolbox::kCheatMapSize,
-                                      cheat_id);
+    return cheat_id >= 0 &&
+           static_cast<std::size_t>(cheat_id) < cheat_enabled_map.size() &&
+           cheat_enabled_map[static_cast<std::size_t>(cheat_id)] != 0;
   }
 };
 

@@ -167,9 +167,8 @@ std::string join_authors(cJSON* root) {
 }
 
 template <typename G>
-void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
-                          const std::string& game_name, bool can_toggle) {
-  cJSON* cheats = onion_cjson::item(root, "cheats");
+void append_cheat_array(G& page, cJSON* cheats, const std::string& tid,
+                        const std::string& game_name, bool can_toggle) {
   if (!cJSON_IsArray(cheats))
     return;
 
@@ -193,6 +192,40 @@ void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
                   desc, "tex_game_icon");
     }
     g_ui.set_cheat_enabled(id, enabled);
+  }
+}
+
+template <typename G>
+void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
+                          const std::string& game_name, bool can_toggle) {
+  cJSON* groups = onion_cjson::item(root, "groups");
+  if (!cJSON_IsArray(groups) || cJSON_GetArraySize(groups) == 0) {
+    append_cheat_array(page, onion_cjson::item(root, "cheats"), tid,
+                       game_name, can_toggle);
+    return;
+  }
+
+  int group_index = 0;
+  cJSON* group = nullptr;
+  cJSON_ArrayForEach(group, groups) {
+    const std::string format = onion_cjson::string_item(group, "format", "");
+    const std::string source_id =
+        onion_cjson::string_item(group, "sourceId", "");
+    const std::string authors = join_authors(group);
+    std::string heading =
+        format.empty() ? toolbox_i18n::tr("cheats.group.unnamed") : format;
+    if (!source_id.empty())
+      heading += " / " + source_id;
+    if (!authors.empty())
+      heading += " / " + authors;
+    /* U+3000: Settings needs a title to keep the row. Skip before the first source. */
+    if (group_index > 0)
+      page.label("id_cheat_group_spacer_" + std::to_string(group_index), "　",
+                 ps5ui::Style::Center);
+    page.label("id_cheat_group_" + std::to_string(group_index++), heading,
+               ps5ui::Style::Center);
+    append_cheat_array(page, onion_cjson::item(group, "cheats"), tid,
+                       game_name, can_toggle);
   }
 }
 
@@ -363,7 +396,12 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
   }
 
   std::string cheat_path;
-  if (!client.GetGameCheats(g_ui.running_tid, game_ver, cheat_path)) {
+  const int cheat_pid =
+      g_ui.is_game_open ? onion_find_pid_ex(g_ui.running_tid.c_str(), false,
+                                             true, true)
+                         : 0;
+  if (!client.GetGameCheats(g_ui.running_tid, game_ver, cheat_path, cheat_pid,
+                            appid)) {
     page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
                ps5ui::Style::Center);
     new_xml = page.build();
@@ -578,6 +616,17 @@ void append_toolbox_display_group(ps5ui::Group& g) {
                    },
                    toolbox_i18n::tr("overlay.pos.sub"),
                    toolbox_val("id_overlay_change_pos"))
+             .list("id_overlay_align", toolbox_i18n::tr("overlay.align"),
+                   [](ps5ui::ListBuilder& L) {
+                     L.item("id_overlay_align_left",
+                            toolbox_i18n::tr("overlay.align.left"), "0")
+                         .item("id_overlay_align_center",
+                               toolbox_i18n::tr("overlay.align.center"), "1")
+                         .item("id_overlay_align_right",
+                               toolbox_i18n::tr("overlay.align.right"), "2");
+                   },
+                   toolbox_i18n::tr("overlay.align.sub"),
+                   toolbox_val("id_overlay_align"))
              .toggle("id_overlay_gpu", toolbox_i18n::tr("overlay.gpu"),
                      toolbox_on("id_overlay_gpu"), std::nullopt,
                      toolbox_i18n::tr("overlay.gpu.desc"))

@@ -79,6 +79,9 @@ background=true
 # edge chooses the screen edge used by the monitor bar.
 # Available values: top, bottom
 edge=top
+# align packs metrics to the left, center, or right of the bar.
+# Available values: left, center, right
+align=center
 # show_cpu displays CPU temperature and usage.
 # Available values: true, false
 show_cpu=true

@@ -2,11 +2,11 @@
 
 #include "cheats/runtime.h"
 
+#include <onion/fs.h>
 #include <onion/log.h>
 
 #include <miniz.h>
 
-#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <set>
@@ -27,27 +27,6 @@ struct SelectedEntry {
   mz_uint64 size = 0;
   std::string relative;
 };
-
-bool mkdir_tree(const std::string &path) {
-  if (path.empty() || path.size() >= 1024) {
-    return false;
-  }
-  std::string current;
-  current.reserve(path.size());
-  for (size_t i = 0; i < path.size(); ++i) {
-    current.push_back(path[i]);
-    if (path[i] != '/' || current.size() == 1) {
-      continue;
-    }
-    current.pop_back();
-    if (!current.empty() && mkdir(current.c_str(), 0777) != 0 &&
-        errno != EEXIST) {
-      return false;
-    }
-    current.push_back('/');
-  }
-  return mkdir(current.c_str(), 0777) == 0 || errno == EEXIST;
-}
 
 bool safe_relative_path(const std::string &path) {
   if (path.empty() || path.size() >= 768 || path.front() == '/' ||
@@ -197,7 +176,7 @@ SyncStatus extract_cheat_zip(const char *zip_path, const char *dest_root,
         goto done;
       }
       const std::string dest = std::string(dest_root) + '/' + entry.relative;
-      if (!mkdir_tree(parent_path(dest)) ||
+      if (!mkdir_tree(parent_path(dest).c_str()) ||
           !mz_zip_reader_extract_to_file(&zip, entry.index, dest.c_str(), 0)) {
         (void)unlink(dest.c_str());
         LOG_ERROR("cheat zip extract failed path=%s err=%s", dest.c_str(),

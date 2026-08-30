@@ -42,6 +42,28 @@ static int test_replace_all_rewrites_entities(void) {
   return 0;
 }
 
+static int test_xml_unescape_named_entities(void) {
+  char amp[32] = "Health &amp; Ammo";
+  char mixed[64] = "A &lt; B &gt; &quot;q&quot; &apos;s &amp; Z";
+  char unknown[24] = "keep &nbsp; as-is";
+  char empty[1] = "";
+
+  onion_cheat_xml_unescape(amp);
+  TEST_ASSERT_STREQ("Health & Ammo", amp);
+
+  onion_cheat_xml_unescape(mixed);
+  TEST_ASSERT_STREQ("A < B > \"q\" 's & Z", mixed);
+
+  onion_cheat_xml_unescape(unknown);
+  TEST_ASSERT_STREQ("keep &nbsp; as-is", unknown);
+
+  onion_cheat_xml_unescape(empty);
+  TEST_ASSERT_STREQ("", empty);
+
+  onion_cheat_xml_unescape(NULL);
+  return 0;
+}
+
 static int test_load_file_buffer_reads_regular_file(void) {
   char path[256];
   long size = -1;
@@ -87,6 +109,8 @@ int test_cheat_utils_suite(void) {
                              test_hex_decode_handles_success_and_truncation);
   failures += onion_test_run("cheat utils replace all",
                              test_replace_all_rewrites_entities);
+  failures += onion_test_run("cheat utils xml unescape",
+                             test_xml_unescape_named_entities);
   failures += onion_test_run("cheat utils load file buffer",
                              test_load_file_buffer_reads_regular_file);
   failures += onion_test_run("cheat utils reject empty file",

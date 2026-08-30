@@ -184,6 +184,28 @@ int test_parse_xml_buffer_success() {
   return 0;
 }
 
+int test_parse_xml_unescapes_ampersand() {
+  const char *xml =
+      "<Trainer Process=\"eboot.bin\" Game=\"Ratchet &amp; Clank\" "
+      "Moder=\"Alice &amp; Bob\">"
+      "<Cheat Text=\"Inf Health &amp; Ammo\" Description=\"HP &amp; ammo\">"
+      "<Cheatline><Offset>10</Offset>"
+      "<ValueOn>AA</ValueOn><ValueOff>BB</ValueOff></Cheatline>"
+      "</Cheat>"
+      "</Trainer>";
+  static onion_cheat_file_t file;
+
+  TEST_ASSERT_EQ_INT(0, load_buf("shn", xml, file));
+  TEST_ASSERT_STREQ("Ratchet & Clank", file.name);
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(file.author_count));
+  TEST_ASSERT_STREQ("Alice & Bob", file.authors[0]);
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(file.cheat_count));
+  TEST_ASSERT_STREQ("Inf Health & Ammo", file.cheats[0].name);
+  TEST_ASSERT_STREQ("HP & ammo", file.cheats[0].description);
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
 int test_parse_xml_ignores_out_of_range_section() {
   const char *xml =
       "<Trainer Process=\"eboot.bin\" Game=\"Demo\">"
@@ -360,6 +382,8 @@ extern "C" int test_cheat_parsers_suite(void) {
                              test_parse_json_ignores_out_of_range_section);
   failures +=
       onion_test_run("cheat xml parse success", test_parse_xml_buffer_success);
+  failures += onion_test_run("cheat xml unescapes ampersand",
+                             test_parse_xml_unescapes_ampersand);
   failures += onion_test_run("cheat xml ignores out-of-range section",
                              test_parse_xml_ignores_out_of_range_section);
   failures +=

@@ -30,8 +30,8 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 |-------|----------------|
 | `test_cheat_utils` | hex decode, JSON extract, braces, replace_all, load buffer, ABI layout |
 | `test_cheat_parsers` | JSON / SHN / MC4 / ShnExt via factory + real fixtures |
-| `test_cheat_flatten` | extension match, TITLE/VERSION/PROCESS/HASH parse, flat install names, version sanitize |
-| `test_cheat_repository` | resolve TITLE_VERSION[_PROCESS][_HASH], process vs generic, hash match |
+| `test_cheat_flatten` | extension match, TITLE/VERSION/PROCESS/SOURCE_ID parse, HENCC json/shn/mc4 copy with original names, version sanitize |
+| `test_cheat_repository` | resolve every compatible TITLE_VERSION[_PROCESS][_SOURCE_ID] source, JSON/SHN/MC4 side-by-side, process vs generic |
 | `test_git_mirror_factory` | archive URL factory; zh-Hans → cnb |
 | `test_cheat_catalog` | registry + catalog layout/slug (no host URLs) |
 | `test_cheat_sync` | mocked HTTPS ZIP download, miniz extraction, fallback, install and cleanup |
@@ -45,6 +45,7 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_x64_relocator` | relocation-aware trampolines: RIP-relative memory/call, rel8/rel32 call/jmp/jcc, internal targets, safe rejection |
 | `test_reg_entity` | registry entity-id formula (account slots) |
 | `test_toolbox_helpers` | UI path rewrite + payload .elf basename filter |
+| `test_overlay_layout` | monitor-bar packing: top/bottom × left/right, hidden metrics, per-core width |
 | `test_settings` | semantic schema serialize/round-trip, partial INI defaults |
 | `test_ready` | ready markers, PID-bound process instances, path builder, name rejection, **fps_overlay / util_booted** flags, toolbox runtime-root marker |
 | `test_toolbox_injection` | same-PID skip, new-PID reinject, failure cleanup, concurrent request serialization |
@@ -54,7 +55,7 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_msg_protocol` | IPC paths, magic, command ordinals, `IPC_Ret`, message POD, reply JSON body |
 | `test_app_jailbreak_policy` | configurable app-jailbreak exact/prefix Title ID allowlist, including the Itemzflow compatibility ID `ITEM00001` |
 | `test_ps5_settings_ui` | fluent XML builder + escaping |
-| `test_toolbox_route` | resource → page routing + cheat map helpers |
+| `test_toolbox_route` | resource → page routing + dynamic cheat enabled-state |
 | `test_onpress_policy` | page-scoped OnPress ownership, stock-page pass-through, unrelated-resource stability |
 
 ## Intentionally not host-tested

@@ -1,6 +1,6 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods
  *
- * Shared filesystem helpers (if_exists / touch / rmtree).
+ * Shared filesystem helpers (if_exists / touch / mkdir_tree / rmtree).
  */
 
 #pragma once
@@ -17,6 +17,9 @@ bool if_exists(const char *path);
 
 /** Create or truncate empty file at path (mode 0777). */
 bool touch_file(const char *path);
+
+/** Create path and any missing parents (mode 0777). True if the directory exists. */
+bool mkdir_tree(const char *path);
 
 /** Recursively delete directory tree at path. */
 bool rmtree(const char *path);

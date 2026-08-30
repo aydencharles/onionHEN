@@ -215,7 +215,7 @@ void set_label_layout(const char *widget_name, float margin_left,
 }
 
 /**
- * Lay out metrics as slots centered as a group on the full-width bar.
+ * Lay out metrics as slots packed left/center/right on the full-width bar.
  * Labels use PositionType + margins layout.
  * Horizontal: label + value(s) + " | " between items (not after the last).
  *
@@ -326,7 +326,9 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   const float screen_w = g_overlay_layout.bar_w;
   if (screen_w <= 1.0f)
     return;
-  float x = (screen_w - total) * 0.5f;
+  float x = onion::overlay::pack_origin(
+      screen_w, total,
+      onion::overlay::bar_align_from_value(g_settings.overlay_align));
   const float margin_top = g_overlay_layout.label_margin_top;
 
   static const char *kAll[] = {

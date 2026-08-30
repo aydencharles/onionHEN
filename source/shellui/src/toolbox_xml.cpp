@@ -616,6 +616,17 @@ void append_toolbox_display_group(ps5ui::Group& g) {
                    },
                    toolbox_i18n::tr("overlay.pos.sub"),
                    toolbox_val("id_overlay_change_pos"))
+             .list("id_overlay_align", toolbox_i18n::tr("overlay.align"),
+                   [](ps5ui::ListBuilder& L) {
+                     L.item("id_overlay_align_left",
+                            toolbox_i18n::tr("overlay.align.left"), "0")
+                         .item("id_overlay_align_center",
+                               toolbox_i18n::tr("overlay.align.center"), "1")
+                         .item("id_overlay_align_right",
+                               toolbox_i18n::tr("overlay.align.right"), "2");
+                   },
+                   toolbox_i18n::tr("overlay.align.sub"),
+                   toolbox_val("id_overlay_align"))
              .toggle("id_overlay_gpu", toolbox_i18n::tr("overlay.gpu"),
                      toolbox_on("id_overlay_gpu"), std::nullopt,
                      toolbox_i18n::tr("overlay.gpu.desc"))

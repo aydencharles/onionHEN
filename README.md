@@ -272,6 +272,7 @@ default from [`config.ini.example`](config.ini.example).
 | `overlay.enabled` | `true` | `true`, `false` |
 | `overlay.background` | `true` | `true`, `false` |
 | `overlay.edge` | `top` | `top`, `bottom` |
+| `overlay.align` | `center` | `left`, `center`, `right` |
 | `overlay.show_cpu` / `overlay.show_gpu` / `overlay.show_memory` / `overlay.show_fps` | `true` | `true`, `false` |
 | `overlay.cpu_usage_mode` | `average` | `average`, `per_core` |
 | `overlay.show_ip_address` | `false` | `true`, `false` |

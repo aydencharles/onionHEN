@@ -49,6 +49,8 @@ static int test_default_zh(void) {
                   "OnionHEN 已崩溃……\n\n请将 /data/OnionHEN/"
                   "OnionHEN_crash.log 附加到 GitHub Issue：https://github.com/"
                   "aydencharles/onionHEN/issues") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("overlay.pos.top"), "顶部贴边") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("overlay.align.center"), "居中") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.enable_fmt"),
                                "为 %s 启用/禁用 %s") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.group.unnamed"), "来源") == 0);

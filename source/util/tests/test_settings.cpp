@@ -51,6 +51,7 @@ static int test_defaults_and_serialize_keys(void) {
                                  "# Available values: true, false\n"
                                  "enabled=true\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("edge=top") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("align=center") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("background=true") != std::string::npos);
   TEST_ASSERT_TRUE(
       text.find("exact_title_ids=ITEM00001,NPXS39041,PKGI13337,PKGI12345,"
@@ -132,6 +133,7 @@ static int test_full_schema_roundtrip(void) {
   in.overlay_ip = true;
   in.all_cpu_usage = true;
   in.overlay_pos = 2;
+  in.overlay_align = onion::kOverlayAlignRight;
   in.cheats_shortcut_opt = 4;
   in.toolbox_shortcut_opt = 2;
   in.ui_lang = onion::kUiLanguageZhHans;
@@ -167,6 +169,7 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(out.overlay_ip == in.overlay_ip);
   TEST_ASSERT_TRUE(out.all_cpu_usage == in.all_cpu_usage);
   TEST_ASSERT_EQ_INT(in.overlay_pos, out.overlay_pos);
+  TEST_ASSERT_EQ_INT(in.overlay_align, out.overlay_align);
   TEST_ASSERT_EQ_INT(in.cheats_shortcut_opt, out.cheats_shortcut_opt);
   TEST_ASSERT_EQ_INT(in.toolbox_shortcut_opt, out.toolbox_shortcut_opt);
   TEST_ASSERT_EQ_INT(in.ui_lang, out.ui_lang);
@@ -521,6 +524,61 @@ static int test_clamp_fan_threshold(void) {
   return 0;
 }
 
+static int test_overlay_edge_and_align(void) {
+  const std::string path = temp_ini_path();
+  TEST_ASSERT_TRUE(!path.empty());
+
+  struct {
+    const char *edge;
+    int expected_pos;
+    const char *edge_canonical;
+  } const edges[] = {
+      {"top", 0, "top"},
+      {"bottom", 2, "bottom"},
+  };
+  for (const auto &c : edges) {
+    FILE *f = fopen(path.c_str(), "w");
+    TEST_ASSERT_TRUE(f != nullptr);
+    fprintf(f, "[meta]\nschema_version=1\n\n[overlay]\nedge=%s\n", c.edge);
+    fclose(f);
+    onion::Settings out{};
+    TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
+    TEST_ASSERT_EQ_INT(c.expected_pos, out.overlay_pos);
+    TEST_ASSERT_EQ_INT(onion::kOverlayAlignCenter, out.overlay_align);
+    TEST_ASSERT_TRUE(onion::settings_serialize(out).find(
+                         std::string("edge=") + c.edge_canonical) !=
+                     std::string::npos);
+  }
+
+  struct {
+    const char *align;
+    int expected;
+    const char *canonical;
+  } const aligns[] = {
+      {"left", onion::kOverlayAlignLeft, "left"},
+      {"center", onion::kOverlayAlignCenter, "center"},
+      {"right", onion::kOverlayAlignRight, "right"},
+  };
+  for (const auto &c : aligns) {
+    FILE *f = fopen(path.c_str(), "w");
+    TEST_ASSERT_TRUE(f != nullptr);
+    fprintf(f,
+            "[meta]\nschema_version=1\n\n[overlay]\nedge=top\nalign=%s\n",
+            c.align);
+    fclose(f);
+    onion::Settings out{};
+    TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
+    TEST_ASSERT_EQ_INT(0, out.overlay_pos);
+    TEST_ASSERT_EQ_INT(c.expected, out.overlay_align);
+    TEST_ASSERT_TRUE(onion::settings_serialize(out).find(
+                         std::string("align=") + c.canonical) !=
+                     std::string::npos);
+  }
+
+  unlink(path.c_str());
+  return 0;
+}
+
 extern "C" int test_settings_suite(void) {
   int failures = 0;
   failures += onion_test_run("settings_defaults_serialize", test_defaults_and_serialize_keys);
@@ -531,6 +589,8 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_startup_open_after_load",
                              test_startup_open_after_load_parse_policy);
   failures += onion_test_run("settings_serialize_overlay_keys", test_serialize_contains_overlay_keys);
+  failures += onion_test_run("settings_overlay_edge_and_align",
+                             test_overlay_edge_and_align);
   failures += onion_test_run("settings_empty_file_defaults", test_empty_file_loads_defaults);
   failures += onion_test_run("settings_app_jailbreak_allowlist",
                              test_app_jailbreak_allowlist_parse_policy);

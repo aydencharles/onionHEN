@@ -97,6 +97,17 @@ static OnPressResult id_overlay_change_pos(OnPressContext &ctx) {
   return OnPressResult::Handled;
 }
 
+static OnPressResult id_overlay_align(OnPressContext &ctx) {
+  const int align = atoi(ctx.value.c_str());
+  if (align == g_settings.overlay_align) {
+    return OnPressResult::EarlyReturn;
+  }
+  g_settings.overlay_align = align;
+  rebuild_overlay_bar();
+  ctx.reload_main = true;
+  return OnPressResult::Handled;
+}
+
 static const OnPressExactEntry kExact[] = {
     {"id_overlay_enabled", id_overlay_enabled},
     {"id_overlay_background", id_overlay_background},
@@ -107,6 +118,7 @@ static const OnPressExactEntry kExact[] = {
     {"id_overlay_ip", id_overlay_ip},
     {"id_all_cpu_usage", id_all_cpu_usage},
     {"id_overlay_change_pos", id_overlay_change_pos},
+    {"id_overlay_align", id_overlay_align},
 };
 
 const OnPressExactEntry *onpress_overlay_exact(size_t *count) {

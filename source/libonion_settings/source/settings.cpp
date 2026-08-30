@@ -427,6 +427,29 @@ const char *overlay_edge_name(int pos) {
   return pos == 2 || pos == 3 ? "bottom" : "top";
 }
 
+int parse_overlay_align(const char *s, int def) {
+  if (streq_ci(s, "left")) {
+    return kOverlayAlignLeft;
+  }
+  if (streq_ci(s, "center")) {
+    return kOverlayAlignCenter;
+  }
+  if (streq_ci(s, "right")) {
+    return kOverlayAlignRight;
+  }
+  return def;
+}
+
+const char *overlay_align_name(int align) {
+  if (align == kOverlayAlignLeft) {
+    return "left";
+  }
+  if (align == kOverlayAlignRight) {
+    return "right";
+  }
+  return "center";
+}
+
 bool parse_per_core_cpu(const char *s, bool def) {
   if (streq_ci(s, "average")) {
     return false;
@@ -568,6 +591,8 @@ bool apply_parser(IniParser *parser, Settings *out) {
       ini_get(parser, "overlay.background"), out->overlay_background);
   out->overlay_pos =
       parse_overlay_edge(ini_get(parser, "overlay.edge"), out->overlay_pos);
+  out->overlay_align =
+      parse_overlay_align(ini_get(parser, "overlay.align"), out->overlay_align);
   out->overlay_cpu =
       parse_bool(ini_get(parser, "overlay.show_cpu"), out->overlay_cpu);
   out->all_cpu_usage =
@@ -727,6 +752,9 @@ std::string settings_serialize(const Settings &in) {
   b += "# edge chooses the screen edge used by the monitor bar.\n";
   b += "# Available values: top, bottom\n";
   b += "edge=" + std::string(overlay_edge_name(in.overlay_pos)) + "\n";
+  b += "# align packs metrics to the left, center, or right of the bar.\n";
+  b += "# Available values: left, center, right\n";
+  b += "align=" + std::string(overlay_align_name(in.overlay_align)) + "\n";
   b += "# show_cpu displays CPU temperature and usage.\n";
   b += "# Available values: true, false\n";
   b += "show_cpu=" + bool_text(in.overlay_cpu) + "\n";

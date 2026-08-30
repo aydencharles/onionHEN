@@ -120,6 +120,48 @@ void onion_cheat_replace_all(char *text, size_t cap, const char *from,
   free(tmp);
 }
 
+/**
+ * 原地解码 XML 命名实体（&amp; &lt; &gt; &quot; &apos;）。
+ * 替换后长度只减不增。未知实体（如 &nbsp;）原样保留。
+ *
+ * @param text 待处理的字符串，可为 NULL。
+ */
+void onion_cheat_xml_unescape(char *text) {
+  static const struct {
+    const char *entity;
+    size_t len;
+    char ch;
+  } kEntities[] = {
+      {"&quot;", 6, '"'}, {"&apos;", 6, '\''}, {"&amp;", 5, '&'},
+      {"&lt;", 4, '<'},   {"&gt;", 4, '>'},
+  };
+  char *src;
+  char *dst;
+  size_t i;
+
+  if (text == NULL) {
+    return;
+  }
+  src = text;
+  dst = text;
+  while (*src != '\0') {
+    if (*src == '&') {
+      for (i = 0; i < sizeof(kEntities) / sizeof(kEntities[0]); ++i) {
+        if (strncmp(src, kEntities[i].entity, kEntities[i].len) == 0) {
+          *dst++ = kEntities[i].ch;
+          src += kEntities[i].len;
+          break;
+        }
+      }
+      if (i < sizeof(kEntities) / sizeof(kEntities[0])) {
+        continue;
+      }
+    }
+    *dst++ = *src++;
+  }
+  *dst = '\0';
+}
+
 void onion_cheat_secure_zero(void *ptr, size_t len) {
   volatile unsigned char *p = (volatile unsigned char *)ptr;
 

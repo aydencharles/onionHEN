@@ -20,28 +20,32 @@ static OnPressResult prefix_id_cheat(OnPressContext &ctx) {
   }
   char tid[32];
   int cheat_id;
-  std::string cheat_name;
+  std::string reply;
   ParseCheatID(ctx.id.c_str(), tid, &cheat_id);
   LOG_DEBUG("Getting PID for %s", ctx.id.c_str());
   int pid = onion_find_pid_ex(tid, false, true, true);
   if (pid < 0) {
-    notify("notify.cheats.no_pid",
-           cheat_name.c_str());
+    notify("notify.cheats.no_pid", ctx.title.c_str());
     LOG_ERROR("Failed to get pid for %s", tid);
     return OnPressResult::Consumed;
   }
   LOG_DEBUG("Got proc for %s, tid %s, pid %i", ctx.id.c_str(), tid, pid);
   if (IPC_Client::getInstance(true).ToggleGameCheat(pid, tid, cheat_id,
-                                                    cheat_name)) {
+                                                    reply)) {
     (void)g_ui.reset_cheats_if_tid_changed(tid);
     const bool enabled = ctx.value == "1";
     g_ui.set_cheat_enabled(cheat_id, enabled);
-    notify("notify.cheats.toggle_banner", cheat_name.c_str(),
+    const char *name =
+        !ctx.title.empty() ? ctx.title.c_str() : reply.c_str();
+    notify("notify.cheats.toggle_banner", name,
            onion_notify_tr(enabled ? "notify.common.on" : "notify.common.off"));
   } else {
     LOG_ERROR("Failed to activate cheat %d for %s: %s", cheat_id, tid,
-              cheat_name.empty() ? "no detail" : cheat_name.c_str());
-    notify("notify.cheats.activate_failed", cheat_name.c_str());
+              reply.empty() ? "no detail" : reply.c_str());
+    if (!reply.empty())
+      notify("notify.cheats.engine_status", reply.c_str());
+    else
+      notify("notify.cheats.activate_failed", ctx.title.c_str());
   }
   // Consumed: stock SettingPage.OnPressed null-derefs unknown dynamic ids
   // (id_cheat_<TID>_<n> + toggle_switch) after our IPC/notify path.

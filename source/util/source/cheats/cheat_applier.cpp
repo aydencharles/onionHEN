@@ -1,6 +1,8 @@
 #include <onion/log.h>
+#include <onion/notify.h>
 #include "cheats/cheat_applier.hpp"
 
+#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -94,6 +96,26 @@ void fixMasterCode(const game_context_t &game, onion_cheat_file_t &file,
   dp.offset = ((mp.offset >> 8) << 8) | (dp.offset & 0xff);
 }
 
+std::string status_tr(const char *key, ...) {
+  char buf[384];
+  va_list ap;
+  va_start(ap, key);
+  onion_notify_format(buf, sizeof(buf), 0, key, ap);
+  va_end(ap);
+  return buf;
+}
+
+const char *source_label(const std::string &source_key) {
+  if (source_key.empty()) {
+    return "-";
+  }
+  const size_t slash = source_key.find_last_of('/');
+  if (slash != std::string::npos && slash + 1 < source_key.size()) {
+    return source_key.c_str() + slash + 1;
+  }
+  return source_key.c_str();
+}
+
 bool isMasterDependent(const onion_cheat_file_t &file, int index) {
   if (index < 0 || static_cast<size_t>(index) >= file.cheat_count ||
       index == file.master_code_id) {
@@ -112,7 +134,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
                          const std::string &source_key) {
   status.clear();
   if (index < 0 || static_cast<size_t>(index) >= file.cheat_count) {
-    status = "invalid cheat index";
+    status = status_tr("notify.cheats.invalid_index");
     return -1;
   }
 
@@ -120,13 +142,13 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   const std::string owner = ownerFor(file, index, source_key);
   const uint32_t fw = util_system_fw_major();
   if (fw == 0) {
-    status = std::string(entry.name) + " -> firmware version unavailable";
+    status = status_tr("notify.cheats.fw_unavailable", entry.name);
     return -1;
   }
 
   auto backend = MemoryBackendFactory::create(fw);
   if (!backend) {
-    status = std::string(entry.name) + " -> memory backend unavailable";
+    status = status_tr("notify.cheats.backend_unavailable", entry.name);
     return -1;
   }
   game_context_t target = game;
@@ -161,7 +183,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   if (util_find_module(pid, entry.module_name, &mod) < 0) {
     pid_t fb = -1;
     if (util_find_module_in_app(game.appid, entry.module_name, &fb, &mod) < 0) {
-      status = std::string("module not found: ") + entry.module_name;
+      status = status_tr("notify.cheats.module_missing", entry.module_name);
       return -1;
     }
     pid = fb;
@@ -188,11 +210,11 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
     if (reserve_len == 0 || reserve_len > ONION_MAX_PATCH_BYTES ||
         (!entry.enabled && patch.on_len == 0) ||
         (entry.enabled && patch.off_len == 0)) {
-      status = std::string(entry.name) + " -> invalid patch size";
+      status = status_tr("notify.cheats.invalid_patch", entry.name);
       return -1;
     }
     if (patch.is_asm) {
-      status = std::string(entry.name) + " -> ASM text not assembled";
+      status = status_tr("notify.cheats.asm_unassembled", entry.name);
       return -1;
     }
     resolved.push_back({&patch, resolveAddr(mod, patch, is_ps2, base),
@@ -214,13 +236,12 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         if (active.pid == pid && active.owner != owner && !master_dependency &&
             rangesOverlap(candidate.address, candidate_len, active.start,
                           active.length)) {
-          status = std::string(entry.name) + " conflicts with " +
-                   active.cheat_name + " (source " + active.source_key +
-                   ") at 0x";
           char address[32];
           std::snprintf(address, sizeof(address), "%llx",
                         static_cast<unsigned long long>(active.start));
-          status += address;
+          status = status_tr("notify.cheats.conflict", entry.name,
+                             active.cheat_name.c_str(),
+                             source_label(active.source_key), address);
           return -1;
         }
       }
@@ -240,7 +261,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
     snapshot.bytes.resize(reserve_len);
     if (backend->read(pid, snapshot.address, snapshot.bytes.data(),
                       snapshot.bytes.size()) < 0) {
-      status = std::string(entry.name) + " -> snapshot read failed";
+      status = status_tr("notify.cheats.snapshot_failed", entry.name);
       return -1;
     }
     snapshots.push_back(std::move(snapshot));
@@ -257,7 +278,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
      * partial copy, and the snapshot must still be restored. */
     ++touched_count;
     if (backend->write(pid, resolved_patch.address, data, len) < 0) {
-      status = std::string(entry.name) + " -> write failed";
+      status = status_tr("notify.cheats.write_failed", entry.name);
       break;
     }
 
@@ -275,7 +296,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         }
       }
       if (!ok) {
-        status = std::string(entry.name) + " -> verify mismatch";
+        status = status_tr("notify.cheats.verify_failed", entry.name);
         break;
       }
     }
@@ -288,7 +309,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
                            snapshot.bytes.size());
     }
     if (status.empty()) {
-      status = std::string(entry.name) + " -> activation failed";
+      status = status_tr("notify.cheats.activation_failed", entry.name);
     }
     return -1;
   }

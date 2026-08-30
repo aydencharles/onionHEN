@@ -1,8 +1,10 @@
 #include <onion/log.h>
+#include <onion/notify.h>
 #include "cheats/cheat_service.hpp"
 
 #include "onion_cjson.hpp"
 
+#include <cstdarg>
 #include <cstdio>
 #include <cctype>
 #include <cstring>
@@ -14,6 +16,18 @@ int sceKernelGetProcessName(int pid, char *name);
 }
 
 namespace onion::cheats {
+namespace {
+
+std::string status_tr(const char *key, ...) {
+  char buf[384];
+  va_list ap;
+  va_start(ap, key);
+  onion_notify_format(buf, sizeof(buf), 0, key, ap);
+  va_end(ap);
+  return buf;
+}
+
+} // namespace
 
 CheatService &CheatService::instance() {
   static CheatService svc;
@@ -341,7 +355,7 @@ int CheatService::toggle(int pid, int appid, const std::string &title_id,
   game_context_t game{};
   status.clear();
   if (fillGame(game, title_id, version, pid, appid) < 0) {
-    status = "invalid game context";
+    status = status_tr("notify.cheats.invalid_game");
     return -1;
   }
   if (pid > 0) {
@@ -353,11 +367,11 @@ int CheatService::toggle(int pid, int appid, const std::string &title_id,
 
   std::lock_guard<std::mutex> lock(mu_);
   if (refreshLocked(game) < 0) {
-    status = "unable to load cheat file";
+    status = status_tr("notify.cheats.load_failed");
     return -1;
   }
   if (index < 0 || static_cast<size_t>(index) >= cheat_map_.size()) {
-    status = "invalid cheat index";
+    status = status_tr("notify.cheats.invalid_index");
     return -1;
   }
   game_.pid = game.pid;
@@ -365,7 +379,7 @@ int CheatService::toggle(int pid, int appid, const std::string &title_id,
   const CheatRef ref = cheat_map_[static_cast<size_t>(index)];
   if (ref.file_index >= files_.size() || !files_[ref.file_index] ||
       ref.cheat_index >= files_[ref.file_index]->file.cheat_count) {
-    status = "invalid cheat mapping";
+    status = status_tr("notify.cheats.invalid_mapping");
     return -1;
   }
   auto &loaded = *files_[ref.file_index];

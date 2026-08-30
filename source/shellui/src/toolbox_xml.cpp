@@ -212,11 +212,16 @@ void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
     const std::string source_id =
         onion_cjson::string_item(group, "sourceId", "");
     const std::string authors = join_authors(group);
-    std::string heading = format.empty() ? "Source" : format;
+    std::string heading =
+        format.empty() ? toolbox_i18n::tr("cheats.group.unnamed") : format;
     if (!source_id.empty())
       heading += " / " + source_id;
     if (!authors.empty())
       heading += " / " + authors;
+    /* U+3000: Settings needs a title to keep the row. Skip before the first source. */
+    if (group_index > 0)
+      page.label("id_cheat_group_spacer_" + std::to_string(group_index), "　",
+                 ps5ui::Style::Center);
     page.label("id_cheat_group_" + std::to_string(group_index++), heading,
                ps5ui::Style::Center);
     append_cheat_array(page, onion_cjson::item(group, "cheats"), tid,

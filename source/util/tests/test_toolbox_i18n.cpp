@@ -51,6 +51,10 @@ static int test_default_zh(void) {
                   "aydencharles/onionHEN/issues") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.enable_fmt"),
                                "为 %s 启用/禁用 %s") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("cheats.group.unnamed"), "来源") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.cheats.conflict"),
+                  "%s 与 %s 冲突（%s）于 0x%s") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.game_menu"),
                                "★ OnionHEN 金手指") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download"),
@@ -109,6 +113,10 @@ static int test_en(void) {
                   "aydencharles/onionHEN/issues") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.enable_fmt"),
                                "Enable/disable %s for %s") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("cheats.group.unnamed"), "Source") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.cheats.conflict"),
+                  "%s conflicts with %s (%s) at 0x%s") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("payload.start_stop_fmt"),
                                "Start/stop %s (path: %s) (%s)") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("debug.np_env.sub"),

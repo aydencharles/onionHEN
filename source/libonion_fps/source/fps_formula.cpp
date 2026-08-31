@@ -83,19 +83,15 @@ HybridOut compose(const HybridIn &in) {
 bool is_ps5_native_title(const char *title_id) {
   if (!title_id || std::strlen(title_id) < 4)
     return false;
-  return std::strncmp(title_id, "PPSA", 4) == 0 ||
-         std::strncmp(title_id, "PPSB", 4) == 0;
+  /* PS5 native titles use the PPSA prefix. */
+  return std::strncmp(title_id, "PPSA", 4) == 0;
 }
 
 bool is_ps4_bc_title(const char *title_id) {
   if (!title_id || std::strlen(title_id) < 4)
     return false;
-  static const char *const kPs4[] = {"CUSA", "PCAS", "PCJS", "PCKS", "CUHJ"};
-  for (const char *p : kPs4) {
-    if (std::strncmp(title_id, p, 4) == 0)
-      return true;
-  }
-  return false;
+  /* PS4 BC titles use the CUSA prefix. */
+  return std::strncmp(title_id, "CUSA", 4) == 0;
 }
 
 } // namespace fps

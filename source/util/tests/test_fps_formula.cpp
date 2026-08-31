@@ -59,10 +59,13 @@ static int test_compose_dead_ticks(void) {
 
 static int test_title_prefixes(void) {
   TEST_ASSERT_TRUE(onion::fps::is_ps5_native_title("PPSA12345"));
-  TEST_ASSERT_TRUE(onion::fps::is_ps5_native_title("PPSB00001"));
+  TEST_ASSERT_TRUE(!onion::fps::is_ps5_native_title("PPSB00001"));
+  TEST_ASSERT_TRUE(!onion::fps::is_ps5_native_title("ECAS00006"));
   TEST_ASSERT_TRUE(!onion::fps::is_ps5_native_title("CUSA12345"));
   TEST_ASSERT_TRUE(onion::fps::is_ps4_bc_title("CUSA12345"));
-  TEST_ASSERT_TRUE(onion::fps::is_ps4_bc_title("PCAS00001"));
+  TEST_ASSERT_TRUE(!onion::fps::is_ps4_bc_title("PCAS00001"));
+  TEST_ASSERT_TRUE(!onion::fps::is_ps4_bc_title("PLJM80005"));
+  TEST_ASSERT_TRUE(!onion::fps::is_ps4_bc_title("CUHJ10000"));
   TEST_ASSERT_TRUE(!onion::fps::is_ps4_bc_title("PPSA12345"));
   TEST_ASSERT_TRUE(!onion::fps::is_ps5_native_title(""));
   return 0;

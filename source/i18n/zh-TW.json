@@ -145,6 +145,8 @@
     "overlay.ram.desc": "顯示系統記憶體使用率",
     "overlay.ip": "IP 位址",
     "overlay.ip.desc": "顯示主機區域網路 IP",
+    "overlay.fan": "風扇",
+    "overlay.fan.desc": "顯示目前風扇負載（佔空比百分比）",
     "disp_tids": "在主畫面顯示 Title ID",
     "disp_tids.sub": "在主畫面遊戲圖示上顯示 Title ID；僅工具箱處於啟用狀態時生效",
     "fan.group": "風扇控制",

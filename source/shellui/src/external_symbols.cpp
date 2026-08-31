@@ -34,6 +34,7 @@ int (*sceAppMessagingReceiveMsg)(const AppMessage* msg) = nullptr;
 
 /* ====================================== Dynamic libkernel_sys Symbols ===================================*/
 int (*sceKernelGetProcessName)(int pid, char* name) = nullptr;
+int (*sceKernelGetCurrentFanDuty)(uint16_t* out_duty, uint64_t* out_chassis_info) = nullptr;
 int (*sceKernelMprotect)(void* addr, size_t len, int prot) = nullptr;
 int (*sceKernelDebugOutText)(int DBG_CHANNEL, const char* text) = nullptr;
 //  int (*close_alt)(int fd) = nullptr;

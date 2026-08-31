@@ -145,6 +145,8 @@
     "overlay.ram.desc": "Afficher l’usage de la mémoire système",
     "overlay.ip": "Adresse IP",
     "overlay.ip.desc": "Afficher l’IP LAN de la console",
+    "overlay.fan": "VENTILATEUR",
+    "overlay.fan.desc": "Afficher le taux du ventilateur (pourcentage)",
     "disp_tids": "Afficher le Title ID sur l’écran d’accueil",
     "disp_tids.sub": "Afficher le Title ID de chaque jeu sur l’écran d’accueil ; uniquement lorsque la boîte à outils est active",
     "fan.group": "Contrôle du ventilateur",

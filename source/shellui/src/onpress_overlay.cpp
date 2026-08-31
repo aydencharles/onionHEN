@@ -22,6 +22,8 @@ static void rebuild_overlay_bar() {
     CreateGameWidget(CREATE_RAM_OVERLAY);
   if (g_settings.overlay_ip)
     CreateGameWidget(CREATE_IP_OVERLAY);
+  if (g_settings.overlay_fan)
+    CreateGameWidget(CREATE_FAN_OVERLAY);
 }
 
 static OnPressResult toggle_overlay_flag(OnPressContext &ctx, bool &flag) {
@@ -72,6 +74,10 @@ static OnPressResult id_overlay_ip(OnPressContext &ctx) {
   return toggle_overlay_flag(ctx, g_settings.overlay_ip);
 }
 
+static OnPressResult id_overlay_fan(OnPressContext &ctx) {
+  return toggle_overlay_flag(ctx, g_settings.overlay_fan);
+}
+
 static OnPressResult id_all_cpu_usage(OnPressContext &ctx) {
   if (g_settings.all_cpu_usage == atoi(ctx.value.c_str())) {
     return OnPressResult::EarlyReturn;
@@ -116,6 +122,7 @@ static const OnPressExactEntry kExact[] = {
     {"id_overlay_fps", id_overlay_fps},
     {"id_overlay_ram", id_overlay_ram},
     {"id_overlay_ip", id_overlay_ip},
+    {"id_overlay_fan", id_overlay_fan},
     {"id_all_cpu_usage", id_all_cpu_usage},
     {"id_overlay_change_pos", id_overlay_change_pos},
     {"id_overlay_align", id_overlay_align},

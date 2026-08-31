@@ -145,6 +145,8 @@
     "overlay.ram.desc": "แสดงการใช้หน่วยความจำของระบบ",
     "overlay.ip": "ที่อยู่ IP",
     "overlay.ip.desc": "แสดง IP แลนของเครื่อง",
+    "overlay.fan": "พัดลม",
+    "overlay.fan.desc": "แสดงค่าพัดลม (เปอร์เซ็นต์)",
     "disp_tids": "แสดง Title ID บนเมนูหลัก",
     "disp_tids.sub": "แสดง Title ID ของแต่ละเกมบนเมนูหลัก; เฉพาะขณะที่ toolbox ทำงานอยู่",
     "fan.group": "ควบคุมพัดลม",

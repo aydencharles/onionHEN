@@ -644,7 +644,10 @@ void append_toolbox_display_group(ps5ui::Group& g) {
                      toolbox_i18n::tr("overlay.ram.desc"))
              .toggle("id_overlay_ip", toolbox_i18n::tr("overlay.ip"),
                      toolbox_on("id_overlay_ip"), std::nullopt,
-                     toolbox_i18n::tr("overlay.ip.desc"));
+                     toolbox_i18n::tr("overlay.ip.desc"))
+             .toggle("id_overlay_fan", toolbox_i18n::tr("overlay.fan"),
+                     toolbox_on("id_overlay_fan"), std::nullopt,
+                     toolbox_i18n::tr("overlay.fan.desc"));
        },
        toolbox_i18n::tr("overlay.group.sub"), kIconOverlay,
        "id_overlay_enabled")

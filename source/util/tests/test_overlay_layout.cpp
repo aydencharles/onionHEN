@@ -11,6 +11,7 @@ using onion::overlay::kCpuAllWidth;
 using onion::overlay::kCpuAvgWidth;
 using onion::overlay::kEdgeInset;
 using onion::overlay::kFpsWidth;
+using onion::overlay::kFanWidth;
 using onion::overlay::kGap;
 using onion::overlay::kGpuWidth;
 using onion::overlay::kIpWidth;
@@ -193,6 +194,26 @@ int test_hidden_metric_is_offscreen_between_neighbors() {
   return 0;
 }
 
+int test_fan_slot_packs_after_ip() {
+  Metrics m = all_average();
+  m.show_fan = true;
+  const Layout layout =
+      compute_overlay_layout(kW, kH, BarEdge::Top, BarAlign::Left, m);
+  TEST_ASSERT_TRUE(layout.overlay_fan_x > layout.overlay_ip_x);
+  TEST_ASSERT_EQ_INT(as_int(layout.overlay_ip_x + kIpWidth + kGap),
+                     as_int(layout.overlay_fan_x));
+  TEST_ASSERT_TRUE(layout.overlay_fan_x + kFanWidth <= kW - kEdgeInset + 0.1f);
+  return 0;
+}
+
+int test_fan_hidden_when_disabled() {
+  const Layout layout =
+      compute_overlay_layout(kW, kH, BarEdge::Top, BarAlign::Left,
+                             all_average());
+  TEST_ASSERT_EQ_INT(as_int(kOffscreen), as_int(layout.overlay_fan_x));
+  return 0;
+}
+
 int test_pack_origin_left_center_right() {
   constexpr float content = 200.0f;
   TEST_ASSERT_EQ_INT(as_int(kEdgeInset),
@@ -251,6 +272,10 @@ extern "C" int test_overlay_layout_suite(void) {
                              test_per_core_cpu_uses_wider_slot);
   failures += onion_test_run("overlay_layout.hidden_gap",
                              test_hidden_metric_is_offscreen_between_neighbors);
+  failures += onion_test_run("overlay_layout.fan_after_ip",
+                             test_fan_slot_packs_after_ip);
+  failures += onion_test_run("overlay_layout.fan_hidden",
+                             test_fan_hidden_when_disabled);
   failures += onion_test_run("overlay_layout.pack_origin",
                              test_pack_origin_left_center_right);
   failures += onion_test_run("overlay_layout.edge_align_mapping",

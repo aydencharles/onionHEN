@@ -478,6 +478,7 @@ extern  int (*scePthreadCreate)(void* thread, const void* attr, void* (*entry) (
 
 extern int (*sceKernelGetAppInfo)(pid_t pid, app_info_t *info);
 extern int (*sceKernelGetProcessName)(int pid, char* name);
+extern int (*sceKernelGetCurrentFanDuty)(uint16_t* out_duty, uint64_t* out_chassis_info);
 extern  int (*sceKernelJitCreateSharedMemory)(int flags, size_t size, int protection, int *destinationHandle);
 extern  int (*sceKernelJitCreateAliasOfSharedMemory)(int handle, int protection, int *destinationHandle);
 extern  int (*sceKernelJitMapSharedMemory)(int handle, int protection, void **destination);

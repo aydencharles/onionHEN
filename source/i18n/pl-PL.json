@@ -145,6 +145,8 @@
     "overlay.ram.desc": "Użycie pamięci systemowej",
     "overlay.ip": "Adres IP",
     "overlay.ip.desc": "IP LAN konsoli",
+    "overlay.fan": "WENTYLATOR",
+    "overlay.fan.desc": "Pokaż wentylator (procent)",
     "disp_tids": "Pokazuj Title ID na ekranie głównym",
     "disp_tids.sub": "Title ID każdej gry na ekranie głównym; tylko gdy narzędzia są włączone",
     "fan.group": "Sterowanie wentylatorem",

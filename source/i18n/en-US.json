@@ -145,6 +145,8 @@
     "overlay.ram.desc": "Show system memory usage",
     "overlay.ip": "IP address",
     "overlay.ip.desc": "Show console LAN IP",
+    "overlay.fan": "FAN",
+    "overlay.fan.desc": "Show current fan duty (percent)",
     "disp_tids": "Show Title ID on home menu",
     "disp_tids.sub": "Show each game’s Title ID on the home menu; only while the toolbox is active",
     "fan.group": "Fan control",

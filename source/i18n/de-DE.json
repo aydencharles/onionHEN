@@ -145,6 +145,8 @@
     "overlay.ram.desc": "Systemspeicherauslastung anzeigen",
     "overlay.ip": "IP-Adresse",
     "overlay.ip.desc": "LAN-IP der Konsole anzeigen",
+    "overlay.fan": "LÜFTER",
+    "overlay.fan.desc": "Aktuelle Lüfterauslastung in Prozent anzeigen",
     "disp_tids": "Title ID auf dem Startbildschirm anzeigen",
     "disp_tids.sub": "Die Title ID jedes Spiels auf dem Startbildschirm einblenden; nur bei aktiver Toolbox",
     "fan.group": "Lüftersteuerung",

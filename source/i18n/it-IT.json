@@ -145,6 +145,8 @@
     "overlay.ram.desc": "Mostrare l’uso della memoria di sistema",
     "overlay.ip": "Indirizzo IP",
     "overlay.ip.desc": "Mostrare l’IP LAN della console",
+    "overlay.fan": "VENTOLA",
+    "overlay.fan.desc": "Mostrare la ventola (percentuale)",
     "disp_tids": "Mostrare il Title ID nella schermata iniziale",
     "disp_tids.sub": "Mostrare il Title ID di ogni gioco nella schermata iniziale; solo a cassetta attiva",
     "fan.group": "Controllo ventola",

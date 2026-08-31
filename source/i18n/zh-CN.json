@@ -145,6 +145,8 @@
     "overlay.ram.desc": "显示系统内存占用",
     "overlay.ip": "IP 地址",
     "overlay.ip.desc": "显示主机局域网 IP",
+    "overlay.fan": "风扇",
+    "overlay.fan.desc": "显示当前风扇负载（占空比百分比）",
     "disp_tids": "在主菜单显示 Title ID",
     "disp_tids.sub": "在主菜单游戏图标上显示 Title ID；仅工具箱处于激活状态时生效",
     "fan.group": "风扇控制",

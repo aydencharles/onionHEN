@@ -100,6 +100,9 @@ show_memory=true
 # show_ip_address displays the console LAN IP address.
 # Available values: true, false
 show_ip_address=false
+# show_fan_duty displays the current fan duty in percent.
+# Available values: true, false
+show_fan_duty=false
 
 [shortcuts]
 # cheats_menu controls the shortcut that opens the cheats menu.

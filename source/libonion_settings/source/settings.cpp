@@ -606,6 +606,8 @@ bool apply_parser(IniParser *parser, Settings *out) {
       parse_bool(ini_get(parser, "overlay.show_memory"), out->overlay_ram);
   out->overlay_ip = parse_bool(ini_get(parser, "overlay.show_ip_address"),
                                out->overlay_ip);
+  out->overlay_fan = parse_bool(ini_get(parser, "overlay.show_fan_duty"),
+                                out->overlay_fan);
   out->cheats_shortcut_opt =
       parse_cheats_shortcut(ini_get(parser, "shortcuts.cheats_menu"),
                             out->cheats_shortcut_opt);
@@ -774,6 +776,9 @@ std::string settings_serialize(const Settings &in) {
   b += "# show_ip_address displays the console LAN IP address.\n";
   b += "# Available values: true, false\n";
   b += "show_ip_address=" + bool_text(in.overlay_ip) + "\n";
+  b += "# show_fan_duty displays the current fan duty in percent.\n";
+  b += "# Available values: true, false\n";
+  b += "show_fan_duty=" + bool_text(in.overlay_fan) + "\n";
   b += "\n";
   b += "[shortcuts]\n";
   b += "# cheats_menu controls the shortcut that opens the cheats menu.\n";

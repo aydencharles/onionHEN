@@ -225,7 +225,7 @@ void set_label_layout(const char *widget_name, float margin_left,
 void layout_bar_labels(const char *fps_str, const char *cpu_temp,
                        const char *cpu_usage, const char *gpu_temp,
                        const char *gpu_usage, const char *ram_str,
-                       const char *ip_str) {
+                       const char *ip_str, const char *fan_str) {
   constexpr float kPairGap = 8.0f;   /* label → first value */
   constexpr float kValGap = 10.0f;   /* value → value (temp / usage) */
   constexpr float kSepGap = 10.0f;   /* last value → "|" */
@@ -251,7 +251,7 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
     const char *v1;
     const char *id_sep;
   };
-  GroupSpec groups[5];
+  GroupSpec groups[6];
   int ng = 0;
 
   if (g_settings.overlay_fps && fps_str)
@@ -279,6 +279,9 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   if (g_settings.overlay_ip && ip_str)
     groups[ng++] = {"id_ip_label", "IP", "id_ip_value", ip_str, nullptr,
                     nullptr, "id_ip_sep"};
+  if (g_settings.overlay_fan && fan_str)
+    groups[ng++] = {"id_fan_label", "FAN", "id_fan_value", fan_str, nullptr,
+                    nullptr, "id_fan_sep"};
 
   if (ng == 0)
     return;
@@ -337,7 +340,8 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
       "id_cpu_sep",          "id_gpu_label",       "id_gpu_temp_value",
       "id_gpu_usage_value",  "id_gpu_sep",         "id_ram_label",
       "id_ram_value",        "id_ram_sep",         "id_ip_label",
-      "id_ip_value",         "id_ip_sep",
+      "id_ip_value",         "id_ip_sep",          "id_fan_label",
+      "id_fan_value",        "id_fan_sep",
   };
   for (const char *id : kAll)
     set_label_layout(id, kOff, margin_top, 0.0f);
@@ -409,6 +413,10 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
     if (!CreateGameWidget(CREATE_IP_OVERLAY))
       widgets_ready = false;
   }
+  if (g_settings.overlay_fan) {
+    if (!CreateGameWidget(CREATE_FAN_OVERLAY))
+      widgets_ready = false;
+  }
   if (!widgets_ready) {
     RemoveGameWidget(REMOVE_ALL_OVERLAYS);
     return false;
@@ -422,7 +430,8 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
       g_settings.overlay_gpu ? "--C" : nullptr,
       g_settings.overlay_gpu ? "--%" : nullptr,
       g_settings.overlay_ram ? "---- MB" : nullptr,
-      g_settings.overlay_ip ? "---.---.---.---" : nullptr);
+      g_settings.overlay_ip ? "---.---.---.---" : nullptr,
+      g_settings.overlay_fan ? "--%" : nullptr);
   return true;
 }
 
@@ -491,7 +500,8 @@ void update_overlay_metrics(unsigned int idle_tid[kCpuCores], int& current_bank,
                             char *cpu_temp, size_t cpu_temp_sz, char *cpu_usage,
                             size_t cpu_usage_sz, char *gpu_temp, size_t gpu_temp_sz,
                             char *gpu_usage, size_t gpu_usage_sz, char *ram_str,
-                            size_t ram_sz, char *ip_address, size_t ip_sz) {
+                            size_t ram_sz, char *ip_address, size_t ip_sz,
+                            char *fan_str, size_t fan_sz) {
   if (!g_settings.overlay_enabled)
     return;
 
@@ -521,6 +531,18 @@ void update_overlay_metrics(unsigned int idle_tid[kCpuCores], int& current_bank,
     sceKernelGetCpuTemperature(&cpu_t);
     snprintf(cpu_temp, cpu_temp_sz, "%dC", cpu_t);
   }
+
+  if (g_settings.overlay_fan) {
+    uint16_t duty = 0;
+    uint64_t chassis = 0;
+    if (sceKernelGetCurrentFanDuty &&
+        sceKernelGetCurrentFanDuty(&duty, &chassis) == 0) {
+      snprintf(fan_str, fan_sz, "%.0f%%",
+               (double)duty * 100.0 / 1024.0);
+    } else {
+      snprintf(fan_str, fan_sz, "--%%");
+    }
+  }
 }
 
 } // namespace
@@ -547,6 +569,7 @@ void OnRender_Hook(MonoObject* instance) {
   static char cpu_usage[120] = {};
   static char ram_str[32] = {};
   static char ip_address[64] = {};
+  static char fan_str[32] = "--%";
   static char fps_str[16] = "--";
 
   if (!inited) {
@@ -566,7 +589,8 @@ void OnRender_Hook(MonoObject* instance) {
                            sizeof(cpu_temp), cpu_usage, sizeof(cpu_usage),
                            gpu_temp, sizeof(gpu_temp), gpu_usage,
                            sizeof(gpu_usage), ram_str, sizeof(ram_str),
-                           ip_address, sizeof(ip_address));
+                           ip_address, sizeof(ip_address), fan_str,
+                           sizeof(fan_str));
     frames_until_update = kOverlayUpdateIntervalFrames;
   } else {
     frames_until_update--;
@@ -586,7 +610,8 @@ void OnRender_Hook(MonoObject* instance) {
         g_settings.overlay_gpu ? gpu_temp : nullptr,
         g_settings.overlay_gpu ? gpu_usage : nullptr,
         g_settings.overlay_ram ? ram_str : nullptr,
-        g_settings.overlay_ip ? ip_address : nullptr);
+        g_settings.overlay_ip ? ip_address : nullptr,
+        g_settings.overlay_fan ? fan_str : nullptr);
     frames_until_fps = kFpsUpdateIntervalFrames;
   } else {
     frames_until_fps--;

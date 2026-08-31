@@ -145,6 +145,8 @@
     "overlay.ram.desc": "システムメモリの使用量を表示します",
     "overlay.ip": "IP アドレス",
     "overlay.ip.desc": "本体の LAN IP を表示します",
+    "overlay.fan": "ファン",
+    "overlay.fan.desc": "現在のファン負荷（デューティ比、パーセント）を表示します",
     "disp_tids": "ホーム画面に Title ID を表示",
     "disp_tids.sub": "ホーム画面のゲームアイコンに Title ID を重ねます。ツールボックス有効時のみ",
     "fan.group": "ファン制御",

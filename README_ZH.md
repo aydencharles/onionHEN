@@ -336,6 +336,12 @@ OnionHEN 在下面两处读写同一份配置：
 
 <a href="https://ko-fi.com/0xp0co"><img src="https://img.shields.io/badge/Ko--fi-Support-FF6433?style=for-the-badge&logo=kofi&logoColor=white" alt="在 Ko-fi 上支持 OnionHEN"/></a>
 
+国内用户也可以扫描下方二维码进行捐赠：
+
+| 支付宝（国内） | 微信（国内） |
+| --- | --- |
+| <img src="assets/donation_alipay_cn.JPG" width="200" alt="支付宝"/> | <img src="assets/donation_wechat_cn.JPG" width="200" alt="微信"/> |
+
 如果 OnionHEN 对你有用，欢迎支持后续开发。谢谢。
 
 <br>

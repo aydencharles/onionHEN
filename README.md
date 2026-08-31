@@ -353,6 +353,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 <a href="https://ko-fi.com/0xp0co"><img src="https://img.shields.io/badge/Ko--fi-Support-FF6433?style=for-the-badge&logo=kofi&logoColor=white" alt="Support OnionHEN on Ko-fi"/></a>
 
+For Chinese users, you can also scan the QR codes below to donate:
+
+国内用户也可以扫描下方二维码进行捐赠：
+
+| Alipay (CN) | WeChat (CN) |
+| --- | --- |
+| <img src="assets/donation_alipay_cn.JPG" width="200" alt="Alipay"/> | <img src="assets/donation_wechat_cn.JPG" width="200" alt="WeChat"/> |
+
 If OnionHEN is useful to you, consider supporting further development. Thank you.
 
 <br>

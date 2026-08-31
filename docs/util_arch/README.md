@@ -103,8 +103,11 @@ source/util/
 | Logging / notify | `common_utils.c` | 几乎全部 |
 | Platform | `util_platform.c` | cheats、可被其它业务复用 |
 | FTP | `service_facade.cpp` + `third_party/ftpsrv` | main / IPC |
+| ShadowMount+ | `shadowmount_main.cpp` + `third_party/ShadowMountPlus` | main / IPC |
+| DPI | `pkgserver_adapter.h` + `third_party/pkgserver` | main / IPC |
 | Cheat sync | `cheats/sync/*` | IPC 后台任务 |
 | IP poll | `cpp_service.cpp` | main 启动 |
+| WebUI lang poll | `daemon_language.cpp` | daemon → util IPC push |
 | Toolbox reinject | `util_toolbox.cpp` | util 崩溃重启路径 |
 | Cheats | `cheats/*` | msg IPC |
 
@@ -129,6 +132,8 @@ CheatService ──► Repository / ParserFactory / Applier ──► util_platf
 | IPC client | `ipc_client`（每连接一个，detach） | 连接级 | 读 `IPCMessage` → `handleIPC` |
 | IP poll | `start_ip_thread` | 常驻 | 刷新本机 IP 字符串 |
 | FTP listener | `FtpServiceFacade::start` | 配置启用期间 | 运行 `ftp_serve` 并管理监听端口 |
+| ShadowMount+ | `ShadowMountServiceFacade::start` | 配置启用期间 | 扫描/挂载/安装游戏镜像 |
+| DPI pkg-server | `PkgNetServiceFacade::start` | 配置启用期间 | pkg 上传/安装 API + Web UI |
 | Cheat sync | `CheatSyncService::start` | 单次任务 | HTTPS 下载、解压与安装 catalog |
 
 故障：`faulthandler` 触发 `cleanup` → cleanup → `exit`。
@@ -161,6 +166,11 @@ struct IPCMessage {
 | `TOGGLE_FTP` | 启停进程内 FTP | `FtpServiceFacade` |
 | `FTP_STATUS` | 返回 FTP 运行状态 | `FtpServiceFacade` |
 | `RECOVER_FTP` | 待机恢复后重绑已启用的 FTP 监听 | `FtpServiceFacade` |
+| `TOGGLE_SHADOWMOUNT` | 启停 ShadowMount+ 模块 | `ShadowMountServiceFacade` |
+| `SHADOWMOUNT_STATUS` | 返回 ShadowMount+ 运行状态 | `ShadowMountServiceFacade` |
+| `TOGGLE_PKGNET` | 启停 DPI pkg-server | `PkgNetServiceFacade` |
+| `PKGNET_STATUS` | 返回 pkg-server 运行状态 | `PkgNetServiceFacade` |
+| `SET_SYSTEM_LANG` | 推送系统语言变化（daemon 轮询） | util 刷新 SCE 语言 + Web UI 语言 |
 | `GET_GAME_VER` | 游戏版本字符串 | param.json / param.sfo（msg 内实现） |
 | `GET_GAME_CHEAT` | 导出金手指列表 JSON 文件路径 | `CheatService::exportList` |
 | `TOGGLE_CHEAT` | 开关某条金手指 | `CheatService::toggle` |

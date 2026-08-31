@@ -12,6 +12,8 @@ features, usage, configuration, and credits.
 | `daemon/` | Main daemon |
 | `util/` | Utility daemon (cheats, IPC, …) |
 | `shellui/` | Toolbox / ShellUI hooks |
+| `webui/` | Web UI source — React app built to a single-file bundle (`webui/dist/index.html`) embedded in the pkg-server inside `util.elf` |
+| `i18n/` | Shared Toolbox / notification locale catalogs (see [its README](i18n/README.md)) |
 | `unpacker/` | Payload unpacker |
 | `libhijacker/`, `libNineS/`, `libNidResolver/` | Internal static libs |
 | `include/` | Shared headers |
@@ -35,8 +37,10 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 ```
 
 Stages external embeds, then shellui → daemon/util → bootstrapper → unpacker.
-See [`../third_party/README.md`](../third_party/README.md) and
-`./scripts/build.sh --help`.
+The web UI bundle (`webui/dist/index.html`) is compiled into the pkg-server
+inside `util.elf`; if web UI sources changed, rebuild it first with
+`npm run build` in `webui/`. See [`../third_party/README.md`](../third_party/README.md)
+and `./scripts/build.sh --help`.
 
 Manual CMake:
 

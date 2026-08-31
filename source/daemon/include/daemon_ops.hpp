@@ -52,6 +52,8 @@ void *fan_maintenance_thread(void *args) noexcept;
 void *fps_sampler_thread(void *args) noexcept;
 /** V-sync FPS sampler: feeds the FPS sampler when render counters are invalid. */
 void *vsync_fps_sampler_thread(void *args) noexcept;
+/** Live console-language poll: pushes language changes to util over IPC. */
+void *system_language_poll_thread(void *args) noexcept;
 
 /**
  * Tear down OnionHEN userland (does not return). Caller should reply to IPC first.

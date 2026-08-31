@@ -10,6 +10,8 @@ add_library(${PROJECT_NAME} STATIC
   source/fps_dce.cpp
   source/fps_agc.cpp
   source/fps_publish.cpp
+  source/fps_bc.cpp
+  ${PROJECT_ROOT}/libonion_detour/source/hde64.cpp
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${PROJECT_NAME}")
 
@@ -21,6 +23,8 @@ target_include_directories(${PROJECT_NAME}
   PRIVATE "${PROJECT_ROOT}/include"
   PRIVATE "${PROJECT_ROOT}/libonion_proc/include"
   PRIVATE "${PROJECT_ROOT}/libonion_platform/include"
+  PRIVATE "${PROJECT_ROOT}/libhijacker/include"
+  PRIVATE "${PROJECT_ROOT}/libonion_detour/include"
 )
 
-add_dependencies(${PROJECT_NAME} onion_proc onion_platform)
+add_dependencies(${PROJECT_NAME} onion_proc onion_platform hijacker)

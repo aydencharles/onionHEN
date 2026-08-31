@@ -31,6 +31,8 @@ inline constexpr Descriptor kRegistry[] = {
      "plugin.kstuff.sub"},
     {"ftpsrv", "id_plugin_ftpsrv", "ftpsrv.xml", "plugin.ftpsrv.title",
      "plugin.ftpsrv.sub"},
+    {"shadowmount", "id_plugin_shadowmount", "shadowmount.xml",
+     "plugin.shadowmount.title", "plugin.shadowmount.sub"},
 };
 
 inline constexpr std::size_t kRegistrySize =

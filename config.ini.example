@@ -124,3 +124,14 @@ autoload=false
 # port selects the TCP listen port for the built-in server.
 # Available values: 1 through 65535
 port=1337
+
+[shadowmount]
+# autoload starts the built-in ShadowMount+ module the next time OnionHEN launches.
+# Available values: true, false
+autoload=false
+
+[pkgnet]
+# autoload starts the built-in network package installer (DPI, TCP 9090)
+# the next time OnionHEN launches.
+# Available values: true, false
+autoload=false

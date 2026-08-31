@@ -76,6 +76,12 @@ public:
   bool FtpStatus();
   /** Ask util to rebind an enabled FTP listener after network resume. */
   bool RecoverFtp();
+  /** Query the in-process ShadowMount+ module without inspecting a PID marker. */
+  bool ShadowMountStatus();
+  /** Query the in-process DPI package install server without a PID marker. */
+  bool PkgNetStatus();
+  /** Push a fresh console system language to util for live re-apply. */
+  bool SetSystemLanguage(int language);
   void KillDaemon();
   /** Crit Unix IPC: util → restart ShellUI → daemon exit (BREW_SHUTDOWN_STACK). */
   void ShutdownStack();

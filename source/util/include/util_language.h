@@ -21,8 +21,18 @@ bool util_refresh_system_language(void);
 /** Return the last successfully queried PS5 system language (English first). */
 int util_cached_system_language(void);
 
+/**
+ * Store an externally sourced PS5 system language (IPC from the daemon, which
+ * can query at runtime). Refreshes the same cache used by consumers below.
+ */
+void util_store_system_language(int language);
+
 /** Apply an explicit or system-backed Toolbox language to util notifications. */
 void util_apply_ui_language(int ui_language);
+
+/** Resolved UI language code for the web UI (one of the catalog locales,
+ *  e.g. "zh-Hans", "en", "es", "pt-BR"). */
+const char *util_webui_language_code(void);
 
 #ifdef __cplusplus
 }

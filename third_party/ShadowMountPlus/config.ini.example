@@ -1,0 +1,146 @@
+# ShadowMount runtime config example
+# Place as: /data/shadowmount/config.ini
+#
+# This file is a template.
+# Nothing below is active until you remove the leading '#'.
+#
+# How to use this file:
+# 1. Uncomment only the parameters you really want to override.
+# 2. Lines that start with '# key=value' are real parameters you can uncomment directly.
+# 3. Lines that start with '##' are examples/templates only. Edit them before use.
+
+# Debug logging:
+# 1/true/yes/on  -> enable log_debug output to console and /data/shadowmount/debug.log
+# 0/false/no/off -> disable log_debug output
+# Default: 1
+# debug=1
+
+# Quiet mode:
+# 1/true/yes/on  -> only show the startup version popup and runtime errors
+# 0/false/no/off -> also show normal informational popups
+# Default: 0
+# quiet_mode=0
+
+# Global mount mode:
+# 1/true/yes/on/ro  -> read-only mounts
+# 0/false/no/off/rw -> read-write mounts
+# Default: 1
+# mount_read_only=1
+
+# Mounting even damaged file systems:
+# 1/true/yes/on  -> include force option
+# 0/false/no/off -> default mount options
+# Default: 0
+# force_mount=0
+
+# Use batch registration for newly staged titles:
+# 1/true/yes/on  -> submit queued installs through sceAppInstUtilAppInstallAll
+# 0/false/no/off -> register each title directly
+# Default: 0 on FW below 12.00, forced to 1 on FW 12.00 and newer
+# app_install_all=0
+
+# Scan depth relative to each scan root:
+# 1 -> scan only first-level subdirectories
+# 2 -> also scan one additional nested level
+# Default: 1
+# scan_depth=1
+
+# Legacy compatibility:
+# recursive_scan=1 forces scan_depth=2
+# Default: disabled
+# recursive_scan=0
+
+# Full scan loop interval (seconds), range: 1..3600
+# Default: 15
+# scan_interval_seconds=15
+
+# Source stabilization wait window (seconds), range: 0..3600
+# If source mtime/ctime is newer than this window, it will be deferred to next scan.
+# Default: 10
+# stability_wait_seconds=10
+
+# Backend selection per filesystem:
+# lvd   -> /dev/lvdctl -> /dev/lvdN
+# md    -> /dev/mdctl  -> /dev/mdN
+# Defaults: exfat=lvd, ufs=lvd
+# exfat_backend=lvd
+# ufs_backend=lvd
+
+# Sandbox fakelib backport watcher:
+# 1/true/yes/on  -> mount app0/fakelib2 when present, otherwise app0/fakelib, into common/lib
+# 0/false/no/off -> disable fakelib watcher
+# Default: 1
+# backport_fakelib=1
+
+# Global fakelib overlay:
+# 1/true/yes/on  -> also mount global fakelib for every tracked game when present
+# 0/false/no/off -> do not use the global fakelib folder
+# Default: 1
+# global_fakelib=1
+#
+# Default global fakelib folder:
+# global_fakelib_path=/data/shadowmount/fakelib
+#
+# Priority when both global and per-game fakelib exist:
+# game   -> mount global first, then game-specific fakelib (game wins)
+# global -> mount game-specific fakelib first, then global fakelib (global wins)
+# Default: game
+# global_fakelib_priority=game
+#
+## Exclude specific title IDs from the global fakelib overlay (repeatable):
+## global_fakelib_exclude=PPSA12345
+
+# Auto-manage kstuff around game launches:
+# 1/true/yes/on  -> pause kstuff after game launch, resume immediately on stop
+# 0/false/no/off -> leave kstuff state untouched
+# Default: 1
+# kstuff_game_auto_toggle=1
+
+# Detect crash-candidate state and autotune pause delay:
+# 1/true/yes/on  -> enable crash monitoring and autotune updates
+# 0/false/no/off -> disable crash detection/autotune logic
+# Default: 1
+# kstuff_crash_detection=1
+
+# Delay before pausing kstuff for image-backed titles.
+# Default: 25
+# kstuff_pause_delay_image_seconds=25
+
+# Delay before pausing kstuff for direct/non-image launches.
+# Default: 15
+# kstuff_pause_delay_direct_seconds=15
+
+# Backend-specific sector size overrides:
+# Defaults: lvd_exfat=512, lvd_ufs=4096, lvd_pfs=32768, md_exfat=512, md_ufs=512
+# lvd_exfat_sector_size=512
+# lvd_ufs_sector_size=4096
+# lvd_pfs_sector_size=32768
+# md_exfat_sector_size=512
+# md_ufs_sector_size=512
+
+# Optional custom scan roots (can be repeated):
+# If at least one scanpath=... is present, only these paths are used.
+# "/mnt/shadowmnt/pfsc" and "/mnt/shadowmnt" are always added automatically.
+# Default: use built-in scan path list
+# scanpath=/data/homebrew
+
+## Per-image mount mode override by file name (repeatable):
+## image_ro=<image_filename>
+## image_rw=<image_filename>
+## image_sector=<image_filename>:<sector_size>
+##
+## Examples:
+## image_ro=PPSA12345.ffpfs
+## image_rw=My Game Dump.exfat
+## image_sector=My Game Dump.exfat:65536
+
+## Keep kstuff enabled for specific title IDs (repeatable):
+## kstuff_no_pause=PPSA12345
+
+## Override pause delay for specific title IDs (repeatable):
+## Format: TITLEID:SECONDS
+## kstuff_delay=PPSA12345:30
+
+## More custom scan root examples:
+## scanpath=/data/homebrew
+## scanpath=/data/etaHEN/games

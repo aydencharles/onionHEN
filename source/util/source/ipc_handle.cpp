@@ -6,6 +6,8 @@
 #include <onion/payload.h>
 #include "ipc.hpp"
 #include "service_facade.hpp"
+#include "pkgserver_adapter.h"
+#include "util_language.h"
 #include <msg.hpp>
 #include <onion/settings.hpp>
 #include "common_utils.h"
@@ -126,12 +128,47 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, !onion::services::ftpService().recover());
     break;
   }
+  case BREW_UTIL_TOGGLE_SHADOWMOUNT: {
+    const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
+                                                            "toggle");
+    const bool enabled = toggle && cJSON_IsNumber(toggle) && toggle->valueint;
+    bool ok = true;
+    if (enabled)
+      ok = onion::services::shadowMountService().start();
+    else
+      onion::services::shadowMountService().stop();
+    reply(sender_app, !ok);
+    break;
+  }
+  case BREW_UTIL_SHADOWMOUNT_STATUS: {
+    reply(sender_app, false,
+          onion::services::shadowMountService().running() ? "1" : "0");
+    break;
+  }
+  case BREW_UTIL_TOGGLE_PKGNET: {
+    const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
+                                                            "toggle");
+    const bool enabled = toggle && cJSON_IsNumber(toggle) && toggle->valueint;
+    bool ok = true;
+    if (enabled) {
+      pkg_server_set_webui_lang(util_webui_language_code());
+      ok = onion::services::pkgNetService().start();
+    } else {
+      onion::services::pkgNetService().stop();
+    }
+    reply(sender_app, !ok);
+    break;
+  }
+  case BREW_UTIL_PKGNET_STATUS: {
+    reply(sender_app, false,
+          onion::services::pkgNetService().running() ? "1" : "0");
+    break;
+  }
   case BREW_UTIL_UNUSED_LEGACY_SERVICE_SCAN:
   case BREW_UTIL_UNUSED_LEGACY_SERVICE_TOGGLE:
   case BREW_UTIL_UNUSED_KLOG:
-  case BREW_UTIL_UNUSED_DPI:
   case BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY:
-    /* Removed scan-now / Klog / DPI / rest-standby IPC; ordinals stay stable. */
+    /* Removed scan-now / Klog / rest-standby IPC; ordinals stay stable. */
     LOG_WARN("Removed-service toggle: unsupported (cmd=%u)", static_cast<unsigned>(command));
     reply(sender_app, true);
     break;
@@ -365,6 +402,20 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false);
     usleep(50 * 1000);
     exit(1337);
+    break;
+  }
+  case BREW_UTIL_SET_SYSTEM_LANG: {
+    /* Daemon can query the SystemService at runtime; util cannot (PTRACE).
+     * Re-store the raw SCE language so every consumer (notify, webui code,
+     * cheat-mirror, later ui_lang re-applies) follows it. */
+    const cJSON *lang = cJSON_GetObjectItemCaseSensitive(my_json.get(),
+                                                         "lang");
+    if (lang && cJSON_IsNumber(lang)) {
+      util_store_system_language(lang->valueint);
+      util_apply_ui_language(g_settings.snapshot().ui_lang);
+      pkg_server_set_webui_lang(util_webui_language_code());
+    }
+    reply(sender_app, false);
     break;
   }
   case BREW_RELOAD_SETTINGS: {

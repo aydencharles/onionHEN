@@ -6,5 +6,5 @@
 #endif
 
 #ifndef ONIONHEN_AUTHOR
-#define ONIONHEN_AUTHOR "麒麟/0xp0co"
+#define ONIONHEN_AUTHOR "麒麟/0xp0co & kvnhrt"
 #endif

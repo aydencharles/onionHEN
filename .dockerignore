@@ -2,3 +2,12 @@
 build/
 .cache/
 third_party/
+
+# The frontend is built inside the container; keep source/webui/dist for the
+# payload build, but never copy the local dependency tree into the image.
+source/webui/node_modules/
+source/webui/.vite/
+source/webui/.eslintcache
+source/webui/npm-debug.log*
+source/webui/yarn-debug.log*
+source/webui/yarn-error.log*

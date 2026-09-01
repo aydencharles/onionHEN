@@ -9,19 +9,18 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^5.0.4",
+    "lucide-react": "latest",
+    "preact": "^10.29.8",
     "vite": "^7.1.12",
-    "vite-plugin-singlefile": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest"
+    "vite-plugin-singlefile": "latest"
   },
   "devDependencies": {
-    "esbuild": "latest",
-    "globals": "latest",
-    "eslint": "latest",
     "@eslint/js": "latest",
+    "@preact/preset-vite": "^2.10.6",
+    "esbuild": "latest",
+    "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
-    "eslint-plugin-react-refresh": "latest"
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest"
   }
 }

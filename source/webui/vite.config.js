@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import preact from '@preact/preset-vite'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
 export default defineConfig({
-  plugins: [react(), viteSingleFile()],
+  plugins: [preact(), viteSingleFile()],
   build: {
     target: ['es2015', 'safari12'],
     cssCodeSplit: false,

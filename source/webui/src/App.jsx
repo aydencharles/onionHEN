@@ -13,7 +13,7 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react'
-import logoUrl from './assets/logo.png'
+import logoUrl from './assets/logo.webp'
 import { resolveLanguage, translate, languageMeta } from './i18n.js'
 import { sha256Hex } from './sha256.js'
 

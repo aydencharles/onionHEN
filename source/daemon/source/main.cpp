@@ -162,6 +162,9 @@ void start_worker_threads(pthread_t* fifo_thr, pthread_t* msg_thr) {
   pthread_t vsync_fps_thr = nullptr;
   pthread_create(&vsync_fps_thr, nullptr, vsync_fps_sampler_thread, nullptr);
   pthread_detach(vsync_fps_thr);
+  pthread_t language_thr = nullptr;
+  pthread_create(&language_thr, nullptr, system_language_poll_thread, nullptr);
+  pthread_detach(language_thr);
   pthread_t resume_thr = nullptr;
   pthread_create(&resume_thr, nullptr, resume_recovery_thread, nullptr);
   pthread_detach(resume_thr);

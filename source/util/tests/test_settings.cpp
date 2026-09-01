@@ -26,6 +26,8 @@ static int test_defaults_and_serialize_keys(void) {
 
   TEST_ASSERT_TRUE(!s.ftp_autoload);
   TEST_ASSERT_EQ_INT(onion::kFtpPortDefault, s.ftp_port);
+  TEST_ASSERT_TRUE(!s.shadowmount_autoload);
+  TEST_ASSERT_TRUE(!s.pkgnet_autoload);
   TEST_ASSERT_TRUE(text.find("[meta]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("schema_version=1") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[toolbox]") != std::string::npos);
@@ -68,6 +70,19 @@ static int test_defaults_and_serialize_keys(void) {
                                  "# port selects the TCP listen port for the built-in server.\n"
                                  "# Available values: 1 through 65535\n"
                                  "port=1337\n") != std::string::npos);
+  TEST_ASSERT_TRUE(
+      text.find("[shadowmount]\n"
+                "# autoload starts the built-in ShadowMount+ module the next "
+                "time OnionHEN launches.\n"
+                "# Available values: true, false\n"
+                "autoload=false\n") != std::string::npos);
+  TEST_ASSERT_TRUE(
+      text.find("[pkgnet]\n"
+                "# autoload starts the built-in network package installer "
+                "(DPI, TCP 9090)\n"
+                "# the next time OnionHEN launches.\n"
+                "# Available values: true, false\n"
+                "autoload=false\n") != std::string::npos);
   return 0;
 }
 
@@ -141,6 +156,8 @@ static int test_full_schema_roundtrip(void) {
   in.kstuff_autoload = false;
   in.ftp_autoload = true;
   in.ftp_port = 2121;
+  in.shadowmount_autoload = true;
+  in.pkgnet_autoload = true;
   in.app_jailbreak_allowlist.exact_title_ids = {};
   in.app_jailbreak_allowlist.exact_title_ids[0] = "ITEM00001";
   in.app_jailbreak_allowlist.exact_title_ids[1] = "CUSA12345";
@@ -179,6 +196,8 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(out.kstuff_autoload == in.kstuff_autoload);
   TEST_ASSERT_TRUE(out.ftp_autoload == in.ftp_autoload);
   TEST_ASSERT_EQ_INT(in.ftp_port, out.ftp_port);
+  TEST_ASSERT_TRUE(out.shadowmount_autoload == in.shadowmount_autoload);
+  TEST_ASSERT_TRUE(out.pkgnet_autoload == in.pkgnet_autoload);
   TEST_ASSERT_EQ_U64(
       in.app_jailbreak_allowlist.exact_title_id_count,
       out.app_jailbreak_allowlist.exact_title_id_count);
@@ -217,6 +236,8 @@ static int test_partial_ini_keeps_defaults(void) {
   TEST_ASSERT_TRUE(out.kstuff_autoload);
   TEST_ASSERT_TRUE(!out.ftp_autoload);
   TEST_ASSERT_EQ_INT(onion::kFtpPortDefault, out.ftp_port);
+  TEST_ASSERT_TRUE(!out.shadowmount_autoload);
+  TEST_ASSERT_TRUE(!out.pkgnet_autoload);
   TEST_ASSERT_EQ_INT(onion::kCheatsMirrorAuto, out.cheats_mirror);
   TEST_ASSERT_EQ_U64(5, out.app_jailbreak_allowlist.exact_title_id_count);
   TEST_ASSERT_STREQ("ITEM00001",
@@ -504,6 +525,8 @@ static int test_v0_0_10_config_does_not_autoload_plugins(void) {
   TEST_ASSERT_TRUE(out.kstuff_autoload);
   TEST_ASSERT_TRUE(!out.ftp_autoload);
   TEST_ASSERT_EQ_INT(onion::kFtpPortDefault, out.ftp_port);
+  TEST_ASSERT_TRUE(!out.shadowmount_autoload);
+  TEST_ASSERT_TRUE(!out.pkgnet_autoload);
 
   unlink(path.c_str());
   return 0;

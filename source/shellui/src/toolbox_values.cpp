@@ -60,6 +60,14 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.ftp_autoload); }},
     {"id_plugin_ftpsrv_port",
      +[]() -> std::string { return int_str(g_settings.ftp_port); }},
+    {"id_plugin_shadowmount_autoload",
+     +[]() -> std::string { return bool_str(g_settings.shadowmount_autoload); }},
+    {"id_pkgnet_run",
+     +[]() -> std::string {
+       return bool_str(IPC_Client::getInstance(true).PkgNetStatus());
+     }},
+    {"id_pkgnet_autoload",
+     +[]() -> std::string { return bool_str(g_settings.pkgnet_autoload); }},
     {"id_disp_titleids",
      +[]() -> std::string { return bool_str(g_settings.display_tids); }},
     {"id_enable_fan_speed",

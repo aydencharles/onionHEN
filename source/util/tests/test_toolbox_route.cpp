@@ -80,6 +80,20 @@ static int test_plugins_page(void) {
   return 0;
 }
 
+static int test_pkg_pages(void) {
+  RouteResult i = resolve_resource(make_in(kPkgInstallerXml));
+  TEST_ASSERT_TRUE(i.page == Page::PkgInstaller);
+  TEST_ASSERT_TRUE(i.flags.is_pkg_installer);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(i.page) ==
+                   OnPressDomain::PassThrough);
+
+  RouteResult n = resolve_resource(make_in(kPkgNetXml));
+  TEST_ASSERT_TRUE(n.page == Page::PkgNet);
+  TEST_ASSERT_TRUE(n.flags.is_pkg_net);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(n.page) == OnPressDomain::PkgNet);
+  return 0;
+}
+
 static std::string cfg_res(const char *rel) {
   return std::string(onion::plugins::kConfigResourcePrefix) + rel;
 }
@@ -100,19 +114,28 @@ static int test_plugin_config_page(void) {
 static int test_plugins_registry(void) {
   using namespace onion::plugins;
 
-  TEST_ASSERT_EQ_INT(2, static_cast<int>(kRegistrySize));
+  TEST_ASSERT_EQ_INT(3, static_cast<int>(kRegistrySize));
   TEST_ASSERT_TRUE(find_by_key("ftpsrv") != nullptr);
+  TEST_ASSERT_TRUE(find_by_key("shadowmount") != nullptr);
   TEST_ASSERT_TRUE(find_by_key("missing") == nullptr);
   TEST_ASSERT_TRUE(find_by_toggle_id("id_plugin_kstuff") != nullptr);
   TEST_ASSERT_TRUE(find_by_toggle_id("id_nope") == nullptr);
   TEST_ASSERT_STREQ("ftpsrv", find_by_key("ftpsrv")->key);
   TEST_ASSERT_STREQ("id_plugin_ftpsrv", find_by_key("ftpsrv")->toggle_id);
   TEST_ASSERT_STREQ("ftpsrv.xml", find_by_key("ftpsrv")->config_xml);
+  TEST_ASSERT_STREQ("shadowmount", find_by_key("shadowmount")->key);
+  TEST_ASSERT_STREQ("id_plugin_shadowmount",
+                    find_by_key("shadowmount")->toggle_id);
+  TEST_ASSERT_STREQ("shadowmount.xml", find_by_key("shadowmount")->config_xml);
   TEST_ASSERT_TRUE(default_key() == std::string_view("kstuff"));
 
   const Descriptor *by_res = find_by_config_xml_resource(cfg_res("ftpsrv.xml"));
   TEST_ASSERT_TRUE(by_res != nullptr);
   TEST_ASSERT_STREQ("ftpsrv", by_res->key);
+  const Descriptor *by_sm =
+      find_by_config_xml_resource(cfg_res("shadowmount.xml"));
+  TEST_ASSERT_TRUE(by_sm != nullptr);
+  TEST_ASSERT_STREQ("shadowmount", by_sm->key);
   TEST_ASSERT_TRUE(find_by_config_xml_resource(cfg_res("nope.xml")) == nullptr);
   return 0;
 }
@@ -308,6 +331,7 @@ extern "C" int test_toolbox_route_suite(void) {
   fails += onion_test_run("route.cheats", test_cheats_page);
   fails += onion_test_run("route.auto_plapps", test_auto_payloads_and_plapps);
   fails += onion_test_run("route.plugins", test_plugins_page);
+  fails += onion_test_run("route.pkg_pages", test_pkg_pages);
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);
   fails += onion_test_run("plugins.registry", test_plugins_registry);
   fails += onion_test_run("plugins.config_restores_parent",

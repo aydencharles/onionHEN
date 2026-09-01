@@ -319,6 +319,39 @@ bool IPC_Client::RecoverFtp() {
   return true;
 }
 
+bool IPC_Client::ShadowMountStatus() {
+  std::string ipc_msg;
+  if (!IPCSendCommand(BREW_UTIL_SHADOWMOUNT_STATUS, ipc_msg)) {
+    LOG_ERROR("Failed to query ShadowMount service status");
+    return false;
+  }
+  return ipc_msg == "1" || ipc_msg == "true";
+}
+
+bool IPC_Client::PkgNetStatus() {
+  std::string ipc_msg;
+  if (!IPCSendCommand(BREW_UTIL_PKGNET_STATUS, ipc_msg)) {
+    LOG_ERROR("Failed to query pkg-server service status");
+    return false;
+  }
+  return ipc_msg == "1" || ipc_msg == "true";
+}
+
+bool IPC_Client::SetSystemLanguage(int language) {
+  if (!require_util("SetSystemLanguage")) {
+    return false;
+  }
+  cJSON *j = cJSON_CreateObject();
+  cJSON_AddNumberToObject(j, "lang", language);
+  const std::string json = json_object_str(j);
+  std::string ipc_msg;
+  if (!IPCSendCommand(BREW_UTIL_SET_SYSTEM_LANG, ipc_msg, json)) {
+    LOG_ERROR("Failed to push system language %d", language);
+    return false;
+  }
+  return true;
+}
+
 void IPC_Client::KillDaemon() {
   std::string ipc_msg;
   IPCSendCommand(BREW_KILL_DAEMON, ipc_msg);

@@ -166,6 +166,14 @@ struct Settings {
   // TCP listen port for the built-in FTP server (1..65535).
   int ftp_port = kFtpPortDefault;
 
+  // [shadowmount]
+  // Start the built-in ShadowMount+ module the next time OnionHEN launches.
+  bool shadowmount_autoload = false;
+
+  // [pkgnet]
+  // Start the built-in network package installer the next time OnionHEN launches.
+  bool pkgnet_autoload = false;
+
   // [toolbox]
   // 0 = system (default), 1 = zh-Hans, 2 = en, 3 = ar, 4 = zh-Hant,
   // 5 = ja, 6 = fr, 7 = de, 8 = ko, 9 = es, 10 = pt-BR, 11 = it,

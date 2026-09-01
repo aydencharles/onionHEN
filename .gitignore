@@ -44,3 +44,12 @@ source/aerolib.csv
 
 # Machine-local helpers (firmware dump verifiers, etc.)
 /.local/
+
+# Web UI (built by scripts/build.sh into a single-file bundle)
+source/webui/node_modules/
+source/webui/dist/
+source/webui/.vite/
+source/webui/.eslintcache
+source/webui/npm-debug.log*
+source/webui/yarn-debug.log*
+source/webui/yarn-error.log*

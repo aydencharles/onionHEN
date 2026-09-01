@@ -51,11 +51,69 @@ set(FTPSRV_SOURCES
   "${FTPSRV_SOURCE_DIR}/self-prospero.c"
 )
 
+# ShadowMountPlus is linked into util the same way as ftpsrv: a pinned
+# third-party module whose standalone main is excluded; the service facade and
+# shadowmount_main.cpp own the lifecycle.
+set(SHADOWMOUNT_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/ShadowMountPlus")
+set(SHADOWMOUNT_SOURCES
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_appdb.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_config_mount.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_fakelib.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_filesystem.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_gameinfo.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_game_cache.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_game_lifecycle.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_image.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_image_cache.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_install.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_install_queue.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_kstuff.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_log.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_manual.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_mdbg.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_mount_device.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_path_state.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_path_utils.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_scan.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_scan_tree.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_scanner.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_shellcore_flags.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_stability.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_time.c"
+  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_title_state.c"
+)
+
+# The PS5 payload SDK does not ship libsqlite3; the public-domain amalgamation
+# is vendored and compiled like the rest of third_party.
+set(ONION_SQLITE_SOURCES "${ONIONHEN_THIRD_PARTY_DIR}/sqlite/sqlite3.c")
+
+# DPI package install server (network installer) linked into util the same way
+# as ftpsrv: the vendored standalone's main was renamed to pkg_server_main and
+# the service facade owns the worker thread and lifecycle.
+set(PKGNET_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/pkgserver")
+set(PKGNET_SOURCES
+  "${PKGNET_SOURCE_DIR}/pkg_server.c"
+  "${PKGNET_SOURCE_DIR}/multipart.c"
+)
+
+# Web UI bundle (built by scripts/build.sh before configure). Embedded into
+# pkg_server.c via .incbin; rebuild the object when the bundle changes.
+set(WEBUI_INDEX "${D_CWD}/../webui/dist/index.html")
+if(NOT EXISTS "${WEBUI_INDEX}")
+	message(FATAL_ERROR
+		"WebUI bundle missing (looked in ${WEBUI_INDEX}). "
+		"Run scripts/build.sh so the Vite step produces dist/index.html.")
+endif()
+set_source_files_properties("${PKGNET_SOURCE_DIR}/pkg_server.c" PROPERTIES
+	COMPILE_DEFINITIONS "ONIONHEN_WEBUI_INDEX=\"${WEBUI_INDEX}\""
+	OBJECT_DEPENDS "${WEBUI_INDEX}")
+
 set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS} ")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -Wno-unused-const-variable -Wno-deprecated-declarations")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-errors")
 
 target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles} ${FTPSRV_SOURCES}
+  ${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES} ${PKGNET_SOURCES}
   "${ONIONHEN_COMMON_DIR}/elfldr_remote.c")
 onion_target_debug_define(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -88,10 +146,19 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 	CURL_STATICLIB
 	ONION_CURL_CA_BUNDLE="${ONION_CURL_CA_BUNDLE}"
   VERSION_TAG="OnionHEN ftpsrv module"
+  SHADOWMOUNT_VERSION="OnionHEN shadowmount module"
+  ONIONHEN_SHADOWMOUNT_TEMPLATE="${SHADOWMOUNT_SOURCE_DIR}/config.ini.example"
+  ONIONHEN_SHADOWMOUNT_ICON="${SHADOWMOUNT_SOURCE_DIR}/smp_icon.png"
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 	"${ONION_CURL_ROOT}/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "${FTPSRV_SOURCE_DIR}")
+target_include_directories(${PROJECT_NAME} PRIVATE "${PKGNET_SOURCE_DIR}"
+  "${PKGNET_SOURCE_DIR}/include")
+target_include_directories(${PROJECT_NAME} PRIVATE
+  "${SHADOWMOUNT_SOURCE_DIR}"
+  "${SHADOWMOUNT_SOURCE_DIR}/include"
+  "${ONIONHEN_THIRD_PARTY_DIR}/sqlite")
 # The CA bundle is embedded with .incbin, which is invisible to the compiler's
 # normal dependency scanner.
 set_source_files_properties(
@@ -103,6 +170,11 @@ set_source_files_properties(
 # allowing the pinned third-party module to retain its upstream implementation.
 set_source_files_properties(${FTPSRV_SOURCES} PROPERTIES
   COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
+set_source_files_properties(${PKGNET_SOURCES} PROPERTIES
+  COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
+set_source_files_properties(${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES}
+  PROPERTIES COMPILE_FLAGS
+  "-Wno-error -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function")
 target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONIONHEN_PS5_STUB_DIR}"
   "${ONIONHEN_THIRD_PARTY_DIR}/keystone/lib"
@@ -123,6 +195,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     hijacker
     SceSystemService
     SceUserService
+    SceAppInstUtil
+    SceNotification
     SceNetCtl
     SceNet
     kernel_sys

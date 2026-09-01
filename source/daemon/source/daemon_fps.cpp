@@ -9,6 +9,7 @@
 #include "globalconf.hpp"
 
 #include <onion/fps_agc.hpp>
+#include <onion/fps_bc.hpp>
 #include <onion/fps_dce.hpp>
 #include <onion/fps_formula.hpp>
 #include <onion/fps_publish.hpp>
@@ -32,6 +33,7 @@ constexpr unsigned kIdleSleepSec = 1;
 constexpr unsigned kPidRefreshSec = 1;
 constexpr uint64_t kVsyncStaleNs = 2000000000ULL;
 constexpr uint64_t kDiagIntervalNs = 2000000000ULL;
+constexpr int kBcDeadTicks = 15;
 
 struct CounterState {
   uint64_t count = 0;
@@ -466,6 +468,12 @@ void *fps_sampler_thread(void *args) noexcept {
            static_cast<unsigned>(kSampleUs));
 
   onion::fps::AgcSources agc;
+  onion::fps::BcGnmHook bc_hook;
+  onion::fps::BcHookStatus bc_last_status =
+      onion::fps::BcHookStatus::NotAttempted;
+  CounterState bc_st;
+  uint64_t last_bc_install_ns = 0;
+  int bc_dead = 0;
   CounterState ring_st;
   CounterState global_st;
   CalibrationState calibration;
@@ -522,6 +530,11 @@ void *fps_sampler_thread(void *args) noexcept {
       global_st = {};
       calibration.reset();
       agc.reset();
+      bc_hook.reset();
+      bc_st = {};
+      bc_last_status = onion::fps::BcHookStatus::NotAttempted;
+      last_bc_install_ns = 0;
+      bc_dead = 0;
       window_n = 0;
       window_i = 0;
       dead_ticks = 0;
@@ -549,6 +562,11 @@ void *fps_sampler_thread(void *args) noexcept {
         global_st = {};
         calibration.reset();
         agc.reset();
+        bc_hook.reset();
+        bc_st = {};
+        bc_last_status = onion::fps::BcHookStatus::NotAttempted;
+        last_bc_install_ns = 0;
+        bc_dead = 0;
         window_n = 0;
         window_i = 0;
         dead_ticks = 0;
@@ -574,15 +592,95 @@ void *fps_sampler_thread(void *args) noexcept {
       }
     }
 
-    if (cached_pid <= 0 || onion::fps::is_ps4_bc_title(tid.c_str())) {
-      publish_invalid(cached_pid > 0 ? static_cast<int>(cached_pid) : -1,
-                      tid.c_str());
+    if (cached_pid <= 0) {
+      publish_invalid(-1, nullptr);
       if (diag_due(last_diag_ns))
         LOG_INFO("fps-diag: render tid=%s app=%d pid=%d name=%s state=%s "
                  "publish_valid=0",
                  tid.c_str(), app_id, static_cast<int>(cached_pid),
-                 cached_proc_name.c_str(),
-                 cached_pid <= 0 ? "pid-not-found" : "ps4-bc-skipped");
+                 cached_proc_name.c_str(), "pid-not-found");
+      usleep(kSampleUs);
+      continue;
+    }
+
+    if (onion::fps::is_ps4_bc_title(tid.c_str())) {
+      /* PS4 BC: measure the GNM flip counter exposed by the remote detour. */
+      float bc_hz = 0.f;
+      bool bc_ok = false;
+      uint64_t bc_count = 0;
+      RateDiag bc_rate_diag;
+      onion::fps::BcHookStatus bc_status =
+          onion::fps::BcHookStatus::NotAttempted;
+      if (!bc_hook.installed()) {
+        const uint64_t now_ns = monotonic_ns();
+        if (last_bc_install_ns == 0 ||
+            now_ns - last_bc_install_ns >= 500000000ULL) {
+          last_bc_install_ns = now_ns;
+          bc_status = bc_hook.install(cached_pid);
+          bc_last_status = bc_status;
+          LOG_INFO("fps-diag: bc-hook install tid=%s pid=%d status=%s "
+                   "target=0x%llx counter=0x%llx len=%u",
+                   tid.c_str(), static_cast<int>(cached_pid),
+                   onion::fps::bc_hook_status_name(bc_status),
+                   static_cast<unsigned long long>(bc_hook.target_addr()),
+                   static_cast<unsigned long long>(bc_hook.counter_addr()),
+                   static_cast<unsigned>(bc_hook.hook_len()));
+        }
+      }
+      if (bc_hook.installed()) {
+        if (bc_hook.sample(&bc_count, &bc_status)) {
+          bc_rate_diag = sample_hz(bc_st, bc_count, &bc_hz);
+          bc_ok = bc_rate_diag.status == RateStatus::Ok;
+        }
+        if (!bc_ok && bc_last_status != bc_status) {
+          bc_last_status = bc_status;
+          LOG_INFO("fps-diag: bc-hook sample tid=%s pid=%d status=%s "
+                   "counter=%llu",
+                   tid.c_str(), static_cast<int>(cached_pid),
+                   onion::fps::bc_hook_status_name(bc_status),
+                   static_cast<unsigned long long>(bc_count));
+        }
+      }
+      if (bc_ok) {
+        bc_dead = 0;
+        window[window_i] = bc_hz;
+        window_i = (window_i + 1) % onion::fps::kWindow;
+        if (window_n < onion::fps::kWindow)
+          ++window_n;
+        const float smoothed = onion::fps::rolling_mean(window, window_n);
+        OnionFpsSample bc_sample {};
+        bc_sample.pid = static_cast<int>(cached_pid);
+        bc_sample.valid = 1;
+        bc_sample.source = ONION_FPS_SRC_BC;
+        bc_sample.fps = smoothed;
+        bc_sample.unix_ns = onion_fps_realtime_ns();
+        std::strncpy(bc_sample.title_id, tid.c_str(),
+                     sizeof(bc_sample.title_id) - 1);
+        onion::fps::publish(bc_sample);
+        if (last_publish_valid != 1) {
+          LOG_INFO("fps: bc source active tid=%s pid=%d fps=%.2f "
+                   "counter=%llu",
+                   tid.c_str(), static_cast<int>(cached_pid), smoothed,
+                   static_cast<unsigned long long>(bc_count));
+          last_publish_valid = 1;
+        }
+      } else if (last_publish_valid == 1) {
+        ++bc_dead;
+        if (bc_dead >= kBcDeadTicks) {
+          last_publish_valid = -1;
+          publish_invalid(static_cast<int>(cached_pid), tid.c_str());
+        }
+      } else {
+        publish_invalid(static_cast<int>(cached_pid), tid.c_str());
+      }
+      if (diag_due(last_diag_ns))
+        LOG_INFO("fps-diag: bc-render tid=%s pid=%d installed=%d "
+                 "counter=%llu rate=%s hz=%.2f publish_valid=%d dead=%d",
+                 tid.c_str(), static_cast<int>(cached_pid),
+                 bc_hook.installed() ? 1 : 0,
+                 static_cast<unsigned long long>(bc_count),
+                 rate_status_name(bc_rate_diag.status), bc_hz,
+                 bc_ok ? 1 : 0, bc_dead);
       usleep(kSampleUs);
       continue;
     }

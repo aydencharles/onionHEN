@@ -10,13 +10,14 @@
 namespace {
 
 OnPressResult toggle_plugin_now(OnPressContext &ctx, DaemonCommands cmd,
+                                bool (*is_running)(),
                                 const char *fail_notify,
                                 const char *on_notify, const char *off_notify) {
   ctx.dirty = false;
   const bool enabled = value_as_int(ctx);
   /* Stop is idempotent and must clear util's desired state even when a
    * listener failed before the UI could observe it as running. */
-  if (enabled && IPC_Client::getInstance(true).FtpStatus())
+  if (enabled && is_running())
     return OnPressResult::EarlyReturn;
 
   if (IPC_Client::getInstance(true).ToggleSetting(cmd, enabled) !=
@@ -41,9 +42,11 @@ OnPressResult toggle_next_boot(OnPressContext &ctx, bool &field,
 } // namespace
 
 OnPressResult onpress_ftp_run(OnPressContext &ctx) {
-  return toggle_plugin_now(ctx, BREW_UTIL_TOGGLE_FTP,
-                           "notify.ftp.toggle_failed", "notify.ftp.enabled",
-                           "notify.ftp.disabled");
+  return toggle_plugin_now(
+      ctx, BREW_UTIL_TOGGLE_FTP,
+      +[]() { return IPC_Client::getInstance(true).FtpStatus(); },
+      "notify.ftp.toggle_failed", "notify.ftp.enabled",
+      "notify.ftp.disabled");
 }
 
 OnPressResult onpress_ftp_autoload(OnPressContext &ctx) {
@@ -72,6 +75,45 @@ OnPressResult onpress_ftp_port(OnPressContext &ctx) {
   return OnPressResult::Handled;
 }
 
+/* ShadowMount+ run is a button: read the live module state from util, flip
+ * it, and report through notifications. The page carries no toggle state for
+ * this control. */
+OnPressResult onpress_shadowmount_run(OnPressContext &ctx) {
+  ctx.dirty = false;
+  const bool running = IPC_Client::getInstance(true).ShadowMountStatus();
+  if (IPC_Client::getInstance(true).ToggleSetting(BREW_UTIL_TOGGLE_SHADOWMOUNT,
+                                                  !running) !=
+      IPC_Ret::NO_ERROR) {
+    notify("notify.shadowmount.toggle_failed");
+    return OnPressResult::EarlyReturn;
+  }
+  notify(running ? "notify.shadowmount.disabled" : "notify.shadowmount.enabled");
+  return OnPressResult::Consumed;
+}
+
+OnPressResult onpress_shadowmount_autoload(OnPressContext &ctx) {
+  return toggle_next_boot(ctx, g_settings.shadowmount_autoload,
+                          "notify.shadowmount.next_boot_on",
+                          "notify.shadowmount.next_boot_off");
+}
+
+/* Network package installer toggles. Run controls the in-process DPI server
+ * (TCP 9090) for this session only; autoload mirrors the FTP next-boot
+ * behavior. */
+OnPressResult onpress_pkgnet_run(OnPressContext &ctx) {
+  return toggle_plugin_now(
+      ctx, BREW_UTIL_TOGGLE_PKGNET,
+      +[]() { return IPC_Client::getInstance(true).PkgNetStatus(); },
+      "notify.pkgnet.toggle_failed", "notify.pkgnet.enabled",
+      "notify.pkgnet.disabled");
+}
+
+OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx) {
+  return toggle_next_boot(ctx, g_settings.pkgnet_autoload,
+                          "notify.pkgnet.next_boot_on",
+                          "notify.pkgnet.next_boot_off");
+}
+
 /*
  * The Plugins page lists each built-in plugin as a <link> that the stock
  * settings UI navigates natively (file="<plugin>.xml"). Each plugin's config
@@ -84,6 +126,10 @@ static const OnPressExactEntry kPluginsExact[] = {
     {"id_plugin_ftpsrv_run", onpress_ftp_run},
     {"id_plugin_ftpsrv_autoload", onpress_ftp_autoload},
     {"id_plugin_ftpsrv_port", onpress_ftp_port},
+    {"id_plugin_shadowmount_run", onpress_shadowmount_run},
+    {"id_plugin_shadowmount_autoload", onpress_shadowmount_autoload},
+    {"id_pkgnet_run", onpress_pkgnet_run},
+    {"id_pkgnet_autoload", onpress_pkgnet_autoload},
 };
 
 const OnPressExactEntry *onpress_plugins_exact(size_t *count) {

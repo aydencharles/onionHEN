@@ -52,7 +52,7 @@ OnionHEN 是 PS5 的 All-in-One Homebrew Enabler，提供提权、后台服务�
 
 - util 先提供网络/IPC 等服务
 - kstuff 需先完成 ShellUI 补丁
-- `ftp.autoload` 为 true 时，util 在进程内创建 FTP 工作线程
+- `ftp.autoload` / `shadowmount.autoload` 为 true 时，util 在进程内创建对应服务工作线程
 - daemon 再注入 Toolbox
 
 若并行 ptrace 同一进程，容易导致 Toolbox 超时或崩溃。
@@ -167,6 +167,8 @@ OnionHEN/
 | Cheats | IPC | flat-file cheat engine（multi-source `TITLE_VERSION[_PROCESS][_SOURCE_ID].ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | Toolbox 请求 | IPC | util 崩溃重拉后向 crit 请求 `BREW_ENABLE_TOOLBOX`；休息恢复在 daemon |
 | FTP | TCP `ftp.port`（默认 1337） | util 内部 `ftpsrv` 源码模块；插件页提供启停、自启和端口修改；待机恢复时由 util 重绑已启用监听 |
+| ShadowMount+ | 进程内线程 | 固定版本 `ShadowMountPlus 1.6beta16` 源码模块；插件页提供本次按钮启停与下次开机自启；扫描/挂载/安装游戏镜像并写自身日志与配置到 `/data/shadowmount/` |
+| DPI（网络包安装器 / Web UI） | TCP **9090** + **12800** | 进程内 pkg 上传/安装服务（`third_party/pkgserver`，配置 `[pkgnet]`）；Web UI 内嵌 `source/webui/dist` 单文件页面，SSE 推送状态与进度，界面语言与工具箱一致（14 种） |
 
 `ps5/klog.h` 的 `klog_printf` / `klog_puts` 用于写入内核日志，不提供 TCP 网络服务。
 
@@ -179,7 +181,7 @@ OnionHEN/
 主要菜单能力：
 
 - 内容安装与管理（系统 PkgInstaller UI、附加内容管理）
-- Payload 与内核组件（用户 Payload；插件：kstuff、FTP）
+- Payload 与内核组件（用户 Payload；插件：kstuff、FTP、ShadowMount+）
 - 游戏辅助（金手指引擎、OnionHEN 游戏选项）
 - 监控与显示（ShellUI 监控条、Title ID）
 - 账号激活
@@ -332,6 +334,9 @@ struct IPCMessage {
 - `BREW_UTIL_DOWNLOAD_CHEATS` / `BREW_UTIL_CHEAT_SYNC_STATUS` / `BREW_UTIL_CANCEL_CHEAT_SYNC`（git catalog 同步）
 - `BREW_UTIL_TOGGLE_FTP`（Toolbox 本次启停 ftpsrv）
 - `BREW_UTIL_FTP_STATUS`（查询 util 内部 FTP 线程状态）
+- `BREW_UTIL_TOGGLE_SHADOWMOUNT`（Toolbox 按钮启停 ShadowMount+ 模块）
+- `BREW_UTIL_SHADOWMOUNT_STATUS`（查询 util 内部 ShadowMount+ 线程状态）
+- `BREW_UTIL_SET_SYSTEM_LANG`（daemon 轮询到控制台系统语言变化时经 IPC 推送；util 重新存储 SCE 语言并刷新 notify 与 Web UI 语言）
 
 **ABI 占位命令：**
 
@@ -360,6 +365,7 @@ struct IPCMessage {
 | `/system_tmp/onionhen/pid/<key>.PID` | 用户 Payload PID 状态 |
 | `/system_tmp/onionhen/app_launched` | ShellUI LaunchApp 返回值 |
 | `/system_tmp/onionhen/patch_plugin` | LaunchApp patch gate（外部标记；ShellUI 只读取） |
+| `/user/data/tmp/` | DPI 暂存的上传 pkg（校验通过后由系统安装） |
 
 ### 3.4 Itemzflow 兼容状态
 
@@ -386,7 +392,7 @@ struct IPCMessage {
 
 - Debug Settings 风格菜单
 - 内容安装与管理、Payload 与内核组件
-- 插件（kstuff、FTP 服务器）
+- 插件（kstuff、FTP 服务器、ShadowMount+）
 - 游戏辅助、监控与显示
 - 账号激活
 - 系统与硬件、操作偏好
@@ -397,13 +403,17 @@ struct IPCMessage {
 
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
 - **FTP**：util 内置 `ftpsrv` 源码模块，默认监听 **1337**；Toolbox 插件页提供本次启停、下次开机自启和端口配置
+- **ShadowMount+**：util 内置 `ShadowMountPlus` 源码模块；Toolbox 插件页提供本次按钮启停与下次开机自启；依赖 kstuff，配置与日志位于 `/data/shadowmount/`
 - **Remote Play**：ShellUI 调用 PS5 原生 Remote Play API 完成 PIN 生成和客户端注册确认
+- **DPI（网络安装器 / Web UI）**：util 内嵌 pkg-server；浏览器上传 `.pkg` 以分块安装（TCP 9090），实时进度经 SSE（TCP 12800）刷新，UI 语言跟随工具箱/控制台系统语言（14 种）
 
 所有 `.elf` 文件名都使用相同的 Payload 页面、自动启动扫描和共享加载器，包括
 `kstuff`、`ftpsrv` 与 `ftpsrv-ps5`。内置服务只管理自身进程或线程，不停止同名
 用户 Payload；用户 Payload 仅由 Payload 页的明确停止操作终止。已有有效 PID
 记录时，后续启动和自动启动请求保持现有实例。相同端口的服务由 socket bind
 结果决定唯一端口所有者。
+名称 `shadowmountplus` 为内置模块保留，自动启动扫描
+忽略同名用户 Payload。
 
 ### 4.4 扩展
 
@@ -428,6 +438,7 @@ struct IPCMessage {
 |------|------|------|
 | **kstuff-lite** | [EchoStretch/kstuff-lite](https://github.com/EchoStretch/kstuff-lite) | 提供 `kstuff.elf`；休息后 Toolbox 恢复也参考其 ShellUI PID 监视 |
 | **ftpsrv** | [drakmor/ftpsrv](https://github.com/drakmor/ftpsrv) | 编译进 `util.elf` 的 FTP 源码模块 |
+| **ShadowMountPlus** | [drakmor/ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) | 编译进 `util.elf` 的游戏扫描/挂载源码模块（固定 `1.6beta16`） |
 
 ```bash
 git submodule update --init --recursive
@@ -440,6 +451,7 @@ git submodule update --init --recursive
 |----|------|
 | **7zip-sdk (LZMA)** | unpacker 解压 bootstrapper |
 | **cJSON** | JSON（通知、IPC 载荷等） |
+| **sqlite** | 公有领域 amalgamation；ShadowMount+ 模块的 app 数据库 |
 
 金手指解析器使用 `third_party/cheat_support/` 内直接编译的 AES、base64、miniz、SHA-256 实现。
 
@@ -505,6 +517,7 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 |------|------|
 | [../README.md](../README.md) | 项目总览、功能列表、配置、加载方式 |
 | [shellui-injection.md](shellui-injection.md) | ShellUI 注入路径、安全契约与失败行为 |
+| [api.md](api.md) | DPI pkg-server API：上传、SSE 进度、Web UI |
 | [pkg-writeup.md](pkg-writeup.md) | PS5 PKG 技术说明 |
 | [../source/README.md](../source/README.md) | 源码树与构建说明 |
 | [../third_party/README.md](../third_party/README.md) | 第三方源码、子模块与运行时依赖 |

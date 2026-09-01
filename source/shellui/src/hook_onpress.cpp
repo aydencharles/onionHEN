@@ -66,6 +66,7 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
     break;
   case toolbox::OnPressDomain::Plugins:
   case toolbox::OnPressDomain::PluginConfig:
+  case toolbox::OnPressDomain::PkgNet:
     run_exact(onpress_plugins_exact);
     break;
   case toolbox::OnPressDomain::Cheats:

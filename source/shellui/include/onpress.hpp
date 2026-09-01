@@ -79,6 +79,10 @@ OnPressResult onpress_ftp_run(OnPressContext &ctx);
 OnPressResult onpress_ftp_autoload(OnPressContext &ctx);
 OnPressResult onpress_ftp_port(OnPressContext &ctx);
 OnPressResult onpress_delete_kstuff(OnPressContext &ctx);
+OnPressResult onpress_shadowmount_run(OnPressContext &ctx);
+OnPressResult onpress_shadowmount_autoload(OnPressContext &ctx);
+OnPressResult onpress_pkgnet_run(OnPressContext &ctx);
+OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx);
 
 /** Shared toggle helpers. */
 inline bool value_as_int(const OnPressContext &ctx) {

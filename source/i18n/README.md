@@ -100,8 +100,17 @@ the runtime mapping:
    `system`, add that id in `onion_notify_resolve_language`
    (`0` → `ja`, `2`/`22` → `fr`, `3`/`20` → `es`, `4` → `de`, `5` → `it`,
    `7`/`17` → `pt-BR`, `8` → `ru`, `9` → `ko`, `10` → `zh-Hant`,
-   `11` → `zh-Hans`, `16` → `pl`, `21` → `ar`, `27` → `th`;
-   everything else is `en`).
+    `11` → `zh-Hans`, `16` → `pl`, `21` → `ar`, `27` → `th`;
+    everything else is `en`).
+
+## Web UI
+
+The browser pkg-installer UI in [`../webui/`](../webui/) keeps its own
+dictionaries in `src/i18n.js` — the same 14-locale set as the Toolbox, but
+bundled into the pkg-server's single-file page. Its language resolves the
+same way as the Toolbox (`toolbox.language`, else the console system
+language) and updates live when the daemon's system-language poll pushes
+`BREW_UTIL_SET_SYSTEM_LANG` to util.
 
 ## Intentional exclusions
 
@@ -133,5 +142,11 @@ Checked against call sites (not just the JSON files):
 - Welcome toast still concatenates `version + notify.boot.made_by + author`.
   That word order is correct for current zh and en; the other locales use
   the same concatenation.
+- ShadowMount+ and PkgNet toolbox keys (`shadowmount.*`, `pkgnet.*`) and
+  notification keys (`notify.shadowmount.*`, `notify.pkgnet.*`) are
+  translated across all 14 locales.
+- The Web UI (`source/webui/src/i18n.js`) carries its own dictionaries for
+  the same 14 locales; its language resolves identically to the Toolbox and
+  updates live on `BREW_UTIL_SET_SYSTEM_LANG`.
 
 Arabic is a complete key-for-key trial locale, not a native RTL layout.

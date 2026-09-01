@@ -22,6 +22,7 @@ enum class OnPressDomain : unsigned char {
   Plapps,
   Progress,
   RemotePlay,
+  PkgNet,
 };
 
 /**
@@ -50,9 +51,12 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
     return OnPressDomain::Progress;
   case Page::RemotePlay:
     return OnPressDomain::RemotePlay;
+  case Page::PkgNet:
+    return OnPressDomain::PkgNet;
   case Page::None:
   case Page::SuperuserPass:
   case Page::RedirectOgDebug:
+  case Page::PkgInstaller:
     return OnPressDomain::PassThrough;
   }
   return OnPressDomain::PassThrough;

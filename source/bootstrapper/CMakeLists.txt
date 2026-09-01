@@ -110,6 +110,7 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 	$<$<COMPILE_LANGUAGE:CXX>:${CXX_DEFS} ${CXX_FLAGS}>
 	$<$<COMPILE_LANGUAGE:ASM>:${ASM_FLAGS}>
 )
+target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--gc-sections" "-Wl,--icf=safe")
 
 # Byepervisor removed from OnionHEN — bootstrapper sources only.
 # pt.c / elfldr.c live in libonion_elfldr (raise_privileges + inject primitives).
@@ -117,8 +118,10 @@ file(GLOB SrcFiles CONFIGURE_DEPENDS ${D_SRC}/*.c ${D_SRC}/*.cpp ${D_SRC}/../inc
 list(FILTER SrcFiles EXCLUDE REGEX ".*/(pt|elfldr)\\.c$")
 
 set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS} ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -ffunction-sections -fdata-sections")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-errors")
+set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
 target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles})
 # .incbin in daemon.c is invisible to the compiler dependency scanner.

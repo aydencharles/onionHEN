@@ -109,8 +109,10 @@ set_source_files_properties("${PKGNET_SOURCE_DIR}/pkg_server.c" PROPERTIES
 	OBJECT_DEPENDS "${WEBUI_INDEX}")
 
 set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS} ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -Wno-unused-const-variable -Wno-deprecated-declarations")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -Wno-unused-const-variable -Wno-deprecated-declarations -ffunction-sections -fdata-sections")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-errors")
+set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
 target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles} ${FTPSRV_SOURCES}
   ${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES} ${PKGNET_SOURCES}
@@ -181,6 +183,7 @@ target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONION_CURL_ROOT}/lib"
   "${PS5_PAYLOAD_SDK}/target/lib"
 )
+target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--gc-sections" "-Wl,--icf=safe")
 add_dependencies(${PROJECT_NAME} hijacker onion_settings onion_ipc onion_proc onion_platform onion_payload onion_ready onion_elfldr)
 # keystone: ShnExt ASM only
 target_link_libraries(${PROJECT_NAME} PUBLIC

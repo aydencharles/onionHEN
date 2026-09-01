@@ -7,6 +7,8 @@
 
 #include "daemon_ops.hpp"
 #include "daemon_power_state.hpp"
+#include "plugin_ipc_server.hpp"
+#include "plugin_manager_runtime.hpp"
 #include <onion/ipc_client.hpp>
 #include <onion/platform.h>
 #include <atomic>
@@ -15,7 +17,8 @@
 namespace {
 
 bool listeners_ready() {
-  return control_tcp_is_listening() && crit_ipc_is_listening();
+  return control_tcp_is_listening() && crit_ipc_is_listening() &&
+         onion::daemon::plugin_ipc::is_listening();
 }
 
 } // namespace
@@ -36,6 +39,7 @@ void *resume_recovery_thread(void *args) noexcept {
       usleep(1000 * 1000);
       restart_crit_ipc_server();
       control_tcp_restart();
+      onion::daemon::plugin_ipc::restart();
 
       bool ready = false;
       for (int i = 0; i < 30; ++i) {
@@ -45,10 +49,18 @@ void *resume_recovery_thread(void *args) noexcept {
         }
         usleep(100 * 1000);
       }
-      LOG_INFO("rest: listener recovery %s (tcp9048=%d crit_ipc=%d)",
+      LOG_INFO("rest: listener recovery %s (tcp9048=%d crit_ipc=%d plugin_ipc=%d)",
                ready ? "ready" : "pending",
                control_tcp_is_listening() ? 1 : 0,
-               crit_ipc_is_listening() ? 1 : 0);
+               crit_ipc_is_listening() ? 1 : 0,
+               onion::daemon::plugin_ipc::is_listening() ? 1 : 0);
+
+      if (onion::daemon::plugin_ipc::is_listening()) {
+        /* plugin_ipc restart closes every stream; restart managed processes so
+         * their SDK clients perform HELLO again on a fresh connection. */
+        onion::daemon::plugins::stop();
+        onion::daemon::plugins::reconcile();
+      }
 
       /* FTP owns its socket inside util; ask it to restore only when the
        * service was enabled before standby.  Recovery itself is bounded in

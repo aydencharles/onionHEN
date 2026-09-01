@@ -23,6 +23,7 @@ enum class OnPressDomain : unsigned char {
   Progress,
   RemotePlay,
   PkgNet,
+  DynamicPlugin,
 };
 
 /**
@@ -53,6 +54,8 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
     return OnPressDomain::RemotePlay;
   case Page::PkgNet:
     return OnPressDomain::PkgNet;
+  case Page::DynamicPlugin:
+    return OnPressDomain::DynamicPlugin;
   case Page::None:
   case Page::SuperuserPass:
   case Page::RedirectOgDebug:

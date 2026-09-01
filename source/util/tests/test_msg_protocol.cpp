@@ -11,6 +11,8 @@
 static int test_ipc_paths_and_magic(void) {
   TEST_ASSERT_STREQ("/tmp/onionhen/ipc/crit_service", CRIT_IPC_SOC);
   TEST_ASSERT_STREQ("/tmp/onionhen/ipc/util_service", UTIL_IPC_SOC);
+  TEST_ASSERT_STREQ("/tmp/onionhen/ipc/plugin_service",
+                    ONION_SYSTEM_TMP_PLUGIN_SOCKET);
   TEST_ASSERT_EQ_INT(0x1000, DAEMON_BUFF_MAX);
 
   IPCMessage msg{};

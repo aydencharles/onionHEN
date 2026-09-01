@@ -31,7 +31,7 @@ OnionHEN 是 PS5 的 All-in-One Homebrew Enabler，提供提权、后台服务�
         │  3. unmount /update（阻止系统更新）
         │  4. 经 9021 启动内嵌 onion_elfldr.elf（监听 9020）
         │  5. 将内嵌 ELF 字节经 9020 顺序启动：util → kstuff → daemon
-        │  6. 加载 /data/OnionHEN/payloads/ 下 .elf
+        │  6. 扫描并启动 /data/OnionHEN/plugins/ 下带 descriptor 的 .elf
         ▼
 ┌───────────────┬────────────────┬──────────────────┐
 │  util.elf     │  kstuff.elf    │  daemon.elf      │
@@ -82,7 +82,8 @@ onion_elfldr.elf ──┘                       │
 6. `unpacker` → `OnionHEN.elf`
 
 > 用户 Payload 使用裸 `.elf` 文件，存放在 `/data/OnionHEN/payloads/`
-> 或 USB 的 `.../payloads/` 目录。
+> 或 USB 的 `.../payloads/` 目录。插件也是标准 `.elf`，但必须包含
+> `.onion_plugin` descriptor，并存放在 `/data/OnionHEN/plugins/`。
 
 产物落在仓库根目录 `build/bin/`（静态库 `build/lib/`；CMake 树 `build/`）。
 
@@ -134,7 +135,9 @@ OnionHEN/
 2. 启动内置 `onion_elfldr.elf`，并通过握手确认 `127.0.0.1:9020`
 3. 顺序发送内部 ELF 字节：util → kstuff → daemon；9020 是正常路径，9021 仅承担引导/恢复职责
 4. 各子 ELF 启动后把主线程名设为稳定进程名（`onion_util.elf` / `kstuff.elf` / `onion_daemon.elf`）
-5. 仅在 9020 健康时加载 `/data/OnionHEN/payloads/` 下带 `.auto_start` 的 `.elf`；已有有效 PID 记录时保持现有实例，否则必须取得精确 PID
+5. 仅在 9020 健康时加载 `/data/OnionHEN/payloads/` 下带 `.auto_start` 的用户 `.elf`；插件由
+   `libonion_plugin_manager` 扫描 `/data/OnionHEN/plugins/`，校验 `.onion_plugin`
+   descriptor 后按 `AUTO_START` 启动。已有有效 PID 记录时保持现有实例，否则必须取得精确 PID
 
 可用 Toolbox「启动时自动加载 Kstuff」（默认开启）关闭，或放 `/mnt/usb0/no_kstuff` 跳过 kstuff。
 
@@ -359,7 +362,8 @@ struct IPCMessage {
 | `/data/OnionHEN/config.ini` | 配置 |
 | `/data/OnionHEN/OnionHEN.log` | 日志 |
 | `/data/OnionHEN/OnionHEN_crash.log` | daemon 崩溃信号与回溯日志；跨重启追加保留 |
-| `/data/OnionHEN/payloads/` | payload `.elf`（唯一扩展包格式；启动时 stage 到同目录） |
+| `/data/OnionHEN/payloads/` | 用户 payload `.elf`（启动时 stage 到同目录） |
+| `/data/OnionHEN/plugins/` | OnionHEN plugin `.elf`（含 `.onion_plugin` descriptor） |
 | `/system_tmp/onionhen/ipc/*` | Unix IPC socket |
 | `/system_tmp/onionhen/ready/<name>` | ready/runtime 标记；`toolbox` 内容为 SceShellUI PID |
 | `/system_tmp/onionhen/pid/<key>.PID` | 用户 Payload PID 状态 |
@@ -487,6 +491,42 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 | **Python3** | 构建辅助脚本（如 `encryptver.py`） |
 | **lzma / xz** | bootstrapper 打包 |
 
+### 5.7 SDK 动态 XML UI
+
+动态 UI 分为三个职责边界：
+
+1. SDK 用稳定 C ABI 构造 neutral UI document，并通过 10–15 号插件 IPC 命令
+   执行分块注册、提交、取消注册和状态更新。
+2. `libonion_plugin_ui` 校验 wire document、维护 owner 隔离的 registry，并在
+   事务提交后发布不可变 snapshot。`ProtocolBroker` 只接收连接会话绑定的
+   owner，不使用 document 自报的 `plugin_id` 进行路由。
+3. `libonion_plugin_session` 为每条连接处理一次 `HELLO`，绑定插件自报的 ID
+   与 capability；连接存活期间身份不可改变，重复的活跃 ID 会被拒绝，断连时
+   自动清理该 owner 的 transfer 和 contribution。
+4. ShellUI adapter 将 snapshot 中的页面、菜单、分组、标签、按钮、开关、列表
+   和输入框转换为 Legacy Settings XML；resource/control ID 使用稳定 hash，
+   页面返回由动态页面栈恢复。
+
+```text
+SDK plugin -> HELLO -> connection session -> ProtocolBroker -> Registry snapshot
+                                                        -> ShellUI XML adapter
+ShellUI action -> action sink -> connection event pump -> SDK UI event
+```
+
+文档上限为 256 KiB、256 节点、8 层深度；注册采用 ordered chunk 与 FNV-1a
+checksum，只有完整 commit 才替换可见 contribution。断连通过 owner 一次性清理
+未完成 transfer 和所有 UI contribution。当前 ShellUI profile 对 2.30–12.x
+开放，未知固件 fail closed。
+
+这里采用的是适合自制软件生态的协作式身份，不是安全认证：`HELLO` 不校验签名、
+ELF、PID 或启动来源，capability 也只是功能协商与 API 门禁，不能防御恶意插件。
+它解决的是误用、连接中途换 ID、重复 ID 和断连遗留 UI。daemon 中的
+`/system_tmp/onionhen/ipc/plugin_service` 使用独立持久连接 listener，每条
+accepted stream 拥有一个 `ConnectionSession`。它处理完整 SDK frame、`HELLO`、
+`PING` 和 10–15 号 UI 命令；休眠恢复会关闭旧连接并重新监听，整体关停会停止
+listener 并触发 contribution 清理。日志、通知、配置等其它 Host Service handler，
+以及跨进程 snapshot 发布与动作事件泵仍属于后续插件管理器集成。
+
 ---
 
 ## 6. 架构特点小结
@@ -508,6 +548,10 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 
 6. **IPC 协议稳定**  
    Unix socket；ABI 占位命令保持已发布的命令序号稳定。
+
+7. **动态 UI 与固件隔离**
+   插件只提交 neutral document；owner registry、ShellUI XML 与固件 profile
+   分层实现，未知固件不生成动态页面。
 
 ---
 

@@ -24,6 +24,7 @@ enum class Page : unsigned char {
   RemotePlay,
   PkgInstaller,      /**< package installer source chooser (USB / network) */
   PkgNet,            /**< network package installer toggles */
+  DynamicPlugin,     /**< SDK-provided UI contribution page */
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
 };
@@ -71,7 +72,7 @@ RouteResult resolve_resource(const RouteInput &in);
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
          page == Page::PluginConfig || page == Page::PkgInstaller ||
-         page == Page::PkgNet;
+         page == Page::PkgNet || page == Page::DynamicPlugin;
 }
 
 /** Fixed Legacy resource paths (Sony Settings.Plugins module name is fixed). */

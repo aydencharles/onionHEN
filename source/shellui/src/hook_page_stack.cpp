@@ -10,6 +10,7 @@
 #include "progress_dialog.hpp"
 #include "remote_play.hpp"
 #include "shellui_state.hpp"
+#include "dynamic_ui_runtime.hpp"
 
 #include <onion/platform.h>
 
@@ -26,6 +27,13 @@ void SettingPageStackOnPopping_Hook(MonoObject *instance,
     } else if (g_ui.active_page == toolbox::Page::PluginConfig) {
       g_ui.leave_page(toolbox::Page::PluginConfig);
       LOG_DEBUG("plugin_config_xml: page popped and parent route restored");
+    } else if (g_ui.active_page == toolbox::Page::DynamicPlugin) {
+      const bool dynamic_parent =
+          onion::shellui::dynamic_ui::leave_active_page();
+      if (!dynamic_parent)
+        g_ui.leave_page(toolbox::Page::DynamicPlugin);
+      LOG_DEBUG("dynamic_plugin_xml: page popped; dynamic_parent=%d",
+                dynamic_parent ? 1 : 0);
     }
   }
 

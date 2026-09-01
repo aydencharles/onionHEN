@@ -5,6 +5,7 @@
 #include "onpress_policy.hpp"
 #include "hooked_funcs.hpp"
 #include "shellui_state.hpp"
+#include "dynamic_ui_runtime.hpp"
 
 namespace {
 
@@ -84,6 +85,7 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
     run_exact(onpress_network_exact);
     break;
   case toolbox::OnPressDomain::PassThrough:
+  case toolbox::OnPressDomain::DynamicPlugin:
     break;
   }
 
@@ -115,6 +117,16 @@ int OnPress_Hook(MonoObject *Instance, MonoObject *element, MonoObject *e) {
   ctx.id = GetPropertyValue(element, "Id");
   ctx.value = GetPropertyValue(element, "Value");
   ctx.title = GetPropertyValue(element, "Title");
+
+  if (domain == toolbox::OnPressDomain::DynamicPlugin) {
+    const auto dynamic_result = onion::shellui::dynamic_ui::dispatch_control(
+        ctx.id, ctx.value);
+    if (dynamic_result !=
+        onion::shellui::dynamic_ui::DispatchResult::NotOwned) {
+      return 0;
+    }
+    return call_original(Instance, element, e);
+  }
 
 #if SHELL_DEBUG == 1
   LOG_DEBUG("[LM HOOK] OnPress_Hook: page=%u Id=%s Value=%s",

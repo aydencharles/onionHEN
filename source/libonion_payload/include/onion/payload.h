@@ -1,7 +1,8 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods
  *
  * Payload ELF load helpers (PID files + elfldr socket).
- * OnionHEN only supports bare .elf payloads (no .plugin packages).
+ * User payloads are bare .elf files. Plugin ELFs are managed separately under
+ * /data/OnionHEN/plugins by libonion_plugin_manager.
  */
 #pragma once
 

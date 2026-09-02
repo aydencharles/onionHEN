@@ -66,7 +66,72 @@ bool write_all(int descriptor, std::span<const uint8_t> image) {
   return true;
 }
 
+void stop_instance(ProcessRuntime &runtime, const Instance &instance) {
+  if (runtime.alive(instance.pid)) runtime.stop(instance.pid);
+  runtime.persist(instance.descriptor.plugin_id, -1);
+}
+
+void rebuild_inventory(const Discovery &discovery,
+                       const std::vector<Instance> &instances,
+                       std::vector<InventoryEntry> &inventory) {
+  inventory.clear();
+  inventory.reserve(discovery.plugins.size());
+  for (const PluginFile &plugin : discovery.plugins) {
+    const auto running = std::find_if(
+        instances.begin(), instances.end(), [&](const Instance &instance) {
+          return instance.descriptor.plugin_id == plugin.descriptor.plugin_id;
+        });
+    inventory.push_back({plugin.descriptor, plugin.path, plugin.fingerprint,
+                         running == instances.end() ? -1 : running->pid});
+  }
+}
+
+PluginFile *find_plugin(Discovery &discovery, std::string_view plugin_id) {
+  const auto found = std::find_if(
+      discovery.plugins.begin(), discovery.plugins.end(),
+      [&](const PluginFile &plugin) {
+        return plugin.descriptor.plugin_id == plugin_id;
+      });
+  return found == discovery.plugins.end() ? nullptr : &*found;
+}
+
+auto find_instance(std::vector<Instance> &instances,
+                   std::string_view plugin_id) {
+  return std::find_if(instances.begin(), instances.end(),
+                      [&](const Instance &instance) {
+                        return instance.descriptor.plugin_id == plugin_id;
+                      });
+}
+
+OperationResult launch_plugin(ProcessRuntime &runtime, const PluginFile &plugin,
+                              std::vector<Instance> &instances,
+                              bool allow_recover) {
+  pid_t pid = allow_recover
+                  ? runtime.recover(plugin.descriptor.plugin_id)
+                  : -1;
+  if (pid <= 1 || !runtime.alive(pid)) pid = runtime.launch(plugin);
+  if (pid <= 1) {
+    runtime.persist(plugin.descriptor.plugin_id, -1);
+    return {false, "private elfldr launch failed"};
+  }
+  runtime.persist(plugin.descriptor.plugin_id, pid);
+  instances.push_back(
+      {plugin.descriptor, plugin.path, plugin.fingerprint, pid});
+  return {true, {}};
+}
+
 } // namespace
+
+uint64_t fingerprint_elf(std::span<const uint8_t> image) {
+  // FNV-1a is deterministic across host and PS5 builds and catches in-place
+  // replacement without relying on filesystem timestamp precision.
+  uint64_t hash = 14695981039346656037ull;
+  for (const uint8_t byte : image) {
+    hash ^= byte;
+    hash *= 1099511628211ull;
+  }
+  return hash;
+}
 
 Repository::Repository(std::string root, size_t max_elf_size)
     : root_(std::move(root)), max_elf_size_(max_elf_size) {}
@@ -104,6 +169,7 @@ Discovery Repository::discover() const {
       continue;
     }
     plugin.descriptor = std::move(inspection.descriptor);
+    plugin.fingerprint = fingerprint_elf(plugin.image);
     result.plugins.push_back(std::move(plugin));
   }
 
@@ -170,25 +236,31 @@ ReconcileReport Manager::reconcile() {
   report.discovered = discovery.plugins.size();
   report.issues = std::move(discovery.issues);
 
-  std::map<std::string, PluginFile *> desired;
-  for (PluginFile &plugin : discovery.plugins) {
-    if ((plugin.descriptor.flags & kFlagAutoStart) != 0)
-      desired.emplace(plugin.descriptor.plugin_id, &plugin);
+  std::map<std::string, PluginFile *> discovered;
+  for (PluginFile &plugin : discovery.plugins)
+    discovered.emplace(plugin.descriptor.plugin_id, &plugin);
+  for (auto suppressed = suppressed_.begin(); suppressed != suppressed_.end();) {
+    if (!discovered.contains(*suppressed))
+      suppressed = suppressed_.erase(suppressed);
+    else
+      ++suppressed;
   }
+  std::set<std::string> restart;
 
   for (auto instance = instances_.begin(); instance != instances_.end();) {
-    const auto found = desired.find(instance->descriptor.plugin_id);
-    if (found == desired.end()) {
-      if (runtime_.alive(instance->pid)) runtime_.stop(instance->pid);
-      runtime_.persist(instance->descriptor.plugin_id, -1);
+    const auto found = discovered.find(instance->descriptor.plugin_id);
+    if (found == discovered.end()) {
+      stop_instance(runtime_, *instance);
+      suppressed_.erase(instance->descriptor.plugin_id);
       instance = instances_.erase(instance);
       continue;
     }
     PluginFile *current = found->second;
     if (instance->path != current->path ||
-        instance->descriptor.version != current->descriptor.version) {
-      if (runtime_.alive(instance->pid)) runtime_.stop(instance->pid);
-      runtime_.persist(instance->descriptor.plugin_id, -1);
+        instance->fingerprint != current->fingerprint) {
+      if (runtime_.alive(instance->pid))
+        restart.insert(instance->descriptor.plugin_id);
+      stop_instance(runtime_, *instance);
       instance = instances_.erase(instance);
       continue;
     }
@@ -197,35 +269,126 @@ ReconcileReport Manager::reconcile() {
       instance = instances_.erase(instance);
       continue;
     }
-    desired.erase(found);
     ++report.running;
     ++instance;
   }
 
-  for (auto &[plugin_id, plugin] : desired) {
-    pid_t pid = runtime_.recover(plugin_id);
-    if (pid <= 1 || !runtime_.alive(pid)) pid = runtime_.launch(*plugin);
-    if (pid <= 1) {
+  for (auto &[plugin_id, plugin] : discovered) {
+    if (find_instance(instances_, plugin_id) != instances_.end()) continue;
+    const bool replacing_running = restart.contains(plugin_id);
+    const bool auto_start =
+        (plugin->descriptor.flags & kFlagAutoStart) != 0 &&
+        !suppressed_.contains(plugin_id);
+    if (!replacing_running && !auto_start) continue;
+    const OperationResult launched = launch_plugin(
+        runtime_, *plugin, instances_, !replacing_running);
+    if (!launched) {
       ++report.failed;
-      report.issues.push_back({plugin->path, "private elfldr launch failed"});
-      runtime_.persist(plugin_id, -1);
+      report.issues.push_back({plugin->path, launched.error});
       continue;
     }
-    runtime_.persist(plugin_id, pid);
-    instances_.push_back({plugin->descriptor, plugin->path, pid});
     ++report.running;
     ++report.started;
   }
+  rebuild_inventory(discovery, instances_, inventory_);
   return report;
+}
+
+OperationResult Manager::start(std::string_view plugin_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  Discovery discovery = repository_.discover();
+  PluginFile *plugin = find_plugin(discovery, plugin_id);
+  if (!plugin) return {false, "plugin is not installed"};
+
+  auto instance = find_instance(instances_, plugin_id);
+  if (instance != instances_.end() && runtime_.alive(instance->pid)) {
+    suppressed_.erase(std::string(plugin_id));
+    rebuild_inventory(discovery, instances_, inventory_);
+    return {true, {}};
+  }
+  if (instance != instances_.end()) {
+    runtime_.persist(plugin_id, -1);
+    instances_.erase(instance);
+  }
+  suppressed_.erase(std::string(plugin_id));
+  const OperationResult result =
+      launch_plugin(runtime_, *plugin, instances_, false);
+  rebuild_inventory(discovery, instances_, inventory_);
+  return result;
+}
+
+OperationResult Manager::stop(std::string_view plugin_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto known = std::find_if(
+      inventory_.begin(), inventory_.end(), [&](const InventoryEntry &entry) {
+        return entry.descriptor.plugin_id == plugin_id;
+      });
+  if (known == inventory_.end()) return {false, "plugin is not installed"};
+
+  auto instance = find_instance(instances_, plugin_id);
+  if (instance != instances_.end()) {
+    stop_instance(runtime_, *instance);
+    instances_.erase(instance);
+  }
+  suppressed_.insert(std::string(plugin_id));
+  known->pid = -1;
+  return {true, {}};
+}
+
+OperationResult Manager::reload(std::string_view plugin_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  Discovery discovery = repository_.discover();
+  PluginFile *plugin = find_plugin(discovery, plugin_id);
+  if (!plugin) return {false, "plugin is not installed"};
+
+  auto instance = find_instance(instances_, plugin_id);
+  if (instance != instances_.end()) {
+    stop_instance(runtime_, *instance);
+    instances_.erase(instance);
+  }
+  suppressed_.erase(std::string(plugin_id));
+  const OperationResult result =
+      launch_plugin(runtime_, *plugin, instances_, false);
+  rebuild_inventory(discovery, instances_, inventory_);
+  return result;
+}
+
+OperationResult Manager::remove(std::string_view plugin_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto known = std::find_if(
+      inventory_.begin(), inventory_.end(), [&](const InventoryEntry &entry) {
+        return entry.descriptor.plugin_id == plugin_id;
+      });
+  if (known == inventory_.end()) return {false, "plugin is not installed"};
+  const std::string path = known->path;
+
+  auto instance = find_instance(instances_, plugin_id);
+  if (instance != instances_.end()) {
+    stop_instance(runtime_, *instance);
+    instances_.erase(instance);
+  }
+  if (unlink(path.c_str()) != 0 && errno != ENOENT) {
+    rebuild_inventory(repository_.discover(), instances_, inventory_);
+    return {false, std::string("cannot delete plugin: ") +
+                       std::strerror(errno)};
+  }
+  suppressed_.erase(std::string(plugin_id));
+  inventory_.erase(known);
+  return {true, {}};
 }
 
 void Manager::stop_all() {
   std::lock_guard<std::mutex> lock(mutex_);
   for (const Instance &instance : instances_) {
-    if (runtime_.alive(instance.pid)) runtime_.stop(instance.pid);
-    runtime_.persist(instance.descriptor.plugin_id, -1);
+    stop_instance(runtime_, instance);
   }
   instances_.clear();
+  for (InventoryEntry &entry : inventory_) entry.pid = -1;
+}
+
+std::vector<InventoryEntry> Manager::inventory() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return inventory_;
 }
 
 std::vector<Instance> Manager::instances() const {

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <mutex>
 #include <span>
+#include <set>
 #include <string>
 #include <string_view>
 #include <sys/types.h>
@@ -53,7 +54,10 @@ struct PluginFile {
   std::string path;
   Descriptor descriptor;
   std::vector<uint8_t> image;
+  uint64_t fingerprint = 0;
 };
+
+uint64_t fingerprint_elf(std::span<const uint8_t> image);
 
 struct DiscoveryIssue {
   std::string path;
@@ -99,7 +103,27 @@ public:
 struct Instance {
   Descriptor descriptor;
   std::string path;
+  uint64_t fingerprint = 0;
   pid_t pid = -1;
+};
+
+struct InventoryEntry {
+  Descriptor descriptor;
+  std::string path;
+  uint64_t fingerprint = 0;
+  pid_t pid = -1;
+
+  bool running() const { return pid > 1; }
+  bool auto_start() const {
+    return (descriptor.flags & kFlagAutoStart) != 0;
+  }
+};
+
+struct OperationResult {
+  bool success = false;
+  std::string error;
+
+  explicit operator bool() const { return success; }
 };
 
 struct ReconcileReport {
@@ -115,14 +139,21 @@ public:
   Manager(Repository repository, ProcessRuntime &runtime);
 
   ReconcileReport reconcile();
+  OperationResult start(std::string_view plugin_id);
+  OperationResult stop(std::string_view plugin_id);
+  OperationResult reload(std::string_view plugin_id);
+  OperationResult remove(std::string_view plugin_id);
   void stop_all();
   std::vector<Instance> instances() const;
+  std::vector<InventoryEntry> inventory() const;
 
 private:
   Repository repository_;
   ProcessRuntime &runtime_;
   mutable std::mutex mutex_;
   std::vector<Instance> instances_;
+  std::vector<InventoryEntry> inventory_;
+  std::set<std::string> suppressed_;
 };
 
 } // namespace onion::plugin

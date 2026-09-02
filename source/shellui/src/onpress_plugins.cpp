@@ -2,6 +2,8 @@
 
 #include "onpress.hpp"
 #include "shellui_payload_state.hpp"
+#include "external_plugin_ui.hpp"
+#include "toolbox_i18n.hpp"
 
 #include <cerrno>
 #include <climits>
@@ -37,6 +39,37 @@ OnPressResult toggle_next_boot(OnPressContext &ctx, bool &field,
   field = enabled;
   notify(enabled ? on_notify : off_notify);
   return OnPressResult::Handled;
+}
+
+OnPressResult external_plugin_control(OnPressContext &ctx) {
+  ctx.dirty = false;
+  const onion::shellui::external_plugins::DispatchResult result =
+      onion::shellui::external_plugins::dispatch(ctx.id, ctx.value);
+  if (!result.owned) return OnPressResult::NotMine;
+
+  const char *key = "plugins.external.operation_failed_fmt";
+  if (result.success) {
+    using onion::shellui::external_plugins::Action;
+    switch (result.action) {
+    case Action::Started:
+      key = "plugins.external.started_fmt";
+      break;
+    case Action::Stopped:
+      key = "plugins.external.stopped_fmt";
+      break;
+    case Action::Reloaded:
+      key = "plugins.external.reloaded_fmt";
+      break;
+    case Action::Deleted:
+      key = "plugins.external.deleted_fmt";
+      break;
+    case Action::None:
+      break;
+    }
+  }
+  const std::string message = toolbox_i18n::format(key, result.plugin_id.c_str());
+  notify("%s", message.c_str());
+  return OnPressResult::Consumed;
 }
 
 } // namespace
@@ -132,7 +165,16 @@ static const OnPressExactEntry kPluginsExact[] = {
     {"id_pkgnet_autoload", onpress_pkgnet_autoload},
 };
 
+static const OnPressPrefixEntry kPluginsPrefix[] = {
+    {"id_external_plugin_", external_plugin_control},
+};
+
 const OnPressExactEntry *onpress_plugins_exact(size_t *count) {
   *count = sizeof(kPluginsExact) / sizeof(kPluginsExact[0]);
   return kPluginsExact;
+}
+
+const OnPressPrefixEntry *onpress_plugins_prefix(size_t *count) {
+  *count = sizeof(kPluginsPrefix) / sizeof(kPluginsPrefix[0]);
+  return kPluginsPrefix;
 }

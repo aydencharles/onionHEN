@@ -1,4 +1,5 @@
 #include "plugin_manager_runtime.hpp"
+#include "plugin_directory_watcher.hpp"
 
 #include <elfldr_remote.h>
 #include <onion/log.h>
@@ -100,6 +101,14 @@ plugin::Manager &manager() {
   return instance;
 }
 
+void watcher_reconcile(void *) { reconcile(); }
+
+PluginDirectoryWatcher &watcher() {
+  static PluginDirectoryWatcher instance(plugin::kInstallRoot,
+                                         watcher_reconcile, nullptr);
+  return instance;
+}
+
 void log_report(const char *operation, const plugin::ReconcileReport &report) {
   for (const plugin::DiscoveryIssue &issue : report.issues)
     LOG_WARN("[plugins] %s: %s", issue.path.c_str(), issue.message.c_str());
@@ -110,13 +119,38 @@ void log_report(const char *operation, const plugin::ReconcileReport &report) {
 
 } // namespace
 
-void start() { log_report("startup", manager().reconcile()); }
+void start() {
+  log_report("startup", manager().reconcile());
+  if (!watcher().start())
+    LOG_ERROR("[plugins] directory watcher failed to start");
+}
 
 void reconcile() { log_report("reconcile", manager().reconcile()); }
 
 void stop() {
+  watcher().stop();
   manager().stop_all();
   LOG_INFO("[plugins] stopped all managed plugin processes");
+}
+
+std::vector<plugin::InventoryEntry> inventory() {
+  return manager().inventory();
+}
+
+plugin::OperationResult start_plugin(std::string_view plugin_id) {
+  return manager().start(plugin_id);
+}
+
+plugin::OperationResult stop_plugin(std::string_view plugin_id) {
+  return manager().stop(plugin_id);
+}
+
+plugin::OperationResult reload_plugin(std::string_view plugin_id) {
+  return manager().reload(plugin_id);
+}
+
+plugin::OperationResult remove_plugin(std::string_view plugin_id) {
+  return manager().remove(plugin_id);
 }
 
 } // namespace onion::daemon::plugins

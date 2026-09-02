@@ -90,6 +90,15 @@ static int test_special_commands_stable(void) {
   return 0;
 }
 
+static int test_plugin_commands_stable(void) {
+  TEST_ASSERT_EQ_U64(0x9000100u, static_cast<unsigned>(BREW_PLUGIN_LIST));
+  TEST_ASSERT_EQ_U64(0x9000101u, static_cast<unsigned>(BREW_PLUGIN_START));
+  TEST_ASSERT_EQ_U64(0x9000102u, static_cast<unsigned>(BREW_PLUGIN_STOP));
+  TEST_ASSERT_EQ_U64(0x9000103u, static_cast<unsigned>(BREW_PLUGIN_RELOAD));
+  TEST_ASSERT_EQ_U64(0x9000104u, static_cast<unsigned>(BREW_PLUGIN_DELETE));
+  return 0;
+}
+
 static int test_ipc_ret_distinct(void) {
   TEST_ASSERT_EQ_INT(0, static_cast<int>(IPC_Ret::NO_ERROR));
   TEST_ASSERT_EQ_INT(-1, static_cast<int>(IPC_Ret::INVALID));
@@ -128,6 +137,7 @@ extern "C" int test_msg_protocol_suite(void) {
   failures += onion_test_run("crit_cmd_base_order", test_crit_command_base_and_order);
   failures += onion_test_run("util_cmd_base", test_util_command_base);
   failures += onion_test_run("special_cmds_stable", test_special_commands_stable);
+  failures += onion_test_run("plugin_cmds_stable", test_plugin_commands_stable);
   failures += onion_test_run("ipc_ret_distinct", test_ipc_ret_distinct);
   failures += onion_test_run("message_pod_layout", test_message_pod_layout);
   failures += onion_test_run("ipc_format_reply_body", test_ipc_format_reply_body);

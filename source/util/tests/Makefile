@@ -36,6 +36,7 @@ COMMON_FLAGS := -Wall -Wextra -g -O0 $(DEPFLAGS) -DONION_HOST_TEST=1 -DCBC=1 \
 	-I$(REPO_ROOT)/source/libonion_plugin_ui/include \
 	-I$(REPO_ROOT)/source/libonion_plugin_bridge/include \
 	-I$(REPO_ROOT)/source/libonion_plugin_session/include \
+	-I$(REPO_ROOT)/source/libonion_plugin_manager/include \
 	-I$(REPO_ROOT)/source/daemon/include \
 	-I$(THIRD_PARTY_ROOT)/cjson \
 	-I$(THIRD_PARTY_ROOT)/cheat_support \
@@ -89,6 +90,8 @@ PROD_CXX_SRCS := \
 	$(THIRD_PARTY_ROOT)/cjson/cJSON.cpp \
 	$(REPO_ROOT)/source/libonion_settings/source/settings.cpp \
 	$(REPO_ROOT)/source/libonion_ipc/source/ipc_server.cpp \
+	$(REPO_ROOT)/source/libonion_plugin_manager/source/plugin_descriptor.cpp \
+	$(REPO_ROOT)/source/libonion_plugin_manager/source/plugin_manager.cpp \
 	$(REPO_ROOT)/source/shellui/src/ps5_settings_ui.cpp \
 	$(REPO_ROOT)/source/shellui/src/toolbox_route.cpp \
 	$(REPO_ROOT)/source/shellui/src/toolbox_i18n.cpp \
@@ -140,6 +143,7 @@ TEST_CXX_SRCS := \
   test_overlay_layout.cpp \
   test_fps_formula.cpp \
 	test_plugin_ui.cpp \
+	test_plugin_manager.cpp \
 	test_trampoline_arena.cpp \
 	test_hook_lifecycle.cpp \
 	test_hotpatch.cpp \
@@ -164,6 +168,8 @@ PROD_CXX_OBJS := $(patsubst $(UTIL_ROOT)/%.cpp,$(BUILD_DIR)/prod/%.o,$(filter $(
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/third_party/cjson.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_settings/settings.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_ipc/ipc_server.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_manager/plugin_descriptor.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_manager/plugin_manager.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/hotpatch.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/trampoline_arena.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/x64_relocator.o
@@ -229,6 +235,10 @@ $(BUILD_DIR)/prod/libonion_settings/settings.o: $(REPO_ROOT)/source/libonion_set
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/libonion_ipc/ipc_server.o: $(REPO_ROOT)/source/libonion_ipc/source/ipc_server.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_plugin_manager/%.o: $(REPO_ROOT)/source/libonion_plugin_manager/source/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

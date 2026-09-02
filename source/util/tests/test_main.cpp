@@ -41,6 +41,7 @@ extern "C" int test_builtin_services_suite(void);
 extern "C" int test_multipart_suite(void);
 extern "C" int test_toolbox_pkg_xml_suite(void);
 extern "C" int test_plugin_ui_suite(void);
+extern "C" int test_plugin_manager_suite(void);
 
 int main() {
   int failures = 0;
@@ -86,6 +87,7 @@ int main() {
   failures += test_multipart_suite();
   failures += test_toolbox_pkg_xml_suite();
   failures += test_plugin_ui_suite();
+  failures += test_plugin_manager_suite();
 
   if (failures == 0) {
     std::fprintf(stderr, "All util host tests passed.\n");

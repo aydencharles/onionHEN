@@ -59,7 +59,7 @@ void *resume_recovery_thread(void *args) noexcept {
         /* plugin_ipc restart closes every stream; restart managed processes so
          * their SDK clients perform HELLO again on a fresh connection. */
         onion::daemon::plugins::stop();
-        onion::daemon::plugins::reconcile();
+        onion::daemon::plugins::start();
       }
 
       /* FTP owns its socket inside util; ask it to restore only when the

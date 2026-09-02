@@ -68,6 +68,7 @@ const OnPressPrefixEntry *onpress_cheats_prefix(size_t *count);
 const OnPressPrefixEntry *onpress_packages_prefix(size_t *count);
 
 const OnPressExactEntry *onpress_plugins_exact(size_t *count);
+const OnPressPrefixEntry *onpress_plugins_prefix(size_t *count);
 
 /**
  * Shared built-in plugin handlers (root page + plugins page).

@@ -77,6 +77,14 @@ enum DaemonCommands : unsigned int {
   // needing a SystemService query (util is under PTRACE_AUTHID after launch).
   BREW_UTIL_SET_SYSTEM_LANG = 0x8000019u,
 
+  // Crit daemon plugin management. Payloads contain only validated plugin IDs;
+  // filesystem paths never cross the IPC boundary.
+  BREW_PLUGIN_LIST = 0x9000100u,
+  BREW_PLUGIN_START = 0x9000101u,
+  BREW_PLUGIN_STOP = 0x9000102u,
+  BREW_PLUGIN_RELOAD = 0x9000103u,
+  BREW_PLUGIN_DELETE = 0x9000104u,
+
   // Legacy: manual elfldr launch removed (embedded 9020 is bootstrapper-managed)
   BREW_UTIL_LAUNCH_ELFLDR = 0xE1F1D8u,
   BREW_RELOAD_SETTINGS = 0xC0FFEEu,

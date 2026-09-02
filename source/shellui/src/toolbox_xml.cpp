@@ -15,6 +15,7 @@
 #include "toolbox_pkg_xml.hpp"
 #include "toolbox_values.hpp"
 #include "dynamic_ui_runtime.hpp"
+#include "external_plugin_ui.hpp"
 #include "onion_cjson.hpp"
 
 #include <dirent.h>
@@ -319,6 +320,7 @@ void generate_plugins_xml(std::string& xml_buffer) {
     page.link(d.toggle_id, toolbox_i18n::tr(d.title_key), d.config_xml,
               toolbox_i18n::tr(d.sub_key));
 
+  onion::shellui::external_plugins::append_inventory(page);
   onion::shellui::dynamic_ui::append_plugin_links(page);
 
   xml_buffer = page.build();

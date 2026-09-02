@@ -81,10 +81,6 @@ public:
   // High-level commands
   int GetDaemonPid();
   IPC_Ret ToggleSetting(DaemonCommands cmd, bool turn_on);
-  /** Query the in-process FTP module without inspecting a PID marker. */
-  bool FtpStatus();
-  /** Ask util to rebind an enabled FTP listener after network resume. */
-  bool RecoverFtp();
   /** Query the in-process ShadowMount+ module without inspecting a PID marker. */
   bool ShadowMountStatus();
   /** Query the in-process DPI package install server without a PID marker. */

@@ -63,7 +63,8 @@ OnionHEN 面向已越狱的 PS5，提供一套能日常使用、也方便维护�
 - **ShellUI 工具箱** — 注入 PS5 ShellUI 的设置页
 - **系统准备** — 提权、重新挂载文件系统、阻断系统更新分区
 - **fSELF / fPKG** — 内嵌 kstuff，用来跑自制 SELF / PKG；默认加载，可在工具箱关掉
-- **PS5 FTP 服务器** — 内置源码模块，端口可配置
+- **插件运行时** — 发现、校验、启动、停止、重载和删除带 descriptor 的插件 ELF
+- **PS5 FTP 服务器** — 由可选的外部 `onionHEN-ftpsrv-plugin` 提供
 - **ShadowMount+** — 内置插件，扫描并挂载来自内置或外置存储的游戏
 - **远程游玩配对** — 在网络菜单中启用 PS5 原生远程游玩服务、生成配对 PIN 并注册客户端
 - **用户 Payload 管理** — 启动和停止用户添加的普通 `.elf` payload，可选自动启动
@@ -101,15 +102,16 @@ OnionHEN 不内置内核漏洞。第一次引导仍需要外部 **9021** 上的 
 OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstuff.elf → daemon.elf → Toolbox
 ```
 
-若 `ftp.autoload` 已启用，内置 FTP 模块会在 `kstuff` 之后、daemon 之前启动。
-`shadowmount.autoload` 启用时，ShadowMount+ 模块同样按此顺序启动。
+若 `shadowmount.autoload` 已启用，内置 ShadowMount+ 模块会在 `kstuff` 之后、daemon
+之前启动。外部插件随后由 daemon 发现并启动。
 
 ### FTP 服务器
 
-PS5 FTP 服务器位于 **工具箱 → Payload 与内核 → 插件 → FTP 服务器**。一个开关控制本次会话启停，
-另一个开关控制下次 OnionHEN 启动时是否自动运行。插件页支持 `1` 到 `65535` 的端口，
-修改端口时会重启内置监听线程，并包含上游 `ftpsrv` 的 `KILL`、`SELF`、`SCHK`、
-`MTRW`、`AUTHID` 等命令（视固件支持而定）。
+FTP 由独立的
+[`onionHEN-ftpsrv-plugin`](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin)
+提供。将其安装为 `/data/OnionHEN/plugins/FTPS00001.elf` 后，OnionHEN 会自动发现
+并启动；插件动态设置页提供启用、端口和重启控制。插件保留上游 `ftpsrv` 的
+`KILL`、`SELF`、`SCHK`、`MTRW`、`AUTHID` 等命令（视固件支持而定）。
 
 ### ShadowMount+
 
@@ -153,11 +155,10 @@ Web UI 与工具箱一样支持 14 种语言。`toolbox.language=system` 时跟�
 只支持普通 `.elf`。可在工具箱里打开自动启动；OnionHEN 会在 ELF 旁边写一个
 同名的 `.auto_start` 文件记住这个选择。
 
-所有 `.elf` 文件名都使用相同的 Payload 页面、加载器和自动启动流程，包括
-`kstuff`、`ftpsrv` 和 `ftpsrv-ps5`。已有有效 PID 记录的用户 Payload 会保持运行，
-后续启动和自动启动请求直接跳过。内置服务只管理自身运行时，不会停止同名用户
-Payload。若两个 FTP 服务使用相同 TCP 端口，只有一个服务能够绑定成功。
+所有 `.elf` 文件名都使用相同的 Payload 页面、加载器和自动启动流程。已有有效 PID
+记录的用户 Payload 会保持运行，后续启动和自动启动请求直接跳过。
 `shadowmountplus` 是内置模块的保留名称，用户 Payload 自动启动扫描会忽略它。
+OnionHEN 插件属于独立类别，应放在 `/data/OnionHEN/plugins/`。
 
 ### 金手指
 
@@ -190,9 +191,7 @@ Payload。若两个 FTP 服务使用相同 TCP 端口，只有一个服务能够
 | `lzma` 或 `xz` | 压缩 bootstrapper |
 | Git 与 `curl` 或 `wget` | 初始化 submodule 并获取外部 payload 输入 |
 
-固定版本的 [`drakmor/ftpsrv`](https://github.com/drakmor/ftpsrv) `nexgen`
-源码作为 FTP 模块编译进 `util.elf`。
-同时编译进 util 的还有固定版本
+固定版本的
 [`drakmor/ShadowMountPlus`](https://github.com/drakmor/ShadowMountPlus)
 `1.6beta16` 源码（游戏扫描/挂载模块）以及它使用的 SQLite amalgamation。
 
@@ -289,8 +288,6 @@ OnionHEN 在下面两处读写同一份配置：
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
-| `ftp.autoload` | `false` | `true`, `false` |
-| `ftp.port` | `1337` | `1` 到 `65535` |
 | `shadowmount.autoload` | `false` | `true`, `false` |
 | `pkgnet.autoload` | `false` | `true`, `false` |
 
@@ -299,10 +296,10 @@ OnionHEN 在下面两处读写同一份配置：
 | 路径 | 用途 |
 | --- | --- |
 | `/data/OnionHEN/payloads/` | 用户 payload ELF |
+| `/data/OnionHEN/plugins/` | 带 descriptor 的 OnionHEN 插件 ELF |
 | `/data/OnionHEN/cheats/` | 金手指文件 |
 | `/data/OnionHEN/cheats_tmp/` | HTTPS ZIP 与解压临时文件（同步后清理） |
 | `/data/OnionHEN/kstuff.elf` | 可选的运行时覆盖文件，优先于内嵌 `kstuff` |
-| `ftpsrv` | util 内置 FTP 源码模块，默认端口 `1337` |
 | `/data/shadowmount/config.ini` | ShadowMount+ 模块选项（首次运行时由内置模板生成） |
 | `/data/shadowmount/debug.log` | ShadowMount+ 模块日志 |
 | `/data/OnionHEN/OnionHEN.log` | 主运行日志 |
@@ -410,7 +407,7 @@ OnionHEN 离不开 PS5 自制软件与逆向工程社区。
 - [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) — Prospero 工具链与头文件
 - [elfldr](https://github.com/ps5-payload-dev/elfldr) — 端口 9021 的首次引导加载器；不打进 payload
 - [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) — EchoStretch、sleirsgoevy 与贡献者；可选的 `kstuff.elf`
-- [ftpsrv](https://github.com/drakmor/ftpsrv) — drakmor 与上游贡献者；来自 `nexgen` 的内置 PS5 FTP 源码模块
+- [onionHEN-ftpsrv-plugin](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin) — 基于 drakmor/ftpsrv 的可选外部 FTP 插件
 - [ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) — Drakmor；由 VoidWhisper 的 ShadowMount 演进而来；内置游戏扫描/挂载模块，固定在 `1.6beta16`
 - [SQLite](https://www.sqlite.org/) — ShadowMount+ 模块使用的公有领域 amalgamation
 - [libhijacker](https://github.com/astrelsky/libhijacker) — astrelsky；进程劫持与内核读写

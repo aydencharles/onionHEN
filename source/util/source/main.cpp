@@ -78,7 +78,6 @@ void __stack_chk_fail(void) {
 }
 
 bool LoadSettings() {
-    const onion::Settings previous = g_settings.snapshot();
     onion::Settings s{};
     if (!onion::settings_load(&s)) {
         LOG_ERROR("config.ini missing; using defaults (path primary=%s)",
@@ -99,11 +98,6 @@ bool LoadSettings() {
 
     if (!g_services_initialized) {
         g_services_initialized = true;
-        if (s.ftp_autoload &&
-            !onion::services::ftpService().start(
-                static_cast<uint16_t>(s.ftp_port))) {
-            LOG_WARN("FTP autoload failed on TCP %d", s.ftp_port);
-        }
         if (s.shadowmount_autoload &&
             !onion::services::shadowMountService().running() &&
             !onion::services::shadowMountService().start()) {
@@ -113,11 +107,6 @@ bool LoadSettings() {
             !onion::services::pkgNetService().start()) {
             LOG_WARN("pkg-server autoload failed on TCP %u",
                      static_cast<unsigned>(ONION_PKGNET_PORT));
-        }
-    } else if (previous.ftp_port != s.ftp_port) {
-        if (!onion::services::ftpService().reconfigure(
-                static_cast<uint16_t>(s.ftp_port))) {
-            LOG_WARN("FTP port reconfigure failed on TCP %d", s.ftp_port);
         }
     }
     /* Re-sync on every settings load (boot and IPC reloads) so a Toolbox

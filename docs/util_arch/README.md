@@ -1,6 +1,6 @@
 # util 守护进程架构
 
-`util.elf` 是 OnionHEN 的 **Utility 守护进程**：与 `daemon.elf`（critical）分离，承载网络 IO、FTP、金手指和 Toolbox 相关服务。
+`util.elf` 是 OnionHEN 的 **Utility 守护进程**：与 `daemon.elf`（critical）分离，承载网络 IO、金手指和 Toolbox 相关服务。
 
 | 项 | 值 |
 |----|-----|
@@ -51,7 +51,7 @@ main()
  ├─ 4. payload_get_args() → kernel_base
  ├─ 5. 刷新系统语言并进入 PTRACE_AUTHID
  ├─ 6. 清理 util crash 日志
- ├─ 7. LoadSettings()                      # 配置及 FTP autoload
+ ├─ 7. LoadSettings()                      # 加载 util 配置
  ├─ 8. start_ip_thread()                   # 后台刷新本机 IP
  ├─ 9. pthread_create(IPC_loop)            # 常驻 Unix 监听
  ├─10. 发布 util ready/runtime 标记
@@ -76,7 +76,7 @@ source/util/
 │   ├── main.cpp                 # 生命周期编排
 │   ├── msg.cpp                  # Unix IPC 服务端传输
 │   ├── ipc_handle.cpp           # BREW_UTIL_* 命令分发
-│   ├── service_facade.cpp       # 进程内 FTP 生命周期与端口切换
+│   ├── service_facade.cpp       # ShadowMount+ / DPI 服务生命周期
 │   ├── common_utils.c           # 通知 / ptrace attach / 通用工具
 │   ├── faulthandler.c           # 信号与崩溃落盘
 │   ├── cpp_service.cpp          # IP 线程
@@ -92,7 +92,7 @@ source/util/
 │   ├── common_utils.h / ipc.hpp / pt.h / sfo.hpp / ...
 │   ├── util_platform.h
 │   └── cheats/                  # 金手指公共/内部头
-└── CMakeLists.txt                # util.elf 与 ftpsrv 源码模块构建
+└── CMakeLists.txt                # util.elf 构建
 ```
 
 | 模块 | 文件 | 依赖方向（被谁用） |
@@ -102,7 +102,6 @@ source/util/
 | IPC commands | `ipc_handle.cpp` | IPC client 线程调用 |
 | Logging / notify | `common_utils.c` | 几乎全部 |
 | Platform | `util_platform.c` | cheats、可被其它业务复用 |
-| FTP | `service_facade.cpp` + `third_party/ftpsrv` | main / IPC |
 | ShadowMount+ | `shadowmount_main.cpp` + `third_party/ShadowMountPlus` | main / IPC |
 | DPI | `pkgserver_adapter.h` + `third_party/pkgserver` | main / IPC |
 | Cheat sync | `cheats/sync/*` | IPC 后台任务 |
@@ -114,8 +113,8 @@ source/util/
 **依赖方向**：
 
 ```text
-main ──► IPC / FTP / cheats(init) / ip_thread
-ipc_handle ──► CheatService / CheatSyncService / FtpServiceFacade
+main ──► IPC / cheats(init) / ip_thread
+ipc_handle ──► CheatService / CheatSyncService / built-in service facades
 CheatService ──► Repository / ParserFactory / Applier ──► util_platform + pt/mdbg/kernel
 ```
 
@@ -131,7 +130,6 @@ CheatService ──► Repository / ParserFactory / Applier ──► util_platf
 | IPC accept | `IPC_loop` | 常驻 | accept Unix 连接 |
 | IPC client | `ipc_client`（每连接一个，detach） | 连接级 | 读 `IPCMessage` → `handleIPC` |
 | IP poll | `start_ip_thread` | 常驻 | 刷新本机 IP 字符串 |
-| FTP listener | `FtpServiceFacade::start` | 配置启用期间 | 运行 `ftp_serve` 并管理监听端口 |
 | ShadowMount+ | `ShadowMountServiceFacade::start` | 配置启用期间 | 扫描/挂载/安装游戏镜像 |
 | DPI pkg-server | `PkgNetServiceFacade::start` | 配置启用期间 | pkg 上传/安装 API + Web UI |
 | Cheat sync | `CheatSyncService::start` | 单次任务 | HTTPS 下载、解压与安装 catalog |
@@ -163,9 +161,7 @@ struct IPCMessage {
 |------|------|----------|
 | `TEST_CONNECTION` | util 可用性探测 | IPC reply |
 | `DAEMON_PID` | 返回 util pid | `getpid` |
-| `TOGGLE_FTP` | 启停进程内 FTP | `FtpServiceFacade` |
-| `FTP_STATUS` | 返回 FTP 运行状态 | `FtpServiceFacade` |
-| `RECOVER_FTP` | 待机恢复后重绑已启用的 FTP 监听 | `FtpServiceFacade` |
+| `UNUSED_FTP_TOGGLE` / `UNUSED_FTP_STATUS` / `UNUSED_FTP_RECOVER` | 仅保留旧版 IPC 数值 | 不处理 |
 | `TOGGLE_SHADOWMOUNT` | 启停 ShadowMount+ 模块 | `ShadowMountServiceFacade` |
 | `SHADOWMOUNT_STATUS` | 返回 ShadowMount+ 运行状态 | `ShadowMountServiceFacade` |
 | `TOGGLE_PKGNET` | 启停 DPI pkg-server | `PkgNetServiceFacade` |
@@ -314,7 +310,6 @@ cheat_engine_runtime
 | cJSON | IPC 与配置载荷 JSON 解析 |
 | AES/base64 third_party | MC4 / ShnExt 解密 |
 | miniz / sha256 | ShnExt 解压与密钥派生 |
-| ftpsrv | 编译进 util 的 FTP 服务源码模块 |
 | libcurl / OpenSSL | 金手指 catalog HTTPS 下载与证书校验 |
 
 ---

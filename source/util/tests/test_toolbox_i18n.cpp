@@ -13,15 +13,9 @@ static int test_default_zh(void) {
   set_lang(Lang::ZhHans);
   TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★OnionHEN 工具箱") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.pkg"), "内容安装与管理") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("group.payloads.sub"),
-                               "用户与自动启动 Payload；Kstuff、FTP、ShadowMount+ 插件") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game"), "游戏辅助") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game.sub"),
                                "管理游戏金手指与下载金手指合集") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("ftp.group"), "FTP 服务器") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("ftp.run"), "立即运行 FTP 服务器") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("ftp.autoload"),
-                               "随 OnionHEN 启动 FTP") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("shadowmount.run"),
                                "立即运行 ShadowMount+") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.display"), "监控与显示") == 0);
@@ -78,16 +72,10 @@ static int test_en(void) {
   set_lang(Lang::En);
   TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★OnionHEN Toolbox") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.pkg"), "Content Install & Management") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("group.payloads.sub"),
-                               "User and auto-start payloads; Kstuff, FTP, and "
-                               "ShadowMount+ plugins") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game"), "Game Tools") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game.sub"),
                                "Manage cheats and download the cheat "
                                "collection") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("ftp.group"), "FTP Server") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("ftp.run"), "Run FTP server now") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("ftp.autoload"), "Start FTP with OnionHEN") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("shadowmount.run"),
                                "Run ShadowMount+ now") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("shadowmount.autoload"),

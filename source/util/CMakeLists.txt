@@ -34,26 +34,9 @@ file(GLOB SrcFiles CONFIGURE_DEPENDS
  
 )
 
-# ftpsrv is linked into util as a library-style module.  Its standalone main
-# and platform-specific alternatives are intentionally excluded; the service
-# facade owns the worker thread and lifecycle.
-set(FTPSRV_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/ftpsrv")
-set(FTPSRV_SOURCES
-  "${FTPSRV_SOURCE_DIR}/srv.c"
-  "${FTPSRV_SOURCE_DIR}/cmd.c"
-  "${FTPSRV_SOURCE_DIR}/cmd-proc.c"
-  "${FTPSRV_SOURCE_DIR}/cmd-comp.c"
-  "${FTPSRV_SOURCE_DIR}/cmd-prospero.c"
-  "${FTPSRV_SOURCE_DIR}/notify.c"
-  "${FTPSRV_SOURCE_DIR}/io.c"
-  "${FTPSRV_SOURCE_DIR}/io-freebsd.c"
-  "${FTPSRV_SOURCE_DIR}/self.c"
-  "${FTPSRV_SOURCE_DIR}/self-prospero.c"
-)
-
-# ShadowMountPlus is linked into util the same way as ftpsrv: a pinned
-# third-party module whose standalone main is excluded; the service facade and
-# shadowmount_main.cpp own the lifecycle.
+# ShadowMountPlus is linked into util as a pinned third-party module. Its
+# standalone main is excluded; the service facade and shadowmount_main.cpp own
+# the lifecycle.
 set(SHADOWMOUNT_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/ShadowMountPlus")
 set(SHADOWMOUNT_SOURCES
   "${SHADOWMOUNT_SOURCE_DIR}/src/sm_appdb.c"
@@ -87,9 +70,9 @@ set(SHADOWMOUNT_SOURCES
 # is vendored and compiled like the rest of third_party.
 set(ONION_SQLITE_SOURCES "${ONIONHEN_THIRD_PARTY_DIR}/sqlite/sqlite3.c")
 
-# DPI package install server (network installer) linked into util the same way
-# as ftpsrv: the vendored standalone's main was renamed to pkg_server_main and
-# the service facade owns the worker thread and lifecycle.
+# DPI package install server (network installer) is linked into util. The
+# vendored standalone's main was renamed to pkg_server_main and the service
+# facade owns the worker thread and lifecycle.
 set(PKGNET_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/pkgserver")
 set(PKGNET_SOURCES
   "${PKGNET_SOURCE_DIR}/pkg_server.c"
@@ -114,7 +97,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-error
 set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
-target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles} ${FTPSRV_SOURCES}
+target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles}
   ${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES} ${PKGNET_SOURCES}
   "${ONIONHEN_COMMON_DIR}/elfldr_remote.c")
 onion_target_debug_define(${PROJECT_NAME})
@@ -147,14 +130,12 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
 	CURL_STATICLIB
 	ONION_CURL_CA_BUNDLE="${ONION_CURL_CA_BUNDLE}"
-  VERSION_TAG="OnionHEN ftpsrv module"
   SHADOWMOUNT_VERSION="OnionHEN shadowmount module"
   ONIONHEN_SHADOWMOUNT_TEMPLATE="${SHADOWMOUNT_SOURCE_DIR}/config.ini.example"
   ONIONHEN_SHADOWMOUNT_ICON="${SHADOWMOUNT_SOURCE_DIR}/smp_icon.png"
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 	"${ONION_CURL_ROOT}/include")
-target_include_directories(${PROJECT_NAME} PRIVATE "${FTPSRV_SOURCE_DIR}")
 target_include_directories(${PROJECT_NAME} PRIVATE "${PKGNET_SOURCE_DIR}"
   "${PKGNET_SOURCE_DIR}/include")
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -167,11 +148,6 @@ set_source_files_properties(
 	"${D_SRC}/cheats/sync/http_transport_ps5.cpp"
 	PROPERTIES OBJECT_DEPENDS "${ONION_CURL_CA_BUNDLE}"
 )
-# Upstream ftpsrv is compiled with a less strict warning profile than the
-# OnionHEN util sources.  Keep the shared target's -Werror for our code while
-# allowing the pinned third-party module to retain its upstream implementation.
-set_source_files_properties(${FTPSRV_SOURCES} PROPERTIES
-  COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
 set_source_files_properties(${PKGNET_SOURCES} PROPERTIES
   COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
 set_source_files_properties(${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES}

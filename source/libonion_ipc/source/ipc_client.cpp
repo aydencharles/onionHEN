@@ -301,24 +301,6 @@ IPC_Ret IPC_Client::ToggleSetting(DaemonCommands cmd, bool turn_on) {
   return IPC_Ret::NO_ERROR;
 }
 
-bool IPC_Client::FtpStatus() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_FTP_STATUS, ipc_msg)) {
-    LOG_ERROR("Failed to query FTP service status");
-    return false;
-  }
-  return ipc_msg == "1" || ipc_msg == "true";
-}
-
-bool IPC_Client::RecoverFtp() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_RECOVER_FTP, ipc_msg)) {
-    LOG_ERROR("Failed to recover FTP service");
-    return false;
-  }
-  return true;
-}
-
 bool IPC_Client::ShadowMountStatus() {
   std::string ipc_msg;
   if (!IPCSendCommand(BREW_UTIL_SHADOWMOUNT_STATUS, ipc_msg)) {

@@ -57,7 +57,7 @@ link_directories("${ONIONHEN_OUT_LIB}" "${ONIONHEN_PS5_STUB_DIR}")
 add_subdirectory(libhijacker)
 add_subdirectory(libNidResolver)
 # add_subdirectory(libRPI)
-# libSelfDecryptor removed from OnionHEN (FTP uses local decrypt_self only)
+# libSelfDecryptor removed from OnionHEN.
 # Shared proc/ucred before NineS (inject path links these symbols).
 add_subdirectory(libonion_proc)
 add_subdirectory(libonion_fps)

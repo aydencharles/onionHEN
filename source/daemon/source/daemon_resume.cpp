@@ -62,13 +62,6 @@ void *resume_recovery_thread(void *args) noexcept {
         onion::daemon::plugins::start();
       }
 
-      /* FTP owns its socket inside util; ask it to restore only when the
-       * service was enabled before standby.  Recovery itself is bounded in
-       * FtpServiceFacade and remains a best-effort compensation. */
-      const bool ftp_recovered = IPC_Client::getInstance(true).RecoverFtp();
-      LOG_INFO("rest: FTP listener recovery %s",
-               ftp_recovered ? "ready" : "pending");
-
       /* NOTE_EXEC remains authoritative; this is only compensation. */
       toolbox_on_resume();
     }

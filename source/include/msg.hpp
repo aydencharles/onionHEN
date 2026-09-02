@@ -48,7 +48,7 @@ enum DaemonCommands : unsigned int {
   BREW_UTIL_TEST_CONNECTION = 0x8000000u,
   BREW_UTIL_RETURN_VALUE = 0x8000002u,
   BREW_UTIL_DAEMON_PID,
-  BREW_UTIL_TOGGLE_FTP,  // Stable ordinal retained from the former FTP toggle.
+  BREW_UTIL_UNUSED_FTP_TOGGLE, // was built-in FTP toggle; keep released ordinal
   BREW_UTIL_UNUSED_KLOG, // was BREW_UTIL_TOGGLE_KLOG (service removed)
   BREW_UTIL_TOGGLE_PKGNET, // stable ordinal retained from the former DPI toggle
   BREW_UTIL_LAUNCH_PAYLOAD,
@@ -66,10 +66,9 @@ enum DaemonCommands : unsigned int {
   BREW_UTIL_UNUSED_LEGACY_SERVICE_SCAN,
   BREW_UTIL_UNUSED_LEGACY_SERVICE_TOGGLE,
 
-  // New command uses an explicit value so adding it cannot shift the legacy
-  // sequential command block above.
-  BREW_UTIL_FTP_STATUS = 0x8000014u,
-  BREW_UTIL_RECOVER_FTP = 0x8000015u,
+  // Explicit values preserve the released ordinals after removing built-in FTP.
+  BREW_UTIL_UNUSED_FTP_STATUS = 0x8000014u,
+  BREW_UTIL_UNUSED_FTP_RECOVER = 0x8000015u,
   BREW_UTIL_TOGGLE_SHADOWMOUNT = 0x8000016u,
   BREW_UTIL_SHADOWMOUNT_STATUS = 0x8000017u,
   BREW_UTIL_PKGNET_STATUS = 0x8000018u,

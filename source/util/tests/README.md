@@ -49,7 +49,7 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_overlay_layout` | monitor-bar packing: top/bottom × left/right, hidden metrics, per-core width |
 | `test_settings` | semantic schema serialize/round-trip, partial INI defaults |
 | `test_fps_formula` | broad PS4 BC classification: PPSA/PPSB/CUSA/PCAS/PCJS/PCKS/CUHJ prefix detection |
-| `test_builtin_services` | builtin service key lookup, reserved-name protection, port allocation for ftp/shadowmount/pkgnet |
+| `test_builtin_services` | builtin service key lookup, reserved-name protection, and pkgnet port allocation |
 | `test_ready` | ready markers, PID-bound process instances, path builder, name rejection, **fps_overlay / util_booted** flags, toolbox runtime-root marker |
 | `test_toolbox_injection` | same-PID skip, new-PID reinject, failure cleanup, concurrent request serialization |
 | `test_platform_fs` | `if_exists` / `touch_file` / `rmtree` (libonion_platform) |

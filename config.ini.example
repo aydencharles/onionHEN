@@ -117,14 +117,6 @@ toolbox=off
 # Available values: true, false
 autoload=true
 
-[ftp]
-# autoload starts the built-in FTP server the next time OnionHEN launches.
-# Available values: true, false
-autoload=false
-# port selects the TCP listen port for the built-in server.
-# Available values: 1 through 65535
-port=1337
-
 [shadowmount]
 # autoload starts the built-in ShadowMount+ module the next time OnionHEN launches.
 # Available values: true, false

@@ -28,7 +28,6 @@ static int test_reserved_service_keys(void) {
 }
 
 static int test_service_ports(void) {
-  TEST_ASSERT_EQ_U64(1337u, ONION_FTPSRV_PORT);
   TEST_ASSERT_EQ_U64(9090u, ONION_PKGNET_PORT);
   TEST_ASSERT_EQ_U64(12800u, ONION_WEBUI_PORT);
   return 0;

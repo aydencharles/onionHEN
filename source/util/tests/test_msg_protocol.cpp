@@ -54,6 +54,8 @@ static int test_crit_command_base_and_order(void) {
 static int test_util_command_base(void) {
   TEST_ASSERT_EQ_U64(0x8000000u, static_cast<unsigned>(BREW_UTIL_TEST_CONNECTION));
   TEST_ASSERT_EQ_U64(0x8000002u, static_cast<unsigned>(BREW_UTIL_RETURN_VALUE));
+  TEST_ASSERT_EQ_U64(0x8000004u,
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_TOGGLE));
   TEST_ASSERT_TRUE(static_cast<unsigned>(BREW_UTIL_TOGGLE_PKGNET) >
                    static_cast<unsigned>(BREW_UTIL_RETURN_VALUE));
   /* Retains the former DirectPKGInstaller toggle ordinal. */
@@ -64,9 +66,9 @@ static int test_util_command_base(void) {
   TEST_ASSERT_EQ_U64(0x8000011u,
                      static_cast<unsigned>(BREW_UTIL_CANCEL_CHEAT_SYNC));
   TEST_ASSERT_EQ_U64(0x8000014u,
-                     static_cast<unsigned>(BREW_UTIL_FTP_STATUS));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_STATUS));
   TEST_ASSERT_EQ_U64(0x8000015u,
-                     static_cast<unsigned>(BREW_UTIL_RECOVER_FTP));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_RECOVER));
   TEST_ASSERT_EQ_U64(0x8000016u,
                      static_cast<unsigned>(BREW_UTIL_TOGGLE_SHADOWMOUNT));
   TEST_ASSERT_EQ_U64(0x8000017u,

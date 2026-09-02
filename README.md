@@ -64,7 +64,8 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **ShellUI Toolbox** — a settings page injected into the PS5 ShellUI
 - **System preparation** — raise privileges, remount filesystems, and block the update partition
 - **fSELF / fPKG** — bundled kstuff for homebrew SELF / PKG; loads by default, can be turned off in the Toolbox
-- **PS5 FTP server** — built-in source module with configurable port
+- **Plugin runtime** — discovers, validates, starts, stops, reloads, and removes descriptor-bearing plugin ELFs
+- **PS5 FTP server** — available as the optional external `onionHEN-ftpsrv-plugin`
 - **ShadowMount+** — built-in plugin that scans and mounts games from internal or external storage
 - **Remote Play pairing** — enable the native PS5 Remote Play service, generate a pairing PIN, and register a client from the Network section
 - **User payload manager** — start and stop user-provided `.elf` payloads, with optional auto-start
@@ -103,19 +104,18 @@ Startup is sequential. After the first hop, OnionHEN uses its own
 OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstuff.elf → daemon.elf → Toolbox
 ```
 
-If `ftp.autoload` is enabled, the built-in FTP module starts after `kstuff` and
-before the daemon. The same applies to ShadowMount+ when `shadowmount.autoload`
-is enabled.
+If `shadowmount.autoload` is enabled, the built-in ShadowMount+ module starts
+after `kstuff` and before the daemon. External plugins are discovered and
+started by the daemon afterward.
 
 ### FTP server
 
-The PS5 FTP server is available from **Toolbox → Payloads & Kernel → Plugins →
-FTP server**. One
-switch starts or stops it in the current session. A separate switch starts it
-the next time OnionHEN launches. The plugin page accepts ports from `1` to
-`65535` and applies a new port by restarting the in-process listener. It
-includes the upstream `ftpsrv` commands such as `KILL`, `SELF`, `SCHK`, `MTRW`,
-and `AUTHID` where supported.
+FTP is provided by the separate
+[`onionHEN-ftpsrv-plugin`](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin).
+Install it as `/data/OnionHEN/plugins/FTPS00001.elf`; OnionHEN discovers and
+starts the plugin, and its dynamic settings page provides enable, port, and
+restart controls. The plugin retains upstream `ftpsrv` commands such as
+`KILL`, `SELF`, `SCHK`, `MTRW`, and `AUTHID` where supported.
 
 ### ShadowMount+
 
@@ -168,13 +168,11 @@ Place standalone payloads in:
 Only plain `.elf` files are supported. Auto-start can be turned on in the Toolbox;
 OnionHEN remembers that choice with a matching `.auto_start` file next to the ELF.
 
-All `.elf` filenames use the same Payload page, loader, and auto-start flow,
-including `kstuff`, `ftpsrv`, and `ftpsrv-ps5`. A recorded running instance is
-left running by later launch and auto-start requests. Built-in services manage
-only their own runtime; they do not stop same-name user Payloads. If two FTP
-services use the same TCP port, only one can bind it. The name
-`shadowmountplus` is reserved for the built-in module and is ignored by the
-user-payload auto-start scan.
+All `.elf` filenames use the same Payload page, loader, and auto-start flow. A
+recorded running instance is left running by later launch and auto-start
+requests. The name `shadowmountplus` is reserved for the built-in module and is
+ignored by the user-payload auto-start scan. OnionHEN plugins are a separate
+category and belong in `/data/OnionHEN/plugins/`.
 
 ### Cheats
 
@@ -211,9 +209,6 @@ Cheats load from disk. If a file changes, OnionHEN reloads it without restarting
 | Clang / LLVM | Compile the `x86_64-sie-ps5` targets |
 | `lzma` or `xz` | Compress the bootstrapper |
 | Git and `curl` or `wget` | Initialize submodules and fetch external payload inputs |
-
-The pinned [`drakmor/ftpsrv`](https://github.com/drakmor/ftpsrv) `nexgen`
-sources are compiled into `util.elf` as its FTP module.
 
 The pinned
 [`drakmor/ShadowMountPlus`](https://github.com/drakmor/ShadowMountPlus)
@@ -316,8 +311,6 @@ default from [`config.ini.example`](config.ini.example).
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
-| `ftp.autoload` | `false` | `true`, `false` |
-| `ftp.port` | `1337` | `1` through `65535` |
 | `shadowmount.autoload` | `false` | `true`, `false` |
 | `pkgnet.autoload` | `false` | `true`, `false` |
 
@@ -326,10 +319,10 @@ default from [`config.ini.example`](config.ini.example).
 | Path | Purpose |
 | --- | --- |
 | `/data/OnionHEN/payloads/` | User payload ELFs |
+| `/data/OnionHEN/plugins/` | Descriptor-bearing OnionHEN plugin ELFs |
 | `/data/OnionHEN/cheats/` | Cheat files |
 | `/data/OnionHEN/cheats_tmp/` | Temporary HTTPS ZIP and extraction files, cleaned after sync |
 | `/data/OnionHEN/kstuff.elf` | Optional runtime override with priority over the embedded `kstuff` |
-| `ftpsrv` | In-process FTP source module; default port `1337` |
 | `/data/shadowmount/config.ini` | ShadowMount+ module options (created from the bundled template on first run) |
 | `/data/shadowmount/debug.log` | ShadowMount+ module log |
 | `/data/OnionHEN/OnionHEN.log` | Main runtime log |
@@ -439,7 +432,7 @@ OnionHEN exists because of the PS5 homebrew and reverse-engineering community.
 - [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) — Prospero toolchain and headers
 - [elfldr](https://github.com/ps5-payload-dev/elfldr) — first-hop loader on port 9021; not shipped in the payload
 - [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) — EchoStretch, sleirsgoevy, and contributors; optional `kstuff.elf`
-- [ftpsrv](https://github.com/drakmor/ftpsrv) — drakmor and upstream contributors; in-process PS5 FTP server from `nexgen`
+- [onionHEN-ftpsrv-plugin](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin) — optional external FTP server plugin based on drakmor/ftpsrv
 - [ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) — Drakmor; evolved from ShadowMount by VoidWhisper; in-process game scanner/mounter pinned at `1.6beta16`
 - [SQLite](https://www.sqlite.org/) — public domain amalgamation used by the ShadowMount+ module
 - [libhijacker](https://github.com/astrelsky/libhijacker) — astrelsky; process hijack and kernel R/W

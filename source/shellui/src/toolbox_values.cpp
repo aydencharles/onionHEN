@@ -52,14 +52,6 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.overlay_ram); }},
     {"id_plugin_kstuff_autoload",
      +[]() -> std::string { return bool_str(g_settings.kstuff_autoload); }},
-    {"id_plugin_ftpsrv_run",
-     +[]() -> std::string {
-       return bool_str(IPC_Client::getInstance(true).FtpStatus());
-     }},
-    {"id_plugin_ftpsrv_autoload",
-     +[]() -> std::string { return bool_str(g_settings.ftp_autoload); }},
-    {"id_plugin_ftpsrv_port",
-     +[]() -> std::string { return int_str(g_settings.ftp_port); }},
     {"id_plugin_shadowmount_autoload",
      +[]() -> std::string { return bool_str(g_settings.shadowmount_autoload); }},
     {"id_pkgnet_run",

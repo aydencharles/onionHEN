@@ -14,7 +14,7 @@ enum class Page : unsigned char {
   None = 0,           /**< unknown → original stream */
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
-  Plugins,            /**< built-in plugins (kstuff/ftpsrv) */
+  Plugins,            /**< built-in and externally discovered plugins */
   PluginConfig,       /**< per-plugin configuration page (plugin_config.xml) */
   Cheats,
   AutoPayloads,

@@ -105,29 +105,6 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false, out_var);
     break;
   }
-  case BREW_UTIL_TOGGLE_FTP: {
-    const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
-                                                            "toggle");
-    const bool enabled = toggle && cJSON_IsNumber(toggle) && toggle->valueint;
-    bool ok = true;
-    const onion::Settings settings = g_settings.snapshot();
-    if (enabled)
-      ok = onion::services::ftpService().start(
-          static_cast<uint16_t>(settings.ftp_port));
-    else
-      onion::services::ftpService().stop();
-    reply(sender_app, !ok);
-    break;
-  }
-  case BREW_UTIL_FTP_STATUS: {
-    reply(sender_app, false,
-          onion::services::ftpService().running() ? "1" : "0");
-    break;
-  }
-  case BREW_UTIL_RECOVER_FTP: {
-    reply(sender_app, !onion::services::ftpService().recover());
-    break;
-  }
   case BREW_UTIL_TOGGLE_SHADOWMOUNT: {
     const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
                                                             "toggle");

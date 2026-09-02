@@ -506,11 +506,15 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 4. ShellUI adapter 将 snapshot 中的页面、菜单、分组、标签、按钮、开关、列表
    和输入框转换为 Legacy Settings XML；resource/control ID 使用稳定 hash，
    页面返回由动态页面栈恢复。
+5. daemon 通过独立的 `shellui_plugin_bridge` Unix stream 向 ShellUI 发布完整
+   snapshot。ShellUI 将动作送回 daemon 校验，daemon 按 registry 中解析出的
+   owner 入队；插件在原有 `plugin_service` 连接上用 9 号命令轮询事件。
 
 ```text
 SDK plugin -> HELLO -> connection session -> ProtocolBroker -> Registry snapshot
-                                                        -> ShellUI XML adapter
-ShellUI action -> action sink -> connection event pump -> SDK UI event
+                                           -> bridge -> ShellUI XML adapter
+ShellUI action -> bridge -> ProtocolBroker validation -> owner event queue
+                                                  -> command 9 -> SDK UI event
 ```
 
 文档上限为 256 KiB、256 节点、8 层深度；注册采用 ordered chunk 与 FNV-1a
@@ -523,9 +527,11 @@ ELF、PID 或启动来源，capability 也只是功能协商与 API 门禁，不
 它解决的是误用、连接中途换 ID、重复 ID 和断连遗留 UI。daemon 中的
 `/system_tmp/onionhen/ipc/plugin_service` 使用独立持久连接 listener，每条
 accepted stream 拥有一个 `ConnectionSession`。它处理完整 SDK frame、`HELLO`、
-`PING` 和 10–15 号 UI 命令；休眠恢复会关闭旧连接并重新监听，整体关停会停止
-listener 并触发 contribution 清理。日志、通知、配置等其它 Host Service handler，
-以及跨进程 snapshot 发布与动作事件泵仍属于后续插件管理器集成。
+`PING`、9 号非阻塞事件轮询和 10–15 号 UI 命令。跨进程 snapshot 使用独立
+`/system_tmp/onionhen/ipc/shellui_plugin_bridge` stream，避免异步消息破坏插件
+socket 的 request/response 配对。休眠恢复会关闭旧连接并重新监听，整体关停会
+停止 listener 并触发 contribution 与待处理事件清理。日志、通知、配置等其它
+Host Service handler 仍属于后续集成。
 
 ---
 

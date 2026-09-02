@@ -60,8 +60,9 @@ size_t SessionDirectory::size() const {
 }
 
 ConnectionSession::ConnectionSession(SessionDirectory &directory,
-                                     plugin_ui::ProtocolBroker &ui_broker)
-    : directory_(directory), ui_broker_(ui_broker) {}
+                                     plugin_ui::ProtocolBroker &ui_broker,
+                                     EventSource *events)
+    : directory_(directory), ui_broker_(ui_broker), events_(events) {}
 
 ConnectionSession::~ConnectionSession() { disconnect(); }
 
@@ -94,6 +95,14 @@ ConnectionSession::dispatch(uint16_t command, std::span<const uint8_t> payload) 
   if (command == kPingCommand)
     return payload.empty() ? plugin_ui::WireResponse{plugin_ui::Status::Ok, {}}
                            : plugin_ui::WireResponse{};
+  if (command == kEventCommand) {
+    if (!payload.empty()) return {};
+    if ((capabilities_ & Ui) == 0)
+      return {plugin_ui::Status::PermissionDenied, {}};
+    return events_ ? events_->poll(owner_)
+                   : plugin_ui::WireResponse{plugin_ui::Status::NotSupported,
+                                             {}};
+  }
   if (!is_ui_command(command))
     return {plugin_ui::Status::NotSupported, {}};
   if ((capabilities_ & Ui) == 0)
@@ -105,6 +114,7 @@ void ConnectionSession::disconnect() {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!open_) return;
   ui_broker_.disconnect(owner_);
+  if (events_) events_->disconnect(owner_);
   directory_.release(owner_);
   owner_.clear();
   capabilities_ = 0;

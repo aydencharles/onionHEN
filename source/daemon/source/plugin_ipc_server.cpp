@@ -1,4 +1,5 @@
 #include "plugin_ipc_server.hpp"
+#include "plugin_ui_bridge_server.hpp"
 
 #include <onion/ipc_server.hpp>
 #include <onion/log.h>
@@ -56,7 +57,8 @@ void *client_thread(void *opaque) {
   delete args;
 
   LOG_DEBUG("[plugin-ipc][client %u] connected fd=%d", number, socket);
-  serve_connection(socket, g_sessions, g_ui_broker);
+  serve_connection(socket, g_sessions, g_ui_broker,
+                   &plugin_ui_bridge::event_source());
   forget_client(socket);
   ipc_network_close(socket);
   LOG_DEBUG("[plugin-ipc][client %u] disconnected", number);
@@ -122,8 +124,9 @@ void *server_thread(void *) {
 } // namespace
 
 void serve_connection(int socket, plugin_session::SessionDirectory &directory,
-                      plugin_ui::ProtocolBroker &ui_broker) {
-  plugin_session::ConnectionProtocol protocol(directory, ui_broker);
+                      plugin_ui::ProtocolBroker &ui_broker,
+                      plugin_session::EventSource *events) {
+  plugin_session::ConnectionProtocol protocol(directory, ui_broker, events);
   while (true) {
     plugin_session::Frame request;
     const int received = ipc_network_recv_full(
@@ -143,11 +146,16 @@ void serve_connection(int socket, plugin_session::SessionDirectory &directory,
 bool start() {
   bool expected = false;
   if (!g_started.compare_exchange_strong(expected, true)) return true;
+  if (!plugin_ui_bridge::start(g_ui_broker, g_registry)) {
+    g_started.store(false, std::memory_order_release);
+    return false;
+  }
   g_running.store(true, std::memory_order_release);
   pthread_t thread{};
   if (pthread_create(&thread, nullptr, server_thread, nullptr) != 0) {
     g_running.store(false, std::memory_order_release);
     g_started.store(false, std::memory_order_release);
+    plugin_ui_bridge::stop();
     return false;
   }
   pthread_detach(thread);
@@ -156,6 +164,7 @@ bool start() {
 
 void stop() {
   g_running.store(false, std::memory_order_release);
+  plugin_ui_bridge::stop();
   ipc_release_listen_fd(&g_listener);
   shutdown_clients();
   unlink(ONION_SYSTEM_TMP_PLUGIN_SOCKET);
@@ -163,12 +172,14 @@ void stop() {
 
 void restart() {
   if (!g_running.load(std::memory_order_acquire)) return;
+  plugin_ui_bridge::restart();
   ipc_release_listen_fd(&g_listener);
   shutdown_clients();
 }
 
 bool is_listening() {
-  return g_listener.load(std::memory_order_acquire) >= 0;
+  return g_listener.load(std::memory_order_acquire) >= 0 &&
+         plugin_ui_bridge::is_listening();
 }
 
 } // namespace onion::daemon::plugin_ipc

@@ -7,6 +7,7 @@
 #include <onion/ipc_server.hpp>
 #include <onion/plugin_session.hpp>
 #include <onion/plugin_ui.hpp>
+#include <onion/plugin_ui_bridge.hpp>
 
 #include <cstdint>
 #include <string>
@@ -23,6 +24,26 @@ namespace {
 
 bool g_action_received = false;
 uint64_t g_published_generation = 0;
+
+class TestEventSource final : public onion::plugin_session::EventSource {
+public:
+  onion::plugin_ui::WireResponse poll(std::string_view owner) override {
+    polled_owner.assign(owner);
+    if (event.empty())
+      return {onion::plugin_ui::Status::NotFound, {}};
+    std::vector<uint8_t> result = std::move(event);
+    return {onion::plugin_ui::Status::Ok, std::move(result)};
+  }
+
+  void disconnect(std::string_view owner) override {
+    disconnected_owner.assign(owner);
+    event.clear();
+  }
+
+  std::vector<uint8_t> event;
+  std::string polled_owner;
+  std::string disconnected_owner;
+};
 
 bool action_sink(onion::plugin_ui::Handle, const onion::plugin_ui::Node &node,
                  std::string_view, void *) {
@@ -302,6 +323,79 @@ int test_owner_and_encoding_validation(void) {
   TEST_ASSERT_EQ_INT(
       static_cast<int>(onion::plugin_ui::Status::InvalidEncoding),
       static_cast<int>(onion::plugin_ui::decode_document(truncated, document)));
+
+  TEST_ASSERT_EQ_INT(
+      static_cast<int>(onion::plugin_ui::Status::Ok),
+      static_cast<int>(onion::plugin_ui::decode_document(make_document(), document)));
+  std::vector<uint8_t> reencoded;
+  TEST_ASSERT_EQ_INT(
+      static_cast<int>(onion::plugin_ui::Status::Ok),
+      static_cast<int>(onion::plugin_ui::encode_document(document, reencoded)));
+  TEST_ASSERT_TRUE(reencoded == make_document());
+  return 0;
+}
+
+int test_bridge_protocol_and_actions(void) {
+  using namespace onion;
+  plugin_ui::Registry registry;
+  const auto registered = registry.register_encoded("TEST00001", make_document());
+  TEST_ASSERT_EQ_INT(static_cast<int>(plugin_ui::Status::Ok),
+                     static_cast<int>(registered.status));
+
+  std::vector<uint8_t> snapshot_bytes;
+  TEST_ASSERT_TRUE(plugin_bridge::encode_snapshot(registry.snapshot(),
+                                                   snapshot_bytes));
+  plugin_ui::RegistrySnapshot decoded;
+  TEST_ASSERT_TRUE(plugin_bridge::decode_snapshot(snapshot_bytes, decoded));
+  TEST_ASSERT_EQ_U64(registry.snapshot().generation, decoded.generation);
+  TEST_ASSERT_EQ_U64(1, decoded.contributions.size());
+  TEST_ASSERT_STREQ("TEST00001", decoded.contributions[0].owner.c_str());
+
+  uint8_t header_bytes[plugin_bridge::kFrameHeaderSize];
+  TEST_ASSERT_TRUE(plugin_bridge::encode_frame_header(
+      {plugin_bridge::MessageType::Snapshot,
+       static_cast<uint32_t>(snapshot_bytes.size())}, header_bytes));
+  plugin_bridge::FrameHeader header;
+  TEST_ASSERT_TRUE(plugin_bridge::decode_frame_header(header_bytes, header));
+  TEST_ASSERT_EQ_U64(snapshot_bytes.size(), header.payload_size);
+  header_bytes[12] = 1;
+  TEST_ASSERT_TRUE(!plugin_bridge::decode_frame_header(header_bytes, header));
+
+  plugin_bridge::ActionRequest action{registered.handle, "enabled", "false"};
+  std::vector<uint8_t> action_bytes;
+  TEST_ASSERT_TRUE(plugin_bridge::encode_action(action, action_bytes));
+  plugin_bridge::ActionRequest decoded_action;
+  TEST_ASSERT_TRUE(plugin_bridge::decode_action(action_bytes, decoded_action));
+  TEST_ASSERT_STREQ("enabled", decoded_action.node_id.c_str());
+  action_bytes.push_back(0);
+  TEST_ASSERT_TRUE(!plugin_bridge::decode_action(action_bytes, decoded_action));
+
+  plugin_ui::ProtocolBroker broker(registry);
+  plugin_ui::ActionEvent event;
+  TEST_ASSERT_EQ_INT(
+      static_cast<int>(plugin_ui::Status::Ok),
+      static_cast<int>(broker.dispatch_action(registered.handle, "enabled",
+                                              "false", event)));
+  TEST_ASSERT_STREQ("TEST00001", event.owner.c_str());
+  TEST_ASSERT_STREQ("settings", event.contribution_id.c_str());
+  TEST_ASSERT_STREQ("main", event.page_id.c_str());
+  TEST_ASSERT_STREQ("enabled", event.node_id.c_str());
+  TEST_ASSERT_STREQ("false", event.value.c_str());
+  TEST_ASSERT_EQ_U64(1, event.sequence);
+  const auto updated = registry.snapshot();
+  const auto *entry = updated.find(registered.handle);
+  TEST_ASSERT_TRUE(entry && entry->document);
+  TEST_ASSERT_STREQ("false",
+                    entry->document->find_node("enabled")->value.c_str());
+
+  std::vector<uint8_t> event_bytes;
+  TEST_ASSERT_TRUE(plugin_bridge::encode_ui_event(event, event_bytes));
+  TEST_ASSERT_EQ_INT(plugin_bridge::kUiActionEventId,
+                     read_u32(event_bytes));
+  TEST_ASSERT_EQ_INT(
+      static_cast<int>(plugin_ui::Status::InvalidArgument),
+      static_cast<int>(broker.dispatch_action(registered.handle, "main", "",
+                                              event)));
   return 0;
 }
 
@@ -431,7 +525,8 @@ int test_connection_session(void) {
   onion::plugin_ui::Registry registry;
   ProtocolBroker broker(registry);
   SessionDirectory directory;
-  ConnectionSession first(directory, broker);
+  TestEventSource events;
+  ConnectionSession first(directory, broker, &events);
 
   std::vector<uint8_t> begin_payload;
   const std::vector<uint8_t> encoded = make_document();
@@ -457,6 +552,16 @@ int test_connection_session(void) {
   TEST_ASSERT_STREQ("TEST00001", first_owner.c_str());
   TEST_ASSERT_EQ_U64(onion::plugin_session::Ui, first.capabilities());
   TEST_ASSERT_TRUE(directory.contains("TEST00001"));
+
+  response = first.dispatch(onion::plugin_session::kEventCommand, {});
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::NotFound),
+                     static_cast<int>(response.status));
+  TEST_ASSERT_STREQ("TEST00001", events.polled_owner.c_str());
+  events.event = {1, 2, 3};
+  response = first.dispatch(onion::plugin_session::kEventCommand, {});
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+  TEST_ASSERT_EQ_U64(3, response.data.size());
 
   response = first.dispatch(
       onion::plugin_session::kHelloCommand,
@@ -528,6 +633,7 @@ int test_connection_session(void) {
   TEST_ASSERT_TRUE(!first.is_open());
   TEST_ASSERT_TRUE(!directory.contains("TEST00001"));
   TEST_ASSERT_TRUE(registry.snapshot().contributions.empty());
+  TEST_ASSERT_STREQ("TEST00001", events.disconnected_owner.c_str());
 
   ConnectionSession reconnected(directory, broker);
   response = reconnected.dispatch(
@@ -645,6 +751,8 @@ extern "C" int test_plugin_ui_suite(void) {
                              test_registry_and_renderer);
   failures += onion_test_run("plugin_ui_owner_encoding",
                              test_owner_and_encoding_validation);
+  failures += onion_test_run("plugin_ui_bridge_protocol",
+                             test_bridge_protocol_and_actions);
   failures += onion_test_run("plugin_ui_unknown_firmware",
                              test_unknown_firmware_fails_closed);
   failures += onion_test_run("plugin_ui_registration_transaction",

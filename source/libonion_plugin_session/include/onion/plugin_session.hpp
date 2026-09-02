@@ -17,6 +17,7 @@ inline constexpr uint32_t kFrameMagic = 0x4F504943u;
 inline constexpr uint16_t kWireVersion = 1;
 inline constexpr uint16_t kPingCommand = 1;
 inline constexpr uint16_t kResponseCommand = 2;
+inline constexpr uint16_t kEventCommand = 9;
 inline constexpr uint16_t kHelloCommand = 16;
 inline constexpr size_t kMaxPayloadSize = 4096;
 inline constexpr size_t kResponseHeaderSize = 8;
@@ -62,11 +63,19 @@ private:
   std::unordered_set<std::string> owners_;
 };
 
+class EventSource {
+public:
+  virtual ~EventSource() = default;
+  virtual plugin_ui::WireResponse poll(std::string_view owner) = 0;
+  virtual void disconnect(std::string_view owner) = 0;
+};
+
 /* One instance is owned by one accepted transport connection. */
 class ConnectionSession {
 public:
   ConnectionSession(SessionDirectory &directory,
-                    plugin_ui::ProtocolBroker &ui_broker);
+                    plugin_ui::ProtocolBroker &ui_broker,
+                    EventSource *events = nullptr);
   ~ConnectionSession();
 
   ConnectionSession(const ConnectionSession &) = delete;
@@ -84,6 +93,7 @@ private:
 
   SessionDirectory &directory_;
   plugin_ui::ProtocolBroker &ui_broker_;
+  EventSource *events_ = nullptr;
   mutable std::mutex mutex_;
   std::string owner_;
   uint32_t capabilities_ = 0;
@@ -99,8 +109,9 @@ struct FrameResult {
 class ConnectionProtocol {
 public:
   ConnectionProtocol(SessionDirectory &directory,
-                     plugin_ui::ProtocolBroker &ui_broker)
-      : session_(directory, ui_broker) {}
+                     plugin_ui::ProtocolBroker &ui_broker,
+                     EventSource *events = nullptr)
+      : session_(directory, ui_broker, events) {}
 
   FrameResult handle(const Frame &request);
   ConnectionSession &session() { return session_; }

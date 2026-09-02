@@ -142,9 +142,34 @@ void append_u32(std::vector<uint8_t> &bytes, uint32_t value) {
     bytes.push_back(static_cast<uint8_t>(value >> (i * 8)));
 }
 
+void append_u16(std::vector<uint8_t> &bytes, uint16_t value) {
+  bytes.push_back(static_cast<uint8_t>(value));
+  bytes.push_back(static_cast<uint8_t>(value >> 8));
+}
+
 void append_u64(std::vector<uint8_t> &bytes, uint64_t value) {
   for (unsigned i = 0; i < 8; ++i)
     bytes.push_back(static_cast<uint8_t>(value >> (i * 8)));
+}
+
+void patch_u32(std::vector<uint8_t> &bytes, size_t offset, uint32_t value) {
+  for (unsigned i = 0; i < 4; ++i)
+    bytes[offset + i] = static_cast<uint8_t>(value >> (i * 8));
+}
+
+void append_text(std::vector<uint8_t> &bytes, std::string_view text) {
+  bytes.insert(bytes.end(), text.begin(), text.end());
+}
+
+const Node *page_for_node(const Document &document, const Node &node) {
+  const Node *cursor = &node;
+  for (size_t depth = 0; depth <= kMaxDepth; ++depth) {
+    if (cursor->kind == NodeKind::Page) return cursor;
+    if (cursor->parent_id.empty()) return nullptr;
+    cursor = document.find_node(cursor->parent_id);
+    if (!cursor) return nullptr;
+  }
+  return nullptr;
 }
 
 } // namespace
@@ -247,6 +272,67 @@ Status decode_document(std::span<const uint8_t> encoded, Document &out,
     return Status::InvalidEncoding;
   }
   return validate_document(out, error);
+}
+
+Status encode_document(const Document &document, std::vector<uint8_t> &out,
+                       std::string *error) {
+  out.clear();
+  const Status validated = validate_document(document, error);
+  if (validated != Status::Ok) return validated;
+
+  const std::string *metadata[] = {
+      &document.plugin_id, &document.contribution_id, &document.title,
+      &document.description, &document.root_page_id};
+  size_t total = kDocumentHeaderSize;
+  for (const std::string *text : metadata) total += text->size();
+  for (const Node &node : document.nodes) {
+    const std::string *texts[] = {
+        &node.id, &node.parent_id, &node.title, &node.description,
+        &node.target_id, &node.binding_key, &node.value};
+    total += kNodeHeaderSize;
+    for (const std::string *text : texts) total += text->size();
+  }
+  if (total > kMaxEncodedSize || total > UINT32_MAX) {
+    fail(error, "encoded document exceeds the supported size");
+    return Status::InvalidDocument;
+  }
+
+  out.reserve(total);
+  append_u32(out, kDocumentMagic);
+  append_u16(out, kWireVersion);
+  append_u16(out, static_cast<uint16_t>(kDocumentHeaderSize));
+  append_u32(out, static_cast<uint32_t>(total));
+  append_u32(out, static_cast<uint32_t>(document.nodes.size()));
+  append_u32(out, document.flags);
+  append_u32(out, static_cast<uint32_t>(document.priority));
+  for (const std::string *text : metadata)
+    append_u16(out, static_cast<uint16_t>(text->size()));
+  append_u16(out, 0);
+  for (const std::string *text : metadata) append_text(out, *text);
+
+  for (const Node &node : document.nodes) {
+    const size_t record_begin = out.size();
+    append_u32(out, 0);
+    append_u16(out, static_cast<uint16_t>(node.kind));
+    append_u16(out, 0);
+    append_u32(out, node.flags);
+    append_u32(out, static_cast<uint32_t>(node.value_type));
+    append_u32(out, static_cast<uint32_t>(node.binding));
+    append_u64(out, static_cast<uint64_t>(node.min_value));
+    append_u64(out, static_cast<uint64_t>(node.max_value));
+    append_u32(out, node.min_length);
+    append_u32(out, node.max_length);
+    const std::string *texts[] = {
+        &node.id, &node.parent_id, &node.title, &node.description,
+        &node.target_id, &node.binding_key, &node.value};
+    for (const std::string *text : texts)
+      append_u16(out, static_cast<uint16_t>(text->size()));
+    append_u16(out, 0);
+    for (const std::string *text : texts) append_text(out, *text);
+    patch_u32(out, record_begin,
+              static_cast<uint32_t>(out.size() - record_begin));
+  }
+  return Status::Ok;
 }
 
 Status validate_document(const Document &document, std::string *error) {
@@ -627,6 +713,45 @@ WireResponse ProtocolBroker::dispatch(std::string_view owner, uint16_t command,
   }
   }
   return {};
+}
+
+Status ProtocolBroker::dispatch_action(Handle handle, std::string_view node_id,
+                                       std::string_view value,
+                                       ActionEvent &out) {
+  out = {};
+  const RegistrySnapshot current = registry_.snapshot();
+  const ContributionSnapshot *entry = current.find(handle);
+  if (!entry || !entry->document) return Status::NotFound;
+  const Node *node = entry->document->find_node(node_id);
+  if (!node) return Status::NotFound;
+  if (node->kind != NodeKind::Action && node->kind != NodeKind::Toggle &&
+      node->kind != NodeKind::List && node->kind != NodeKind::Input)
+    return Status::InvalidArgument;
+  if (node->binding == BindingKind::None) return Status::InvalidArgument;
+  if (node->kind == NodeKind::Action) {
+    if (!value.empty()) return Status::InvalidArgument;
+  } else {
+    const Status changed = registry_.set_value(entry->owner, handle, node_id,
+                                               node->value_type, value);
+    if (changed != Status::Ok) return changed;
+  }
+
+  const Node *page = page_for_node(*entry->document, *node);
+  if (!page) return Status::InvalidDocument;
+  out.owner = entry->owner;
+  out.handle = handle;
+  {
+    std::lock_guard<std::mutex> lock(sink_mutex_);
+    out.sequence = next_action_sequence_++;
+    if (next_action_sequence_ == 0) next_action_sequence_ = 1;
+  }
+  out.value_type = node->value_type;
+  out.contribution_id = entry->document->contribution_id;
+  out.page_id = page->id;
+  out.node_id = node->id;
+  out.value.assign(value);
+  if (node->kind != NodeKind::Action) publish_snapshot();
+  return Status::Ok;
 }
 
 size_t ProtocolBroker::disconnect(std::string_view owner) {

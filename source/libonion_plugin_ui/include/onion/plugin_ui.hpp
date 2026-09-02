@@ -91,6 +91,8 @@ enum class Status {
 
 Status decode_document(std::span<const uint8_t> encoded, Document &out,
                        std::string *error = nullptr);
+Status encode_document(const Document &document, std::vector<uint8_t> &out,
+                       std::string *error = nullptr);
 Status validate_document(const Document &document, std::string *error = nullptr);
 
 using Handle = uint64_t;
@@ -154,6 +156,17 @@ struct WireResponse {
   std::vector<uint8_t> data;
 };
 
+struct ActionEvent {
+  std::string owner;
+  Handle handle = 0;
+  uint64_t sequence = 0;
+  ValueType value_type = ValueType::None;
+  std::string contribution_id;
+  std::string page_id;
+  std::string node_id;
+  std::string value;
+};
+
 using SnapshotSink = void (*)(const RegistrySnapshot &snapshot, void *context);
 
 class RegistrationBroker {
@@ -193,6 +206,8 @@ public:
   void set_snapshot_sink(SnapshotSink sink, void *context);
   WireResponse dispatch(std::string_view session_owner,
                         uint16_t command, std::span<const uint8_t> payload);
+  Status dispatch_action(Handle handle, std::string_view node_id,
+                         std::string_view value, ActionEvent &out);
   size_t disconnect(std::string_view session_owner);
 
 private:
@@ -203,6 +218,7 @@ private:
   std::mutex sink_mutex_;
   SnapshotSink snapshot_sink_ = nullptr;
   void *snapshot_context_ = nullptr;
+  uint64_t next_action_sequence_ = 1;
 };
 
 } // namespace onion::plugin_ui

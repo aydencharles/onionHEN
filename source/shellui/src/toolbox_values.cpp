@@ -52,8 +52,6 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.overlay_ram); }},
     {"id_plugin_kstuff_autoload",
      +[]() -> std::string { return bool_str(g_settings.kstuff_autoload); }},
-    {"id_plugin_shadowmount_autoload",
-     +[]() -> std::string { return bool_str(g_settings.shadowmount_autoload); }},
     {"id_pkgnet_run",
      +[]() -> std::string {
        return bool_str(IPC_Client::getInstance(true).PkgNetStatus());

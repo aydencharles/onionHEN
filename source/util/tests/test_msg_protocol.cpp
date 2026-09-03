@@ -70,9 +70,9 @@ static int test_util_command_base(void) {
   TEST_ASSERT_EQ_U64(0x8000015u,
                      static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_RECOVER));
   TEST_ASSERT_EQ_U64(0x8000016u,
-                     static_cast<unsigned>(BREW_UTIL_TOGGLE_SHADOWMOUNT));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE));
   TEST_ASSERT_EQ_U64(0x8000017u,
-                     static_cast<unsigned>(BREW_UTIL_SHADOWMOUNT_STATUS));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS));
   TEST_ASSERT_EQ_U64(0x8000018u,
                      static_cast<unsigned>(BREW_UTIL_PKGNET_STATUS));
   TEST_ASSERT_EQ_U64(0x8000019u,

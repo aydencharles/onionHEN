@@ -158,10 +158,6 @@ struct Settings {
   // Load the embedded/override kstuff payload when OnionHEN starts.
   bool kstuff_autoload = true;
 
-  // [shadowmount]
-  // Start the built-in ShadowMount+ module the next time OnionHEN launches.
-  bool shadowmount_autoload = false;
-
   // [pkgnet]
   // Start the built-in network package installer the next time OnionHEN launches.
   bool pkgnet_autoload = false;

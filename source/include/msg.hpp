@@ -69,8 +69,8 @@ enum DaemonCommands : unsigned int {
   // Explicit values preserve the released ordinals after removing built-in FTP.
   BREW_UTIL_UNUSED_FTP_STATUS = 0x8000014u,
   BREW_UTIL_UNUSED_FTP_RECOVER = 0x8000015u,
-  BREW_UTIL_TOGGLE_SHADOWMOUNT = 0x8000016u,
-  BREW_UTIL_SHADOWMOUNT_STATUS = 0x8000017u,
+  BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE = 0x8000016u,
+  BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS = 0x8000017u,
   BREW_UTIL_PKGNET_STATUS = 0x8000018u,
   // Daemon pushes a live console system language so util re-applies it without
   // needing a SystemService query (util is under PTRACE_AUTHID after launch).

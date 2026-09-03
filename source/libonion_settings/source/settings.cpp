@@ -616,9 +616,6 @@ bool apply_parser(IniParser *parser, Settings *out) {
                              out->toolbox_shortcut_opt);
   out->kstuff_autoload =
       parse_bool(ini_get(parser, "kstuff.autoload"), out->kstuff_autoload);
-  out->shadowmount_autoload =
-      parse_bool(ini_get(parser, "shadowmount.autoload"),
-                 out->shadowmount_autoload);
   out->pkgnet_autoload =
       parse_bool(ini_get(parser, "pkgnet.autoload"), out->pkgnet_autoload);
   return true;
@@ -795,10 +792,6 @@ std::string settings_serialize(const Settings &in) {
   b += "# autoload loads kstuff when OnionHEN starts.\n";
   b += "# Available values: true, false\n";
   b += "autoload=" + bool_text(in.kstuff_autoload) + "\n";
-  b += "\n[shadowmount]\n";
-  b += "# autoload starts the built-in ShadowMount+ module the next time OnionHEN launches.\n";
-  b += "# Available values: true, false\n";
-  b += "autoload=" + bool_text(in.shadowmount_autoload) + "\n";
   b += "\n[pkgnet]\n";
   b += "# autoload starts the built-in network package installer (DPI, TCP 9090)\n";
   b += "# the next time OnionHEN launches.\n";

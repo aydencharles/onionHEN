@@ -98,11 +98,6 @@ bool LoadSettings() {
 
     if (!g_services_initialized) {
         g_services_initialized = true;
-        if (s.shadowmount_autoload &&
-            !onion::services::shadowMountService().running() &&
-            !onion::services::shadowMountService().start()) {
-            LOG_WARN("ShadowMount autoload failed");
-        }
         if (s.pkgnet_autoload && !onion::services::pkgNetService().running() &&
             !onion::services::pkgNetService().start()) {
             LOG_WARN("pkg-server autoload failed on TCP %u",

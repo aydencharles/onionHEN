@@ -99,7 +99,7 @@ static std::string cfg_res(const char *rel) {
 }
 
 static int test_plugin_config_page(void) {
-  RouteResult r = resolve_resource(make_in(cfg_res("shadowmount.xml")));
+  RouteResult r = resolve_resource(make_in(cfg_res("kstuff.xml")));
   TEST_ASSERT_TRUE(r.page == Page::PluginConfig);
   TEST_ASSERT_TRUE(r.flags.is_plugin_config);
   TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) ==
@@ -114,21 +114,19 @@ static int test_plugin_config_page(void) {
 static int test_plugins_registry(void) {
   using namespace onion::plugins;
 
-  TEST_ASSERT_EQ_INT(2, static_cast<int>(kRegistrySize));
-  TEST_ASSERT_TRUE(find_by_key("shadowmount") != nullptr);
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(kRegistrySize));
   TEST_ASSERT_TRUE(find_by_key("missing") == nullptr);
   TEST_ASSERT_TRUE(find_by_toggle_id("id_plugin_kstuff") != nullptr);
   TEST_ASSERT_TRUE(find_by_toggle_id("id_nope") == nullptr);
-  TEST_ASSERT_STREQ("shadowmount", find_by_key("shadowmount")->key);
-  TEST_ASSERT_STREQ("id_plugin_shadowmount",
-                    find_by_key("shadowmount")->toggle_id);
-  TEST_ASSERT_STREQ("shadowmount.xml", find_by_key("shadowmount")->config_xml);
+  TEST_ASSERT_STREQ("kstuff", find_by_key("kstuff")->key);
+  TEST_ASSERT_STREQ("id_plugin_kstuff", find_by_key("kstuff")->toggle_id);
+  TEST_ASSERT_STREQ("kstuff.xml", find_by_key("kstuff")->config_xml);
   TEST_ASSERT_TRUE(default_key() == std::string_view("kstuff"));
 
-  const Descriptor *by_sm =
-      find_by_config_xml_resource(cfg_res("shadowmount.xml"));
-  TEST_ASSERT_TRUE(by_sm != nullptr);
-  TEST_ASSERT_STREQ("shadowmount", by_sm->key);
+  const Descriptor *by_kstuff =
+      find_by_config_xml_resource(cfg_res("kstuff.xml"));
+  TEST_ASSERT_TRUE(by_kstuff != nullptr);
+  TEST_ASSERT_STREQ("kstuff", by_kstuff->key);
   TEST_ASSERT_TRUE(find_by_config_xml_resource(cfg_res("nope.xml")) == nullptr);
   return 0;
 }

@@ -52,7 +52,6 @@ OnionHEN 是 PS5 的 All-in-One Homebrew Enabler，提供提权、后台服务�
 
 - util 先提供网络/IPC 等服务
 - kstuff 需先完成 ShellUI 补丁
-- `shadowmount.autoload` 为 true 时，util 在进程内创建对应服务工作线程
 - daemon 启动插件管理器，发现并管理 `/data/OnionHEN/plugins/` 中的外部插件
 - daemon 再注入 Toolbox
 
@@ -170,7 +169,6 @@ OnionHEN/
 |------|-------------|------|
 | Cheats | IPC | flat-file cheat engine（multi-source `TITLE_VERSION[_PROCESS][_SOURCE_ID].ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | Toolbox 请求 | IPC | util 崩溃重拉后向 crit 请求 `BREW_ENABLE_TOOLBOX`；休息恢复在 daemon |
-| ShadowMount+ | 进程内线程 | 固定版本 `ShadowMountPlus 1.6beta16` 源码模块；插件页提供本次按钮启停与下次开机自启；扫描/挂载/安装游戏镜像并写自身日志与配置到 `/data/shadowmount/` |
 | DPI（网络包安装器 / Web UI） | TCP **9090** + **12800** | 进程内 pkg 上传/安装服务（`third_party/pkgserver`，配置 `[pkgnet]`）；Web UI 内嵌 `source/webui/dist` 单文件页面，SSE 推送状态与进度，界面语言与工具箱一致（14 种） |
 
 `ps5/klog.h` 的 `klog_printf` / `klog_puts` 用于写入内核日志，不提供 TCP 网络服务。
@@ -335,14 +333,14 @@ struct IPCMessage {
 - `BREW_UTIL_LAUNCH_PAYLOAD`
 - `BREW_UTIL_GET_GAME_VER` / `BREW_UTIL_GET_GAME_CHEAT` / `BREW_UTIL_TOGGLE_CHEAT`
 - `BREW_UTIL_DOWNLOAD_CHEATS` / `BREW_UTIL_CHEAT_SYNC_STATUS` / `BREW_UTIL_CANCEL_CHEAT_SYNC`（git catalog 同步）
-- `BREW_UTIL_TOGGLE_SHADOWMOUNT`（Toolbox 按钮启停 ShadowMount+ 模块）
-- `BREW_UTIL_SHADOWMOUNT_STATUS`（查询 util 内部 ShadowMount+ 线程状态）
 - `BREW_UTIL_SET_SYSTEM_LANG`（daemon 轮询到控制台系统语言变化时经 IPC 推送；util 重新存储 SCE 语言并刷新 notify 与 Web UI 语言）
 
 **ABI 占位命令：**
 
 - `BREW_UTIL_UNUSED_FTP_TOGGLE` / `BREW_UTIL_UNUSED_FTP_STATUS` /
   `BREW_UTIL_UNUSED_FTP_RECOVER` 保留旧版已发布数值，不再处理
+- `BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE` /
+  `BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS` 保留旧版已发布数值，不再处理
 
 | 命令 | 当前行为 |
 |------|----------|
@@ -408,7 +406,7 @@ struct IPCMessage {
 
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
 - **FTP**：由可选的外部 `onionHEN-ftpsrv-plugin` 提供；daemon 负责进程生命周期，插件通过动态 UI 提供启用、端口与重启控制
-- **ShadowMount+**：util 内置 `ShadowMountPlus` 源码模块；Toolbox 插件页提供本次按钮启停与下次开机自启；依赖 kstuff，配置与日志位于 `/data/shadowmount/`
+- **ShadowMount+**：由可选的外部 `onionHEN-shadowmountplus-plugin` 提供；daemon 负责进程生命周期，插件通过动态 UI 提供立即扫描操作
 - **Remote Play**：ShellUI 调用 PS5 原生 Remote Play API 完成 PIN 生成和客户端注册确认
 - **DPI（网络安装器 / Web UI）**：util 内嵌 pkg-server；浏览器上传 `.pkg` 以分块安装（TCP 9090），实时进度经 SSE（TCP 12800）刷新，UI 语言跟随工具箱/控制台系统语言（14 种）
 
@@ -416,8 +414,6 @@ struct IPCMessage {
 加载器。用户 Payload 仅由 Payload 页的明确停止操作终止；已有有效 PID 记录时，
 后续启动和自动启动请求保持现有实例。带 `.onion_plugin` descriptor 的插件则放在
 `/data/OnionHEN/plugins/`，由插件管理器独立发现、校验和管理。
-名称 `shadowmountplus` 为内置模块保留，自动启动扫描
-忽略同名用户 Payload。
 
 ### 4.4 扩展
 
@@ -441,7 +437,6 @@ struct IPCMessage {
 | 组件 | 上游 | 角色 |
 |------|------|------|
 | **kstuff-lite** | [EchoStretch/kstuff-lite](https://github.com/EchoStretch/kstuff-lite) | 提供 `kstuff.elf`；休息后 Toolbox 恢复也参考其 ShellUI PID 监视 |
-| **ShadowMountPlus** | [drakmor/ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) | 编译进 `util.elf` 的游戏扫描/挂载源码模块（固定 `1.6beta16`） |
 
 ```bash
 git submodule update --init --recursive
@@ -454,7 +449,6 @@ git submodule update --init --recursive
 |----|------|
 | **7zip-sdk (LZMA)** | unpacker 解压 bootstrapper |
 | **cJSON** | JSON（通知、IPC 载荷等） |
-| **sqlite** | 公有领域 amalgamation；ShadowMount+ 模块的 app 数据库 |
 
 金手指解析器使用 `third_party/cheat_support/` 内直接编译的 AES、base64、miniz、SHA-256 实现。
 

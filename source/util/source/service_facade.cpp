@@ -6,7 +6,6 @@
 #include <onion/platform.h>
 
 #include "pkgserver_adapter.h"
-#include "shadowmount_service.h"
 #include "util_language.h"
 
 #include <stddef.h>
@@ -195,104 +194,6 @@ bool PkgNetServiceFacade::running() const {
 
 PkgNetServiceFacade &pkgNetService() {
   static PkgNetServiceFacade service;
-  return service;
-}
-
-/* ShadowMount+ runs in one facade-owned worker thread, with third-party
- * details confined to the adapter (shadowmount_main.cpp). */
-
-struct ShadowMountRuntime {
-  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  pthread_mutex_t operation_mutex = PTHREAD_MUTEX_INITIALIZER;
-  pthread_t thread = {};
-  bool running = false;
-  bool thread_created = false;
-};
-
-ShadowMountRuntime g_shadowmount_runtime;
-
-void *shadowmount_thread_main(void *arg) {
-  (void)arg;
-  const int result = shadowmount_module_main();
-
-  pthread_mutex_lock(&g_shadowmount_runtime.mutex);
-  g_shadowmount_runtime.running = false;
-  pthread_mutex_unlock(&g_shadowmount_runtime.mutex);
-
-  if (result != 0) {
-    LOG_ERROR("shadowmount stopped with error %d", result);
-  } else {
-    LOG_INFO("shadowmount module stopped");
-  }
-  return nullptr;
-}
-
-void shadowmount_stop_thread() {
-  pthread_t thread = {};
-  bool join = false;
-
-  pthread_mutex_lock(&g_shadowmount_runtime.mutex);
-  if (g_shadowmount_runtime.thread_created) {
-    shadowmount_module_request_stop();
-    thread = g_shadowmount_runtime.thread;
-    join = true;
-  }
-  pthread_mutex_unlock(&g_shadowmount_runtime.mutex);
-
-  if (!join) {
-    return;
-  }
-
-  pthread_join(thread, nullptr);
-  pthread_mutex_lock(&g_shadowmount_runtime.mutex);
-  g_shadowmount_runtime.running = false;
-  g_shadowmount_runtime.thread_created = false;
-  pthread_mutex_unlock(&g_shadowmount_runtime.mutex);
-}
-
-bool ShadowMountServiceFacade::start() {
-  pthread_mutex_lock(&g_shadowmount_runtime.operation_mutex);
-  shadowmount_stop_thread();
-
-  bool ok = true;
-  pthread_mutex_lock(&g_shadowmount_runtime.mutex);
-  g_shadowmount_runtime.running = true;
-  const int rc = pthread_create(&g_shadowmount_runtime.thread, nullptr,
-                                shadowmount_thread_main, nullptr);
-  if (rc == 0) {
-    g_shadowmount_runtime.thread_created = true;
-  } else {
-    g_shadowmount_runtime.running = false;
-    ok = false;
-  }
-  pthread_mutex_unlock(&g_shadowmount_runtime.mutex);
-
-  if (!ok) {
-    pthread_mutex_unlock(&g_shadowmount_runtime.operation_mutex);
-    LOG_ERROR("Failed to create shadowmount thread: %d", rc);
-    return false;
-  }
-  pthread_mutex_unlock(&g_shadowmount_runtime.operation_mutex);
-
-  LOG_INFO("shadowmount module started");
-  return true;
-}
-
-void ShadowMountServiceFacade::stop() {
-  pthread_mutex_lock(&g_shadowmount_runtime.operation_mutex);
-  shadowmount_stop_thread();
-  pthread_mutex_unlock(&g_shadowmount_runtime.operation_mutex);
-}
-
-bool ShadowMountServiceFacade::running() const {
-  pthread_mutex_lock(&g_shadowmount_runtime.mutex);
-  const bool value = g_shadowmount_runtime.running;
-  pthread_mutex_unlock(&g_shadowmount_runtime.mutex);
-  return value;
-}
-
-ShadowMountServiceFacade &shadowMountService() {
-  static ShadowMountServiceFacade service;
   return service;
 }
 

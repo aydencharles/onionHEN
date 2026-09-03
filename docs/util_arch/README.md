@@ -76,7 +76,7 @@ source/util/
 │   ├── main.cpp                 # 生命周期编排
 │   ├── msg.cpp                  # Unix IPC 服务端传输
 │   ├── ipc_handle.cpp           # BREW_UTIL_* 命令分发
-│   ├── service_facade.cpp       # ShadowMount+ / DPI 服务生命周期
+│   ├── service_facade.cpp       # DPI 服务生命周期
 │   ├── common_utils.c           # 通知 / ptrace attach / 通用工具
 │   ├── faulthandler.c           # 信号与崩溃落盘
 │   ├── cpp_service.cpp          # IP 线程
@@ -102,7 +102,6 @@ source/util/
 | IPC commands | `ipc_handle.cpp` | IPC client 线程调用 |
 | Logging / notify | `common_utils.c` | 几乎全部 |
 | Platform | `util_platform.c` | cheats、可被其它业务复用 |
-| ShadowMount+ | `shadowmount_main.cpp` + `third_party/ShadowMountPlus` | main / IPC |
 | DPI | `pkgserver_adapter.h` + `third_party/pkgserver` | main / IPC |
 | Cheat sync | `cheats/sync/*` | IPC 后台任务 |
 | IP poll | `cpp_service.cpp` | main 启动 |
@@ -130,7 +129,6 @@ CheatService ──► Repository / ParserFactory / Applier ──► util_platf
 | IPC accept | `IPC_loop` | 常驻 | accept Unix 连接 |
 | IPC client | `ipc_client`（每连接一个，detach） | 连接级 | 读 `IPCMessage` → `handleIPC` |
 | IP poll | `start_ip_thread` | 常驻 | 刷新本机 IP 字符串 |
-| ShadowMount+ | `ShadowMountServiceFacade::start` | 配置启用期间 | 扫描/挂载/安装游戏镜像 |
 | DPI pkg-server | `PkgNetServiceFacade::start` | 配置启用期间 | pkg 上传/安装 API + Web UI |
 | Cheat sync | `CheatSyncService::start` | 单次任务 | HTTPS 下载、解压与安装 catalog |
 
@@ -162,8 +160,7 @@ struct IPCMessage {
 | `TEST_CONNECTION` | util 可用性探测 | IPC reply |
 | `DAEMON_PID` | 返回 util pid | `getpid` |
 | `UNUSED_FTP_TOGGLE` / `UNUSED_FTP_STATUS` / `UNUSED_FTP_RECOVER` | 仅保留旧版 IPC 数值 | 不处理 |
-| `TOGGLE_SHADOWMOUNT` | 启停 ShadowMount+ 模块 | `ShadowMountServiceFacade` |
-| `SHADOWMOUNT_STATUS` | 返回 ShadowMount+ 运行状态 | `ShadowMountServiceFacade` |
+| `UNUSED_SHADOWMOUNT_TOGGLE` / `UNUSED_SHADOWMOUNT_STATUS` | 仅保留旧版 IPC 数值 | 不处理 |
 | `TOGGLE_PKGNET` | 启停 DPI pkg-server | `PkgNetServiceFacade` |
 | `PKGNET_STATUS` | 返回 pkg-server 运行状态 | `PkgNetServiceFacade` |
 | `SET_SYSTEM_LANG` | 推送系统语言变化（daemon 轮询） | util 刷新 SCE 语言 + Web UI 语言 |

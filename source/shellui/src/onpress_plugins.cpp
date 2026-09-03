@@ -70,28 +70,6 @@ OnPressResult external_plugin_control(OnPressContext &ctx) {
 
 } // namespace
 
-/* ShadowMount+ run is a button: read the live module state from util, flip
- * it, and report through notifications. The page carries no toggle state for
- * this control. */
-OnPressResult onpress_shadowmount_run(OnPressContext &ctx) {
-  ctx.dirty = false;
-  const bool running = IPC_Client::getInstance(true).ShadowMountStatus();
-  if (IPC_Client::getInstance(true).ToggleSetting(BREW_UTIL_TOGGLE_SHADOWMOUNT,
-                                                  !running) !=
-      IPC_Ret::NO_ERROR) {
-    notify("notify.shadowmount.toggle_failed");
-    return OnPressResult::EarlyReturn;
-  }
-  notify(running ? "notify.shadowmount.disabled" : "notify.shadowmount.enabled");
-  return OnPressResult::Consumed;
-}
-
-OnPressResult onpress_shadowmount_autoload(OnPressContext &ctx) {
-  return toggle_next_boot(ctx, g_settings.shadowmount_autoload,
-                          "notify.shadowmount.next_boot_on",
-                          "notify.shadowmount.next_boot_off");
-}
-
 /* Network package installer toggles. Run controls the in-process DPI server
  * (TCP 9090) for this session only; autoload persists the next-boot state. */
 OnPressResult onpress_pkgnet_run(OnPressContext &ctx) {
@@ -117,8 +95,6 @@ OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx) {
 static const OnPressExactEntry kPluginsExact[] = {
     {"id_plugin_kstuff_autoload", onpress_kstuff_autoload},
     {"id_plugin_delete_kstuff", onpress_delete_kstuff},
-    {"id_plugin_shadowmount_run", onpress_shadowmount_run},
-    {"id_plugin_shadowmount_autoload", onpress_shadowmount_autoload},
     {"id_pkgnet_run", onpress_pkgnet_run},
     {"id_pkgnet_autoload", onpress_pkgnet_autoload},
 };

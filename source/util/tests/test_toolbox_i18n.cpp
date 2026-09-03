@@ -16,8 +16,6 @@ static int test_default_zh(void) {
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game"), "游戏辅助") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game.sub"),
                                "管理游戏金手指与下载金手指合集") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("shadowmount.run"),
-                               "立即运行 ShadowMount+") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.display"), "监控与显示") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.display.sub"),
                                "游戏覆盖层、主菜单显示与游戏选项入口") == 0);
@@ -76,12 +74,6 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(std::strcmp(tr("group.game.sub"),
                                "Manage cheats and download the cheat "
                                "collection") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("shadowmount.run"),
-                               "Run ShadowMount+ now") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("shadowmount.autoload"),
-                               "Start ShadowMount+ with OnionHEN") == 0);
-  TEST_ASSERT_TRUE(std::strcmp(tr("plugin.shadowmount.title"),
-                               "ShadowMount+") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("group.display.sub"),
                                "In-game overlay, home menu display, and game "
                                "options entry") == 0);

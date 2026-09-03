@@ -19,15 +19,4 @@ public:
 
 PkgNetServiceFacade &pkgNetService();
 
-class ShadowMountServiceFacade {
-public:
-  /** Start the in-process ShadowMount+ module on a worker thread. */
-  bool start();
-  /** Request module shutdown and join its worker; idempotent. */
-  void stop();
-  bool running() const;
-};
-
-ShadowMountServiceFacade &shadowMountService();
-
 } // namespace onion::services

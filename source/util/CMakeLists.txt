@@ -34,42 +34,6 @@ file(GLOB SrcFiles CONFIGURE_DEPENDS
  
 )
 
-# ShadowMountPlus is linked into util as a pinned third-party module. Its
-# standalone main is excluded; the service facade and shadowmount_main.cpp own
-# the lifecycle.
-set(SHADOWMOUNT_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/ShadowMountPlus")
-set(SHADOWMOUNT_SOURCES
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_appdb.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_config_mount.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_fakelib.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_filesystem.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_gameinfo.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_game_cache.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_game_lifecycle.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_image.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_image_cache.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_install.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_install_queue.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_kstuff.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_log.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_manual.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_mdbg.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_mount_device.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_path_state.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_path_utils.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_scan.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_scan_tree.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_scanner.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_shellcore_flags.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_stability.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_time.c"
-  "${SHADOWMOUNT_SOURCE_DIR}/src/sm_title_state.c"
-)
-
-# The PS5 payload SDK does not ship libsqlite3; the public-domain amalgamation
-# is vendored and compiled like the rest of third_party.
-set(ONION_SQLITE_SOURCES "${ONIONHEN_THIRD_PARTY_DIR}/sqlite/sqlite3.c")
-
 # DPI package install server (network installer) is linked into util. The
 # vendored standalone's main was renamed to pkg_server_main and the service
 # facade owns the worker thread and lifecycle.
@@ -97,8 +61,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-error
 set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
-target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles}
-  ${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES} ${PKGNET_SOURCES}
+target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles} ${PKGNET_SOURCES}
   "${ONIONHEN_COMMON_DIR}/elfldr_remote.c")
 onion_target_debug_define(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -130,18 +93,11 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
 	CURL_STATICLIB
 	ONION_CURL_CA_BUNDLE="${ONION_CURL_CA_BUNDLE}"
-  SHADOWMOUNT_VERSION="OnionHEN shadowmount module"
-  ONIONHEN_SHADOWMOUNT_TEMPLATE="${SHADOWMOUNT_SOURCE_DIR}/config.ini.example"
-  ONIONHEN_SHADOWMOUNT_ICON="${SHADOWMOUNT_SOURCE_DIR}/smp_icon.png"
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 	"${ONION_CURL_ROOT}/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "${PKGNET_SOURCE_DIR}"
   "${PKGNET_SOURCE_DIR}/include")
-target_include_directories(${PROJECT_NAME} PRIVATE
-  "${SHADOWMOUNT_SOURCE_DIR}"
-  "${SHADOWMOUNT_SOURCE_DIR}/include"
-  "${ONIONHEN_THIRD_PARTY_DIR}/sqlite")
 # The CA bundle is embedded with .incbin, which is invisible to the compiler's
 # normal dependency scanner.
 set_source_files_properties(
@@ -150,9 +106,6 @@ set_source_files_properties(
 )
 set_source_files_properties(${PKGNET_SOURCES} PROPERTIES
   COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
-set_source_files_properties(${SHADOWMOUNT_SOURCES} ${ONION_SQLITE_SOURCES}
-  PROPERTIES COMPILE_FLAGS
-  "-Wno-error -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function")
 target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONIONHEN_PS5_STUB_DIR}"
   "${ONIONHEN_THIRD_PARTY_DIR}/keystone/lib"

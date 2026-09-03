@@ -301,15 +301,6 @@ IPC_Ret IPC_Client::ToggleSetting(DaemonCommands cmd, bool turn_on) {
   return IPC_Ret::NO_ERROR;
 }
 
-bool IPC_Client::ShadowMountStatus() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_SHADOWMOUNT_STATUS, ipc_msg)) {
-    LOG_ERROR("Failed to query ShadowMount service status");
-    return false;
-  }
-  return ipc_msg == "1" || ipc_msg == "true";
-}
-
 bool IPC_Client::PkgNetStatus() {
   std::string ipc_msg;
   if (!IPCSendCommand(BREW_UTIL_PKGNET_STATUS, ipc_msg)) {

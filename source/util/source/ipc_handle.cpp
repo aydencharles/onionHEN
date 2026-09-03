@@ -105,23 +105,6 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false, out_var);
     break;
   }
-  case BREW_UTIL_TOGGLE_SHADOWMOUNT: {
-    const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
-                                                            "toggle");
-    const bool enabled = toggle && cJSON_IsNumber(toggle) && toggle->valueint;
-    bool ok = true;
-    if (enabled)
-      ok = onion::services::shadowMountService().start();
-    else
-      onion::services::shadowMountService().stop();
-    reply(sender_app, !ok);
-    break;
-  }
-  case BREW_UTIL_SHADOWMOUNT_STATUS: {
-    reply(sender_app, false,
-          onion::services::shadowMountService().running() ? "1" : "0");
-    break;
-  }
   case BREW_UTIL_TOGGLE_PKGNET: {
     const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
                                                             "toggle");
@@ -145,6 +128,8 @@ void handleIPC(clientArgs *client, std::string &inputStr,
   case BREW_UTIL_UNUSED_LEGACY_SERVICE_TOGGLE:
   case BREW_UTIL_UNUSED_KLOG:
   case BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY:
+  case BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE:
+  case BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS:
     /* Removed scan-now / Klog / rest-standby IPC; ordinals stay stable. */
     LOG_WARN("Removed-service toggle: unsupported (cmd=%u)", static_cast<unsigned>(command));
     reply(sender_app, true);

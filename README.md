@@ -66,7 +66,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **fSELF / fPKG** — bundled kstuff for homebrew SELF / PKG; loads by default, can be turned off in the Toolbox
 - **Plugin runtime** — discovers, validates, starts, stops, reloads, and removes descriptor-bearing plugin ELFs
 - **PS5 FTP server** — available as the optional external `onionHEN-ftpsrv-plugin`
-- **ShadowMount+** — built-in plugin that scans and mounts games from internal or external storage
+- **ShadowMount+** — available as the optional external `onionHEN-shadowmountplus-plugin`
 - **Remote Play pairing** — enable the native PS5 Remote Play service, generate a pairing PIN, and register a client from the Network section
 - **User payload manager** — start and stop user-provided `.elf` payloads, with optional auto-start
 - **Game overlay** — an in-game bar for FPS, CPU, GPU, RAM, temperatures, and network info
@@ -104,9 +104,8 @@ Startup is sequential. After the first hop, OnionHEN uses its own
 OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstuff.elf → daemon.elf → Toolbox
 ```
 
-If `shadowmount.autoload` is enabled, the built-in ShadowMount+ module starts
-after `kstuff` and before the daemon. External plugins are discovered and
-started by the daemon afterward.
+External plugins are discovered and started by the daemon after `kstuff` is
+ready.
 
 ### FTP server
 
@@ -119,14 +118,12 @@ restart controls. The plugin retains upstream `ftpsrv` commands such as
 
 ### ShadowMount+
 
-ShadowMount+ is available from **Toolbox → Payloads & Kernel → Plugins →
-ShadowMount+**. One button
-starts or stops it in the current session; a separate switch starts it the next
-time OnionHEN launches. The module scans supported game dumps from internal and
-external storage (`.ffpkg`, UFS, exFAT, PFS, and nested compressed PFS
-containers), mounts them, and installs them in the background. It requires
-`kstuff` and reads its own options from `/data/shadowmount/config.ini`; scan
-paths can be overridden there with `scanpath=` entries.
+ShadowMount+ is provided by the optional external
+[`onionHEN-shadowmountplus-plugin`](https://github.com/OnionBuddies/onionHEN-shadowmountplus-plugin).
+Install its descriptor-bearing ELF under `/data/OnionHEN/plugins/`; the daemon
+then owns discovery, start, stop, reload, replacement, and removal. Its dynamic
+page provides an immediate scan action. The plugin requires `kstuff` and keeps
+its own options under `/data/shadowmount/config.ini`.
 
 ### DPI (network package installer)
 
@@ -170,9 +167,8 @@ OnionHEN remembers that choice with a matching `.auto_start` file next to the EL
 
 All `.elf` filenames use the same Payload page, loader, and auto-start flow. A
 recorded running instance is left running by later launch and auto-start
-requests. The name `shadowmountplus` is reserved for the built-in module and is
-ignored by the user-payload auto-start scan. OnionHEN plugins are a separate
-category and belong in `/data/OnionHEN/plugins/`.
+requests. OnionHEN plugins are a separate category and belong in
+`/data/OnionHEN/plugins/`.
 
 ### Cheats
 
@@ -209,11 +205,6 @@ Cheats load from disk. If a file changes, OnionHEN reloads it without restarting
 | Clang / LLVM | Compile the `x86_64-sie-ps5` targets |
 | `lzma` or `xz` | Compress the bootstrapper |
 | Git and `curl` or `wget` | Initialize submodules and fetch external payload inputs |
-
-The pinned
-[`drakmor/ShadowMountPlus`](https://github.com/drakmor/ShadowMountPlus)
-`1.6beta16` sources (game scanner/mounter module) and a vendored SQLite
-amalgamation used by it are also compiled into `util.elf`.
 
 ### Full build
 
@@ -311,7 +302,6 @@ default from [`config.ini.example`](config.ini.example).
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
-| `shadowmount.autoload` | `false` | `true`, `false` |
 | `pkgnet.autoload` | `false` | `true`, `false` |
 
 ### Runtime data
@@ -323,8 +313,6 @@ default from [`config.ini.example`](config.ini.example).
 | `/data/OnionHEN/cheats/` | Cheat files |
 | `/data/OnionHEN/cheats_tmp/` | Temporary HTTPS ZIP and extraction files, cleaned after sync |
 | `/data/OnionHEN/kstuff.elf` | Optional runtime override with priority over the embedded `kstuff` |
-| `/data/shadowmount/config.ini` | ShadowMount+ module options (created from the bundled template on first run) |
-| `/data/shadowmount/debug.log` | ShadowMount+ module log |
 | `/data/OnionHEN/OnionHEN.log` | Main runtime log |
 | `/data/OnionHEN/OnionHEN_crash.log` | Preserved daemon signal and backtrace log |
 | `/data/OnionHEN/OnionHEN_util_daemon.log` | Utility daemon log |
@@ -433,8 +421,7 @@ OnionHEN exists because of the PS5 homebrew and reverse-engineering community.
 - [elfldr](https://github.com/ps5-payload-dev/elfldr) — first-hop loader on port 9021; not shipped in the payload
 - [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) — EchoStretch, sleirsgoevy, and contributors; optional `kstuff.elf`
 - [onionHEN-ftpsrv-plugin](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin) — optional external FTP server plugin based on drakmor/ftpsrv
-- [ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) — Drakmor; evolved from ShadowMount by VoidWhisper; in-process game scanner/mounter pinned at `1.6beta16`
-- [SQLite](https://www.sqlite.org/) — public domain amalgamation used by the ShadowMount+ module
+- [onionHEN-shadowmountplus-plugin](https://github.com/OnionBuddies/onionHEN-shadowmountplus-plugin) — optional external ShadowMount+ scanner/mounter plugin based on Drakmor's project
 - [libhijacker](https://github.com/astrelsky/libhijacker) — astrelsky; process hijack and kernel R/W
 - [NineS](https://github.com/buzzer-re/NineS) — buzzer-re; ShellUI injection
 - [cJSON](https://github.com/DaveGamble/cJSON) — JSON parsing

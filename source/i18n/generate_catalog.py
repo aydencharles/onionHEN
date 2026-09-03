@@ -26,19 +26,14 @@ DUPLICATED_INTERNAL_SPACE = re.compile(r"\S {2,}\S")
 
 REQUIRED_TOKENS = {
     "toolbox": {
-        "group.payloads.sub": ("Kstuff", "ShadowMount+"),
-        "shadowmount.run": ("ShadowMount+",),
-        "shadowmount.autoload": ("ShadowMount+",),
-        "plugin.shadowmount.title": ("ShadowMount+",),
-        "plugins.link.sub": ("Kstuff", "ShadowMount+"),
+        "group.payloads.sub": ("Kstuff",),
+        "plugins.link.sub": ("Kstuff",),
     },
     "notifications": {
         "notify.kstuff.loading": ("Kstuff",),
         "notify.kstuff.load_failed": ("Kstuff",),
         "notify.kstuff.load_elfldr_failed": ("Kstuff",),
         "notify.kstuff.deleted": ("Kstuff",),
-        "notify.shadowmount.enabled": ("ShadowMount+",),
-        "notify.shadowmount.disabled": ("ShadowMount+",),
         "notify.crash.main": (
             "OnionHEN_crash.log",
             "https://github.com/aydencharles/onionHEN/issues",

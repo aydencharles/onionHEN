@@ -67,7 +67,7 @@ void set_action_sink(ActionSink sink, void *context) {
   runtime.action_context = context;
 }
 
-void append_plugin_links(ps5ui::Page &page) {
+std::vector<PluginSettingsLink> plugin_settings_links() {
   RuntimeState &runtime = state();
   std::lock_guard<std::mutex> lock(runtime.mutex);
   std::vector<const plugin_ui::ContributionSnapshot *> entries;
@@ -83,13 +83,35 @@ void append_plugin_links(ps5ui::Page &page) {
                 return left->document->priority > right->document->priority;
               return left->document->plugin_id < right->document->plugin_id;
             });
+  std::vector<PluginSettingsLink> links;
+  links.reserve(entries.size());
   for (const plugin_ui::ContributionSnapshot *entry : entries) {
     const plugin_ui::Document &document = *entry->document;
-    page.link(control_id(document, document.root_page_id), document.title,
-              resource_name(document, document.root_page_id),
-              document.description.empty()
+    links.push_back({document.plugin_id,
+                     control_id(document, document.root_page_id),
+                     document.title,
+                     resource_name(document, document.root_page_id),
+                     document.description});
+  }
+  return links;
+}
+
+void append_plugin_links(ps5ui::Page &page,
+                         const std::vector<std::string> &matched_link_ids) {
+  append_plugin_links(page, plugin_settings_links(), matched_link_ids);
+}
+
+void append_plugin_links(
+    ps5ui::Page &page, const std::vector<PluginSettingsLink> &links,
+    const std::vector<std::string> &matched_link_ids) {
+  for (const PluginSettingsLink &link : links) {
+    if (std::find(matched_link_ids.begin(), matched_link_ids.end(),
+                  link.control_id) != matched_link_ids.end())
+      continue;
+    page.link(link.control_id, link.title, link.resource,
+              link.description.empty()
                   ? std::optional<std::string>{}
-                  : std::optional<std::string>{document.description});
+                  : std::optional<std::string>{link.description});
   }
 }
 

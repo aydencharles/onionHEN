@@ -319,8 +319,10 @@ void generate_plugins_xml(std::string& xml_buffer) {
     page.link(d.toggle_id, toolbox_i18n::tr(d.title_key), d.config_xml,
               toolbox_i18n::tr(d.sub_key));
 
-  onion::shellui::external_plugins::append_inventory(page);
-  onion::shellui::dynamic_ui::append_plugin_links(page);
+  const auto settings = onion::shellui::dynamic_ui::plugin_settings_links();
+  const auto matched = onion::shellui::external_plugins::append_inventory(
+      page, settings);
+  onion::shellui::dynamic_ui::append_plugin_links(page, settings, matched);
 
   xml_buffer = page.build();
 }

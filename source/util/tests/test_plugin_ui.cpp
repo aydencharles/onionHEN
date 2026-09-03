@@ -311,10 +311,20 @@ int test_registry_and_renderer(void) {
 
   onion::shellui::dynamic_ui::configure(0x09000000);
   onion::shellui::dynamic_ui::replace_snapshot(snapshot);
+  const auto settings_links =
+      onion::shellui::dynamic_ui::plugin_settings_links();
+  TEST_ASSERT_EQ_U64(1, settings_links.size());
+  TEST_ASSERT_STREQ("TEST00001", settings_links[0].plugin_id.c_str());
+  TEST_ASSERT_TRUE(!settings_links[0].resource.empty());
   ps5ui::Page plugin_page("plugins", "Plugins");
   onion::shellui::dynamic_ui::append_plugin_links(plugin_page);
   const std::string plugin_xml = plugin_page.build();
   TEST_ASSERT_TRUE(plugin_xml.find("Plugin &amp; Settings") != std::string::npos);
+  ps5ui::Page matched_page("plugins", "Plugins");
+  onion::shellui::dynamic_ui::append_plugin_links(
+      matched_page, settings_links, {settings_links[0].control_id});
+  TEST_ASSERT_TRUE(matched_page.build().find("Plugin &amp; Settings") ==
+                   std::string::npos);
   std::string runtime_xml;
   const std::string root_resource =
       onion::shellui::dynamic_ui::resource_name(*entry->document, "main");

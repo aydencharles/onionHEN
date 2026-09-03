@@ -45,6 +45,9 @@ source/aerolib.csv
 # Machine-local helpers (firmware dump verifiers, etc.)
 /.local/
 
+# Local design notes (not for version control)
+/PLUGIN_ROADMAP.md
+
 # Web UI (built by scripts/build.sh into a single-file bundle)
 source/webui/node_modules/
 source/webui/dist/

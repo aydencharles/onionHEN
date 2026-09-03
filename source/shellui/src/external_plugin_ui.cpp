@@ -1,6 +1,7 @@
 #include "external_plugin_ui.hpp"
 
 #include "toolbox_i18n.hpp"
+#include "dynamic_ui_runtime.hpp"
 
 #include <onion/ipc_client.hpp>
 
@@ -25,10 +26,13 @@ bool split_control(std::string_view control_id, std::string_view prefix,
 
 } // namespace
 
-void append_inventory(ps5ui::Page &page) {
+std::vector<std::string> append_inventory(
+    ps5ui::Page &page,
+    const std::vector<dynamic_ui::PluginSettingsLink> &settings) {
+  std::vector<std::string> matched;
   std::vector<PluginInventoryItem> plugins;
   const bool loaded = IPC_Client::getInstance(false).ListPlugins(plugins);
-  if (loaded && plugins.empty()) return;
+  if (loaded && plugins.empty()) return matched;
 
   page.group(
       "id_external_plugins", toolbox_i18n::tr("plugins.external.group"),
@@ -58,11 +62,22 @@ void append_inventory(ps5ui::Page &page) {
                         ps5ui::Style::None,
                         toolbox_i18n::tr("plugins.external.delete.confirm"),
                         toolbox_i18n::tr("account.activate.confirm_phrase"));
+                for (const dynamic_ui::PluginSettingsLink &link : settings) {
+                  if (link.plugin_id != plugin.plugin_id) continue;
+                  controls.link("id_external_plugin_settings_" + plugin.plugin_id,
+                                link.title, link.resource,
+                                link.description.empty()
+                                    ? std::optional<std::string>{}
+                                    : std::optional<std::string>{link.description});
+                  matched.push_back(link.control_id);
+                  break;
+                }
               },
               details);
         }
       },
       toolbox_i18n::tr("plugins.external.group.sub"));
+  return matched;
 }
 
 DispatchResult dispatch(std::string_view control_id, std::string_view value) {

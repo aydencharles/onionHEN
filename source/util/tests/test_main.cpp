@@ -37,9 +37,6 @@ extern "C" int test_toolbox_i18n_suite(void);
 extern "C" int test_overlay_text_metrics_suite(void);
 extern "C" int test_overlay_layout_suite(void);
 extern "C" int test_fps_formula_suite(void);
-extern "C" int test_builtin_services_suite(void);
-extern "C" int test_multipart_suite(void);
-extern "C" int test_toolbox_pkg_xml_suite(void);
 extern "C" int test_plugin_ui_suite(void);
 extern "C" int test_plugin_manager_suite(void);
 
@@ -83,9 +80,6 @@ int main() {
   failures += test_overlay_text_metrics_suite();
   failures += test_overlay_layout_suite();
   failures += test_fps_formula_suite();
-  failures += test_builtin_services_suite();
-  failures += test_multipart_suite();
-  failures += test_toolbox_pkg_xml_suite();
   failures += test_plugin_ui_suite();
   failures += test_plugin_manager_suite();
 

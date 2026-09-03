@@ -7,36 +7,6 @@
 
 namespace {
 
-OnPressResult toggle_plugin_now(OnPressContext &ctx, DaemonCommands cmd,
-                                bool (*is_running)(),
-                                const char *fail_notify,
-                                const char *on_notify, const char *off_notify) {
-  ctx.dirty = false;
-  const bool enabled = value_as_int(ctx);
-  /* Stop is idempotent and must clear util's desired state even when a
-   * listener failed before the UI could observe it as running. */
-  if (enabled && is_running())
-    return OnPressResult::EarlyReturn;
-
-  if (IPC_Client::getInstance(true).ToggleSetting(cmd, enabled) !=
-      IPC_Ret::NO_ERROR) {
-    notify(fail_notify);
-    return OnPressResult::EarlyReturn;
-  }
-  notify(enabled ? on_notify : off_notify);
-  return OnPressResult::Handled;
-}
-
-OnPressResult toggle_next_boot(OnPressContext &ctx, bool &field,
-                               const char *on_notify, const char *off_notify) {
-  const bool enabled = value_as_int(ctx);
-  if (enabled == field)
-    return OnPressResult::EarlyReturn;
-  field = enabled;
-  notify(enabled ? on_notify : off_notify);
-  return OnPressResult::Handled;
-}
-
 OnPressResult external_plugin_control(OnPressContext &ctx) {
   ctx.dirty = false;
   const onion::shellui::external_plugins::DispatchResult result =
@@ -70,22 +40,6 @@ OnPressResult external_plugin_control(OnPressContext &ctx) {
 
 } // namespace
 
-/* Network package installer toggles. Run controls the in-process DPI server
- * (TCP 9090) for this session only; autoload persists the next-boot state. */
-OnPressResult onpress_pkgnet_run(OnPressContext &ctx) {
-  return toggle_plugin_now(
-      ctx, BREW_UTIL_TOGGLE_PKGNET,
-      +[]() { return IPC_Client::getInstance(true).PkgNetStatus(); },
-      "notify.pkgnet.toggle_failed", "notify.pkgnet.enabled",
-      "notify.pkgnet.disabled");
-}
-
-OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx) {
-  return toggle_next_boot(ctx, g_settings.pkgnet_autoload,
-                          "notify.pkgnet.next_boot_on",
-                          "notify.pkgnet.next_boot_off");
-}
-
 /*
  * The Plugins page lists each built-in plugin as a <link> that the stock
  * settings UI navigates natively (file="<plugin>.xml"). Each plugin's config
@@ -95,8 +49,6 @@ OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx) {
 static const OnPressExactEntry kPluginsExact[] = {
     {"id_plugin_kstuff_autoload", onpress_kstuff_autoload},
     {"id_plugin_delete_kstuff", onpress_delete_kstuff},
-    {"id_pkgnet_run", onpress_pkgnet_run},
-    {"id_pkgnet_autoload", onpress_pkgnet_autoload},
 };
 
 static const OnPressPrefixEntry kPluginsPrefix[] = {

@@ -22,8 +22,6 @@ enum class Page : unsigned char {
   Plapps,
   CheatProgress,
   RemotePlay,
-  PkgInstaller,      /**< package installer source chooser (USB / network) */
-  PkgNet,            /**< network package installer toggles */
   DynamicPlugin,     /**< SDK-provided UI contribution page */
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
@@ -55,8 +53,6 @@ struct RouteFlags {
   bool is_plapps = false;
   bool is_cheat_progress = false;
   bool is_remote_play = false;
-  bool is_pkg_installer = false;
-  bool is_pkg_net = false;
 };
 
 struct RouteResult {
@@ -71,8 +67,7 @@ RouteResult resolve_resource(const RouteInput &in);
 /** Child routes whose page-stack pop should restore the owning parent route. */
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
-         page == Page::PluginConfig || page == Page::PkgInstaller ||
-         page == Page::PkgNet || page == Page::DynamicPlugin;
+         page == Page::PluginConfig || page == Page::DynamicPlugin;
 }
 
 /** Fixed Legacy resource paths (Sony Settings.Plugins module name is fixed). */
@@ -88,10 +83,6 @@ inline constexpr std::string_view kCheatProgressXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.cheat_progress.xml";
 inline constexpr std::string_view kRemotePlayXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.remote_play.xml";
-inline constexpr std::string_view kPkgInstallerXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.pkg_installer.xml";
-inline constexpr std::string_view kPkgNetXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.pkg_net.xml";
 inline constexpr std::string_view kSuperuserXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.superuser.xml";
 inline constexpr std::string_view kOgDebugXml =

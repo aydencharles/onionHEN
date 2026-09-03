@@ -71,7 +71,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **User payload manager** — start and stop user-provided `.elf` payloads, with optional auto-start
 - **Game overlay** — an in-game bar for FPS, CPU, GPU, RAM, temperatures, and network info
 - **Cheat engine** — local JSON, SHN, MC4, and ShnExt files that can be toggled at runtime
-- **DPI (network package installer)** — a browser-based pkg installer on the console: drag-and-drop PS4/PS5 `.pkg` files over a chunk-upload API with per-file package-kind detection and staged-file reuse for retries, live SSE progress (speed and estimated remaining time), a sortable install queue with move-up/down and per-file retry, and toast notifications on every state change. The UI ships in the same 14 languages as the Toolbox, follows `toolbox.language`, and re-syncs live when the console language changes while OnionHEN is running
+- **DPI v2** — available as the optional external `onionHEN-dpiv2-plugin`
 - **Console tools** — account activation, external HDD, Title IDs, fan control, shortcuts, and game options
 - **App jailbreak** — allowlisted homebrew can ask the daemon for extra privileges through a sandbox FIFO
 - **Resilient runtime** — the critical daemon and utility daemon run apart; the main daemon can restart the utility
@@ -127,19 +127,13 @@ its own options under `/data/shadowmount/config.ini`.
 
 ### DPI (network package installer)
 
-The network package installer is available from **Toolbox → Content Install &
-Management → Package Installer → Install content from Network** (the page that
-opens is titled *Network Installer*). One button starts or stops it for the
-current session; a separate switch starts it with the next OnionHEN launch
-(`pkgnet.autoload`). It listens on TCP **9090** for uploads/install and
-**12800** for the web UI. Open `http://<console>:12800` in a browser, drop a
-`.pkg`, and the page shows live progress, transfer speed, and an estimated
-remaining time before Sony's install runs.
-
-The web UI ships in the same 14 languages as the Toolbox. With
-`toolbox.language=system` it follows the console system language and updates
-live if the console language changes while OnionHEN is running. See
-[docs/api.md](docs/api.md) for the complete API.
+DPI v2 is provided by the optional external
+[`onionHEN-dpiv2-plugin`](https://github.com/OnionBuddies/onionHEN-dpiv2-plugin).
+Install it as `/data/OnionHEN/plugins/DPIV00001.elf`; OnionHEN discovers and
+starts it, and its dynamic settings page provides enable, API port, WebUI port,
+and restart controls. The browser remains the installer interface, including
+chunked uploads, queue management, staged-file reuse, and SSE progress. The
+default WebUI URL is `http://<console>:12800`.
 
 ### Remote Play
 
@@ -302,7 +296,6 @@ default from [`config.ini.example`](config.ini.example).
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
-| `pkgnet.autoload` | `false` | `true`, `false` |
 
 ### Runtime data
 
@@ -316,7 +309,6 @@ default from [`config.ini.example`](config.ini.example).
 | `/data/OnionHEN/OnionHEN.log` | Main runtime log |
 | `/data/OnionHEN/OnionHEN_crash.log` | Preserved daemon signal and backtrace log |
 | `/data/OnionHEN/OnionHEN_util_daemon.log` | Utility daemon log |
-| `/user/data/tmp/` | Staged pkg uploads of the network installer, reused until finalize |
 
 <br>
 
@@ -343,7 +335,6 @@ default from [`config.ini.example`](config.ini.example).
 │   ├── daemon/                Critical daemon and Toolbox injection
 │   ├── util/                  Utility daemon, IPC, and cheats
 │   ├── shellui/               Toolbox and ShellUI hooks
-│   ├── webui/                 Browser pkg-installer UI source (single-file bundle)
 │   ├── i18n/                  Shared Toolbox / notification locale catalogs
 │   ├── unpacker/              Final OnionHEN payload wrapper
 │   ├── libonion_*/            Shared in-tree libraries

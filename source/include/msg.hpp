@@ -50,7 +50,7 @@ enum DaemonCommands : unsigned int {
   BREW_UTIL_DAEMON_PID,
   BREW_UTIL_UNUSED_FTP_TOGGLE, // was built-in FTP toggle; keep released ordinal
   BREW_UTIL_UNUSED_KLOG, // was BREW_UTIL_TOGGLE_KLOG (service removed)
-  BREW_UTIL_TOGGLE_PKGNET, // stable ordinal retained from the former DPI toggle
+  BREW_UTIL_UNUSED_DPI_TOGGLE, // was built-in DPI toggle; keep released ordinal
   BREW_UTIL_LAUNCH_PAYLOAD,
   BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY, // was SHELLUI_ON_STANDBY; toolbox follows SceSysCore EXEC
   BREW_UTIL_GET_GAME_VER,
@@ -71,7 +71,7 @@ enum DaemonCommands : unsigned int {
   BREW_UTIL_UNUSED_FTP_RECOVER = 0x8000015u,
   BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE = 0x8000016u,
   BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS = 0x8000017u,
-  BREW_UTIL_PKGNET_STATUS = 0x8000018u,
+  BREW_UTIL_UNUSED_DPI_STATUS = 0x8000018u,
   // Daemon pushes a live console system language so util re-applies it without
   // needing a SystemService query (util is under PTRACE_AUTHID after launch).
   BREW_UTIL_SET_SYSTEM_LANG = 0x8000019u,

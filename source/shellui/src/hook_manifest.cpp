@@ -23,8 +23,6 @@ void generate_plugin_config_xml(std::string &xml_buffer);
 void generate_account_xml(std::string &xml_buffer);
 void generate_plapps_xml(std::string &new_xml);
 void generate_toolbox_xml(std::string &new_xml);
-void generate_pkg_installer_xml(std::string &xml_buffer);
-void generate_pkg_net_xml(std::string &xml_buffer);
 void generate_cheats_xml(std::string &new_xml, std::string &not_open_tid,
                          bool running_as_debug_settings,
                          bool show_while_not_open);
@@ -155,12 +153,6 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     break;
   case toolbox::Page::RemotePlay:
     generate_remote_play_xml(new_xml_string);
-    break;
-  case toolbox::Page::PkgInstaller:
-    generate_pkg_installer_xml(new_xml_string);
-    break;
-  case toolbox::Page::PkgNet:
-    generate_pkg_net_xml(new_xml_string);
     break;
   default:
     return GetManifestResourceStream_Original(inst, FileName);

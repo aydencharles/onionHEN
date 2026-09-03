@@ -40,7 +40,6 @@ COMMON_FLAGS := -Wall -Wextra -g -O0 $(DEPFLAGS) -DONION_HOST_TEST=1 -DCBC=1 \
 	-I$(REPO_ROOT)/source/daemon/include \
 	-I$(THIRD_PARTY_ROOT)/cjson \
 	-I$(THIRD_PARTY_ROOT)/cheat_support \
-	-I$(THIRD_PARTY_ROOT)/pkgserver \
 	-I$(REPO_ROOT)/source/shellui/include \
 	-I$(BUILD_DIR)/generated \
 	$(KEYSTONE_CFLAGS)
@@ -95,7 +94,6 @@ PROD_CXX_SRCS := \
 	$(REPO_ROOT)/source/shellui/src/ps5_settings_ui.cpp \
 	$(REPO_ROOT)/source/shellui/src/toolbox_route.cpp \
 	$(REPO_ROOT)/source/shellui/src/toolbox_i18n.cpp \
-	$(REPO_ROOT)/source/shellui/src/toolbox_pkg_xml.cpp \
 	$(REPO_ROOT)/source/shellui/src/dynamic_ui_xml.cpp \
 	$(REPO_ROOT)/source/shellui/src/dynamic_ui_runtime.cpp \
 	$(REPO_ROOT)/source/libonion_fps/source/fps_formula.cpp
@@ -116,8 +114,6 @@ TEST_C_SRCS := \
 	test_platform_net.c \
 	test_platform_notify.c \
 	test_util_language.c \
-	test_builtin_services.c \
-	test_multipart.c \
 	test_hijack_retry.c \
 	stubs/host_stubs.c
 
@@ -137,7 +133,6 @@ TEST_CXX_SRCS := \
 	test_onpress_policy.cpp \
 	test_toolbox_helpers.cpp \
   test_toolbox_i18n.cpp \
-  test_toolbox_pkg_xml.cpp \
   test_toolbox_injection.cpp \
   test_overlay_text_metrics.cpp \
   test_overlay_layout.cpp \
@@ -158,7 +153,6 @@ PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_ready/ready.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload.o
-PROD_C_OBJS += $(BUILD_DIR)/prod/third_party/pkgserver/multipart.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_detour/hde64.o
 
 CHEAT_SUPPORT_SRCS := $(wildcard $(THIRD_PARTY_ROOT)/cheat_support/*.c)
@@ -177,7 +171,6 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/hook_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
-PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_pkg_xml.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_ui/plugin_ui.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_bridge/plugin_ui_bridge.o
@@ -209,10 +202,6 @@ $(BIN): $(ALL_OBJS) | $(BUILD_DIR)
 $(BUILD_DIR)/prod/third_party/cheat_support/%.o: $(THIRD_PARTY_ROOT)/cheat_support/%.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) $(THIRD_PARTY_FLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/prod/third_party/pkgserver/multipart.o: $(THIRD_PARTY_ROOT)/pkgserver/multipart.c | $(BUILD_DIR)
-	@mkdir -p $(dir $@)
-	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/source/cheats/cheat_engine_parser_shnext.o: $(UTIL_ROOT)/source/cheats/cheat_engine_parser_shnext.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
@@ -263,10 +252,6 @@ $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o: $(REPO_ROOT)/source/shellui/src/ps5
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/shellui/toolbox_route.o: $(REPO_ROOT)/source/shellui/src/toolbox_route.cpp | $(BUILD_DIR)
-	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
-
-$(BUILD_DIR)/prod/shellui/toolbox_pkg_xml.o: $(REPO_ROOT)/source/shellui/src/toolbox_pkg_xml.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

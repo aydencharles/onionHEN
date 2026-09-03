@@ -34,34 +34,13 @@ file(GLOB SrcFiles CONFIGURE_DEPENDS
  
 )
 
-# DPI package install server (network installer) is linked into util. The
-# vendored standalone's main was renamed to pkg_server_main and the service
-# facade owns the worker thread and lifecycle.
-set(PKGNET_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/pkgserver")
-set(PKGNET_SOURCES
-  "${PKGNET_SOURCE_DIR}/pkg_server.c"
-  "${PKGNET_SOURCE_DIR}/multipart.c"
-)
-
-# Web UI bundle (built by scripts/build.sh before configure). Embedded into
-# pkg_server.c via .incbin; rebuild the object when the bundle changes.
-set(WEBUI_INDEX "${D_CWD}/../webui/dist/index.html")
-if(NOT EXISTS "${WEBUI_INDEX}")
-	message(FATAL_ERROR
-		"WebUI bundle missing (looked in ${WEBUI_INDEX}). "
-		"Run scripts/build.sh so the Vite step produces dist/index.html.")
-endif()
-set_source_files_properties("${PKGNET_SOURCE_DIR}/pkg_server.c" PROPERTIES
-	COMPILE_DEFINITIONS "ONIONHEN_WEBUI_INDEX=\"${WEBUI_INDEX}\""
-	OBJECT_DEPENDS "${WEBUI_INDEX}")
-
 set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS} ")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -Wno-unused-const-variable -Wno-deprecated-declarations -ffunction-sections -fdata-sections")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-errors")
 set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
-target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles} ${PKGNET_SOURCES}
+target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles}
   "${ONIONHEN_COMMON_DIR}/elfldr_remote.c")
 onion_target_debug_define(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -96,16 +75,12 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 	"${ONION_CURL_ROOT}/include")
-target_include_directories(${PROJECT_NAME} PRIVATE "${PKGNET_SOURCE_DIR}"
-  "${PKGNET_SOURCE_DIR}/include")
 # The CA bundle is embedded with .incbin, which is invisible to the compiler's
 # normal dependency scanner.
 set_source_files_properties(
 	"${D_SRC}/cheats/sync/http_transport_ps5.cpp"
 	PROPERTIES OBJECT_DEPENDS "${ONION_CURL_CA_BUNDLE}"
 )
-set_source_files_properties(${PKGNET_SOURCES} PROPERTIES
-  COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
 target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONIONHEN_PS5_STUB_DIR}"
   "${ONIONHEN_THIRD_PARTY_DIR}/keystone/lib"
@@ -127,7 +102,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     hijacker
     SceSystemService
     SceUserService
-    SceAppInstUtil
     SceNotification
     SceNetCtl
     SceNet

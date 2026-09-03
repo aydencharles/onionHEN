@@ -169,7 +169,6 @@ OnionHEN/
 |------|-------------|------|
 | Cheats | IPC | flat-file cheat engine（multi-source `TITLE_VERSION[_PROCESS][_SOURCE_ID].ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | Toolbox 请求 | IPC | util 崩溃重拉后向 crit 请求 `BREW_ENABLE_TOOLBOX`；休息恢复在 daemon |
-| DPI（网络包安装器 / Web UI） | TCP **9090** + **12800** | 进程内 pkg 上传/安装服务（`third_party/pkgserver`，配置 `[pkgnet]`）；Web UI 内嵌 `source/webui/dist` 单文件页面，SSE 推送状态与进度，界面语言与工具箱一致（14 种） |
 
 `ps5/klog.h` 的 `klog_printf` / `klog_puts` 用于写入内核日志，不提供 TCP 网络服务。
 
@@ -182,7 +181,7 @@ OnionHEN/
 主要菜单能力：
 
 - 内容安装与管理（系统 PkgInstaller UI、附加内容管理）
-- Payload 与内核组件（用户 Payload；插件：kstuff、FTP、ShadowMount+）
+- Payload 与内核组件（用户 Payload；插件：kstuff 及已安装外部插件）
 - 游戏辅助（金手指引擎、OnionHEN 游戏选项）
 - 监控与显示（ShellUI 监控条、Title ID）
 - 账号激活
@@ -333,7 +332,7 @@ struct IPCMessage {
 - `BREW_UTIL_LAUNCH_PAYLOAD`
 - `BREW_UTIL_GET_GAME_VER` / `BREW_UTIL_GET_GAME_CHEAT` / `BREW_UTIL_TOGGLE_CHEAT`
 - `BREW_UTIL_DOWNLOAD_CHEATS` / `BREW_UTIL_CHEAT_SYNC_STATUS` / `BREW_UTIL_CANCEL_CHEAT_SYNC`（git catalog 同步）
-- `BREW_UTIL_SET_SYSTEM_LANG`（daemon 轮询到控制台系统语言变化时经 IPC 推送；util 重新存储 SCE 语言并刷新 notify 与 Web UI 语言）
+- `BREW_UTIL_SET_SYSTEM_LANG`（daemon 轮询到控制台系统语言变化时经 IPC 推送；util 重新存储 SCE 语言并刷新通知语言）
 
 **ABI 占位命令：**
 
@@ -341,12 +340,14 @@ struct IPCMessage {
   `BREW_UTIL_UNUSED_FTP_RECOVER` 保留旧版已发布数值，不再处理
 - `BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE` /
   `BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS` 保留旧版已发布数值，不再处理
+- `BREW_UTIL_UNUSED_DPI_TOGGLE` / `BREW_UTIL_UNUSED_DPI_STATUS`
+  保留旧版已发布数值，不再处理
 
 | 命令 | 当前行为 |
 |------|----------|
 | `BREW_UNUSED_ACTIVATE_DUMPER` | 固定占用 `0x9000004` 并返回 unsupported，保持后续命令序号稳定 |
 | `BREW_UNUSED_DECRYPT_DIR` / `BREW_UNUSED_TESTKIT_CHECK` | 返回 unsupported |
-| `BREW_UTIL_UNUSED_KLOG` / `BREW_UTIL_UNUSED_DPI` | 返回 unsupported |
+| `BREW_UTIL_UNUSED_KLOG` / `BREW_UTIL_UNUSED_DPI_TOGGLE` / `BREW_UTIL_UNUSED_DPI_STATUS` | 返回 unsupported |
 | `BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY` | 返回 unsupported；休息恢复由 daemon 的 SceSysCore `NOTE_EXEC` 处理 |
 | `BREW_UTIL_UNUSED_RELOAD_CHEATS` | 返回 unsupported；金手指按文件签名热重载 |
 | `BREW_UTIL_UNUSED_DOWNLOAD_KSTUFF` / `BREW_UTIL_UNUSED_LEGACY_CMD_SERVER` | 返回 unsupported |
@@ -368,7 +369,6 @@ struct IPCMessage {
 | `/system_tmp/onionhen/pid/<key>.PID` | 用户 Payload PID 状态 |
 | `/system_tmp/onionhen/app_launched` | ShellUI LaunchApp 返回值 |
 | `/system_tmp/onionhen/patch_plugin` | LaunchApp patch gate（外部标记；ShellUI 只读取） |
-| `/user/data/tmp/` | DPI 暂存的上传 pkg（校验通过后由系统安装） |
 
 ### 3.4 Itemzflow 兼容状态
 
@@ -407,8 +407,8 @@ struct IPCMessage {
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
 - **FTP**：由可选的外部 `onionHEN-ftpsrv-plugin` 提供；daemon 负责进程生命周期，插件通过动态 UI 提供启用、端口与重启控制
 - **ShadowMount+**：由可选的外部 `onionHEN-shadowmountplus-plugin` 提供；daemon 负责进程生命周期，插件通过动态 UI 提供立即扫描操作
+- **DPI v2**：由可选的外部 `onionHEN-dpiv2-plugin` 提供；浏览器负责上传与安装操作，插件动态 UI 提供启停、API/WebUI 端口与重启配置
 - **Remote Play**：ShellUI 调用 PS5 原生 Remote Play API 完成 PIN 生成和客户端注册确认
-- **DPI（网络安装器 / Web UI）**：util 内嵌 pkg-server；浏览器上传 `.pkg` 以分块安装（TCP 9090），实时进度经 SSE（TCP 12800）刷新，UI 语言跟随工具箱/控制台系统语言（14 种）
 
 用户 Payload 的所有 `.elf` 文件名都使用相同的 Payload 页面、自动启动扫描和共享
 加载器。用户 Payload 仅由 Payload 页的明确停止操作终止；已有有效 PID 记录时，
@@ -560,7 +560,6 @@ Host Service handler 仍属于后续集成。
 |------|------|
 | [../README.md](../README.md) | 项目总览、功能列表、配置、加载方式 |
 | [shellui-injection.md](shellui-injection.md) | ShellUI 注入路径、安全契约与失败行为 |
-| [api.md](api.md) | DPI pkg-server API：上传、SSE 进度、Web UI |
 | [pkg-writeup.md](pkg-writeup.md) | PS5 PKG 技术说明 |
 | [../source/README.md](../source/README.md) | 源码树与构建说明 |
 | [../third_party/README.md](../third_party/README.md) | 第三方源码、子模块与运行时依赖 |

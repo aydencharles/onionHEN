@@ -12,7 +12,6 @@
 #include "plugins_registry.hpp"
 #include "ps5_settings_ui.hpp"
 #include "toolbox_i18n.hpp"
-#include "toolbox_pkg_xml.hpp"
 #include "toolbox_values.hpp"
 #include "dynamic_ui_runtime.hpp"
 #include "external_plugin_ui.hpp"
@@ -337,17 +336,6 @@ void generate_kstuff_config_xml(std::string &xml_buffer) {
   xml_buffer = page.build();
 }
 
-void generate_pkg_installer_xml(std::string &xml_buffer) {
-  toolbox_pkg::generate_pkg_installer_xml(xml_buffer);
-}
-
-void generate_pkg_net_xml(std::string &xml_buffer) {
-  /* Toggles start off and OnPreCreate binds the real state through
-   * resolve_toolbox_control_value (kExactValues). */
-  toolbox_pkg::generate_pkg_net_xml(xml_buffer, /*run_on=*/false,
-                                    /*autoload_on=*/false);
-}
-
 void generate_plugin_config_xml(std::string &xml_buffer) {
   generate_kstuff_config_xml(xml_buffer);
 }
@@ -537,7 +525,8 @@ std::string toolbox_val(const char* id, const char* fallback = "0") {
 
 void append_toolbox_pkg_group(ps5ui::Group& g) {
   g.link("id_game_package_installer", toolbox_i18n::tr("pkg.installer"),
-         "pkg_installer.xml", toolbox_i18n::tr("pkg.installer.sub"))
+         "PkgInstaller/data/pkginstaller.xml",
+         toolbox_i18n::tr("pkg.installer.sub"))
       .link("id_game_add_content_manager", toolbox_i18n::tr("pkg.add_content"),
             "Addcontent/data/addcontent.xml",
             toolbox_i18n::tr("pkg.add_content.sub"));

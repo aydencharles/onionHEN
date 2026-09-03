@@ -24,8 +24,6 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_plapps = (in.resource == kPlappsXml);
   out.flags.is_cheat_progress = (in.resource == kCheatProgressXml);
   out.flags.is_remote_play = (in.resource == kRemotePlayXml);
-  out.flags.is_pkg_installer = (in.resource == kPkgInstallerXml);
-  out.flags.is_pkg_net = (in.resource == kPkgNetXml);
   out.flags.is_su_menu = (in.resource == kSuperuserXml);
 
   if (in.cheats_shortcut || in.cheats_shortcut_not_open) {
@@ -55,10 +53,6 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::CheatProgress;
   } else if (out.flags.is_remote_play) {
     out.page = Page::RemotePlay;
-  } else if (out.flags.is_pkg_installer) {
-    out.page = Page::PkgInstaller;
-  } else if (out.flags.is_pkg_net) {
-    out.page = Page::PkgNet;
   } else if (out.flags.is_su_menu) {
     out.page = Page::SuperuserPass;
   } else {

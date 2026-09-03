@@ -71,7 +71,7 @@ OnionHEN 面向已越狱的 PS5，提供一套能日常使用、也方便维护�
 - **游戏监控条** — 游戏中显示 FPS、CPU、GPU、内存、温度和网络信息
 - **金手指** — 本地 JSON、SHN、MC4、ShnExt 文件，运行中即可开关
 - **主机工具** — 账号激活、外接硬盘、Title ID、风扇、快捷键和游戏选项
-- **DPI（网络包安装器）** — 控制台上的浏览器 pkg 安装器：拖放上传 PS4/PS5 的 `.pkg`，逐文件识别包类型并复用暂存文件以便重试，SSE 实时进度（速度与预计剩余时间），可排序的安装队列（支持上移/下移与逐文件重试），每次状态变化都有桌面通知。界面与工具箱一样支持 14 种语言，跟随 `toolbox.language`，控制台系统语言在运行中变化时即时同步
+- **DPI v2** — 由可选的外部 `onionHEN-dpiv2-plugin` 提供
 - **应用越狱** — 白名单自制软件可通过守护进程沙盒 FIFO 申请提权
 - **可恢复运行时** — 关键守护进程和工具守护进程分开；主进程可以拉起工具进程
 - **统一配置** — 工具箱和守护进程共用一份带版本号的 `config.ini`
@@ -122,16 +122,12 @@ ShadowMount+ 由可选的外部
 
 ### DPI（网络包安装器）
 
-网络包安装器位于 **工具箱 → 内容安装与管理 → 软件包安装器 → 从网络安装内容**
-（打开后的页面标题为"网络安装器"）。一个按钮控制本次会话启停，
-另一个开关控制下次 OnionHEN 启动时是否自动运行（配置项 `pkgnet.autoload`）。
-它监听 TCP **9090**（上传 / 安装分块 API）和 **12800**（Web UI + 状态流）。
-浏览器打开 `http://<console>:12800`，拖入 `.pkg`，页面实时显示进度、传输速度和
-预计剩余时间，随后由系统执行安装。
-
-Web UI 与工具箱一样支持 14 种语言。`toolbox.language=system` 时跟随控制台
-系统语言，并在运行中系统语言变化时实时更新。完整 API 见
-[docs/api.md](docs/api.md)。
+DPI v2 由可选的外部
+[`onionHEN-dpiv2-plugin`](https://github.com/OnionBuddies/onionHEN-dpiv2-plugin)
+提供。将其安装为 `/data/OnionHEN/plugins/DPIV00001.elf` 后，OnionHEN 会自动发现
+并启动；插件动态设置页提供启用、API 端口、WebUI 端口和重启控制。浏览器仍是
+安装操作界面，保留分块上传、队列管理、暂存文件复用和 SSE 实时进度。默认 WebUI
+地址是 `http://<console>:12800`。
 
 ### 远程游玩
 
@@ -282,7 +278,6 @@ OnionHEN 在下面两处读写同一份配置：
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
-| `pkgnet.autoload` | `false` | `true`, `false` |
 
 ### 运行时数据
 
@@ -296,7 +291,6 @@ OnionHEN 在下面两处读写同一份配置：
 | `/data/OnionHEN/OnionHEN.log` | 主运行日志 |
 | `/data/OnionHEN/OnionHEN_crash.log` | 保留的 daemon 崩溃信号与回溯日志 |
 | `/data/OnionHEN/OnionHEN_util_daemon.log` | Utility daemon 日志 |
-| `/user/data/tmp/` | DPI 暂存的上传 pkg（安装完成后保留以供复用） |
 
 <br>
 
@@ -323,7 +317,6 @@ OnionHEN 在下面两处读写同一份配置：
 │   ├── daemon/                关键守护进程与工具箱注入
 │   ├── util/                  工具守护进程、IPC 与金手指
 │   ├── shellui/               工具箱与 ShellUI 挂钩
-│   ├── webui/                 Web UI 源码（单文件打包的浏览器安装界面）
 │   ├── i18n/                  共享的工具箱 / 通知多语言目录
 │   ├── unpacker/              最终 OnionHEN payload 包装
 │   ├── libonion_*/            本仓库共享库

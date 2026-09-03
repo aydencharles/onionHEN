@@ -81,8 +81,6 @@ public:
   // High-level commands
   int GetDaemonPid();
   IPC_Ret ToggleSetting(DaemonCommands cmd, bool turn_on);
-  /** Query the in-process DPI package install server without a PID marker. */
-  bool PkgNetStatus();
   /** Push a fresh console system language to util for live re-apply. */
   bool SetSystemLanguage(int language);
   void KillDaemon();

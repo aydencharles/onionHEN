@@ -24,7 +24,6 @@ static int test_defaults_and_serialize_keys(void) {
   onion::Settings s{};
   std::string text = onion::settings_serialize(s);
 
-  TEST_ASSERT_TRUE(!s.pkgnet_autoload);
   TEST_ASSERT_TRUE(text.find("[meta]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("schema_version=1") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[toolbox]") != std::string::npos);
@@ -59,13 +58,6 @@ static int test_defaults_and_serialize_keys(void) {
   TEST_ASSERT_TRUE(text.find("mirror=auto") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[kstuff]\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("autoload=true") != std::string::npos);
-  TEST_ASSERT_TRUE(
-      text.find("[pkgnet]\n"
-                "# autoload starts the built-in network package installer "
-                "(DPI, TCP 9090)\n"
-                "# the next time OnionHEN launches.\n"
-                "# Available values: true, false\n"
-                "autoload=false\n") != std::string::npos);
   return 0;
 }
 
@@ -137,7 +129,6 @@ static int test_full_schema_roundtrip(void) {
   in.toolbox_shortcut_opt = 2;
   in.ui_lang = onion::kUiLanguageZhHans;
   in.kstuff_autoload = false;
-  in.pkgnet_autoload = true;
   in.app_jailbreak_allowlist.exact_title_ids = {};
   in.app_jailbreak_allowlist.exact_title_ids[0] = "ITEM00001";
   in.app_jailbreak_allowlist.exact_title_ids[1] = "CUSA12345";
@@ -174,7 +165,6 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_EQ_INT(in.ui_lang, out.ui_lang);
   TEST_ASSERT_EQ_INT(in.cheats_mirror, out.cheats_mirror);
   TEST_ASSERT_TRUE(out.kstuff_autoload == in.kstuff_autoload);
-  TEST_ASSERT_TRUE(out.pkgnet_autoload == in.pkgnet_autoload);
   TEST_ASSERT_EQ_U64(
       in.app_jailbreak_allowlist.exact_title_id_count,
       out.app_jailbreak_allowlist.exact_title_id_count);
@@ -211,7 +201,6 @@ static int test_partial_ini_keeps_defaults(void) {
   TEST_ASSERT_TRUE(out.overlay_background);
   TEST_ASSERT_TRUE(out.app_jailbreak_enabled);
   TEST_ASSERT_TRUE(out.kstuff_autoload);
-  TEST_ASSERT_TRUE(!out.pkgnet_autoload);
   TEST_ASSERT_EQ_INT(onion::kCheatsMirrorAuto, out.cheats_mirror);
   TEST_ASSERT_EQ_U64(5, out.app_jailbreak_allowlist.exact_title_id_count);
   TEST_ASSERT_STREQ("ITEM00001",
@@ -480,7 +469,7 @@ static int test_language_new_locales_roundtrip(void) {
   return 0;
 }
 
-static int test_v0_0_10_config_does_not_autoload_plugins(void) {
+static int test_v0_0_10_config_keeps_kstuff_autoload(void) {
   std::string path = temp_ini_path();
   TEST_ASSERT_TRUE(!path.empty());
   FILE *f = fopen(path.c_str(), "w");
@@ -497,7 +486,6 @@ static int test_v0_0_10_config_does_not_autoload_plugins(void) {
   onion::Settings out{};
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
   TEST_ASSERT_TRUE(out.kstuff_autoload);
-  TEST_ASSERT_TRUE(!out.pkgnet_autoload);
 
   unlink(path.c_str());
   return 0;
@@ -598,8 +586,8 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_language_ar", test_language_ar_roundtrip);
   failures += onion_test_run("settings_language_new_locales",
                              test_language_new_locales_roundtrip);
-  failures += onion_test_run("settings_v0_0_10_no_plugin_autoload",
-                             test_v0_0_10_config_does_not_autoload_plugins);
+  failures += onion_test_run("settings_v0_0_10_kstuff_autoload",
+                             test_v0_0_10_config_keeps_kstuff_autoload);
   failures += onion_test_run("settings_clamp_fan_threshold",
                              test_clamp_fan_threshold);
   return failures;

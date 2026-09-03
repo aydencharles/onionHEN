@@ -77,8 +77,6 @@ const OnPressPrefixEntry *onpress_plugins_prefix(size_t *count);
  */
 OnPressResult onpress_kstuff_autoload(OnPressContext &ctx);
 OnPressResult onpress_delete_kstuff(OnPressContext &ctx);
-OnPressResult onpress_pkgnet_run(OnPressContext &ctx);
-OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx);
 
 /** Shared toggle helpers. */
 inline bool value_as_int(const OnPressContext &ctx) {

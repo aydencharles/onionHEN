@@ -158,10 +158,6 @@ struct Settings {
   // Load the embedded/override kstuff payload when OnionHEN starts.
   bool kstuff_autoload = true;
 
-  // [pkgnet]
-  // Start the built-in network package installer the next time OnionHEN launches.
-  bool pkgnet_autoload = false;
-
   // [toolbox]
   // 0 = system (default), 1 = zh-Hans, 2 = en, 3 = ar, 4 = zh-Hant,
   // 5 = ja, 6 = fr, 7 = de, 8 = ko, 9 = es, 10 = pt-BR, 11 = it,

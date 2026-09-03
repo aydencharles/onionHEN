@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "Lista wtyczek jest niedostępna",
     "plugins.external.run": "Uruchomiona",
     "plugins.external.run.sub": "Uruchom lub zatrzymaj tę wtyczkę na bieżącą sesję",
+    "plugins.external.autostart": "Autostart",
+    "plugins.external.autostart.sub": "Uruchamiaj tę wtyczkę automatycznie wraz z OnionHEN",
     "plugins.external.reload": "Przeładuj wtyczkę",
     "plugins.external.delete": "Usuń wtyczkę ELF",
     "plugins.external.delete.confirm": "Zatrzymać tę wtyczkę i trwale usunąć jej plik ELF?",

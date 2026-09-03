@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "플러그인 목록을 사용할 수 없습니다",
     "plugins.external.run": "실행 중",
     "plugins.external.run.sub": "현재 세션에서 이 플러그인을 시작 또는 중지합니다",
+    "plugins.external.autostart": "자동 시작",
+    "plugins.external.autostart.sub": "OnionHEN 시작 시 이 플러그인을 자동으로 시작합니다",
     "plugins.external.reload": "플러그인 다시 로드",
     "plugins.external.delete": "플러그인 ELF 삭제",
     "plugins.external.delete.confirm": "이 플러그인을 중지하고 ELF를 영구 삭제할까요?",

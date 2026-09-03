@@ -1,6 +1,7 @@
 #include "test_harness.h"
 
 #include <onion/plugin_manager.hpp>
+#include <onion/fs.h>
 
 #include <algorithm>
 #include <fstream>
@@ -129,8 +130,8 @@ const onion::plugin::InventoryEntry *find_entry(
 }
 
 int test_fingerprint_changes_with_content(void) {
-  const auto first = make_plugin("AUTO00001", onion::plugin::kFlagAutoStart, 1);
-  const auto second = make_plugin("AUTO00001", onion::plugin::kFlagAutoStart, 2);
+  const auto first = make_plugin("AUTO00001", 0, 1);
+  const auto second = make_plugin("AUTO00001", 0, 2);
   TEST_ASSERT_TRUE(onion::plugin::fingerprint_elf(first) !=
                    onion::plugin::fingerprint_elf(second));
   return 0;
@@ -141,12 +142,15 @@ int test_manager_lifecycle(void) {
   (void)mkdir(ONION_DATA_ROOT, 0777);
   (void)mkdir(root.c_str(), 0777);
   const std::string auto_path = root + "/auto.elf";
+  const std::string auto_marker = auto_path + ".auto_start";
   const std::string manual_path = root + "/manual.elf";
   unlink(auto_path.c_str());
+  unlink(auto_marker.c_str());
   unlink(manual_path.c_str());
   TEST_ASSERT_TRUE(write_plugin(
       auto_path,
-      make_plugin("AUTO00001", onion::plugin::kFlagAutoStart, 1)));
+      make_plugin("AUTO00001", 0, 1)));
+  TEST_ASSERT_TRUE(touch_file(auto_marker.c_str()));
   TEST_ASSERT_TRUE(
       write_plugin(manual_path, make_plugin("MANU00001", 0, 1)));
 
@@ -158,7 +162,12 @@ int test_manager_lifecycle(void) {
   auto inventory = manager.inventory();
   TEST_ASSERT_EQ_INT(2, static_cast<int>(inventory.size()));
   TEST_ASSERT_TRUE(find_entry(inventory, "AUTO00001")->running());
+  TEST_ASSERT_TRUE(find_entry(inventory, "AUTO00001")->auto_start());
   TEST_ASSERT_TRUE(!find_entry(inventory, "MANU00001")->running());
+  TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", true));
+  TEST_ASSERT_TRUE(find_entry(manager.inventory(), "MANU00001")->auto_start());
+  TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", false));
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->auto_start());
 
   TEST_ASSERT_TRUE(manager.start("MANU00001"));
   TEST_ASSERT_TRUE(manager.stop("AUTO00001"));
@@ -168,17 +177,19 @@ int test_manager_lifecycle(void) {
   TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "AUTO00001")->running());
 
   unlink(auto_path.c_str());
+  unlink(auto_marker.c_str());
   (void)manager.reconcile();
   TEST_ASSERT_TRUE(write_plugin(
       auto_path,
-      make_plugin("AUTO00001", onion::plugin::kFlagAutoStart, 1)));
+      make_plugin("AUTO00001", 0, 1)));
+  TEST_ASSERT_TRUE(touch_file(auto_marker.c_str()));
   report = manager.reconcile();
   TEST_ASSERT_EQ_INT(1, static_cast<int>(report.started));
   const size_t launches_before_replace = runtime.launched.size();
   const int stops_before_replace = runtime.stop_count;
   TEST_ASSERT_TRUE(write_plugin(
       auto_path,
-      make_plugin("AUTO00001", onion::plugin::kFlagAutoStart, 2)));
+      make_plugin("AUTO00001", 0, 2)));
   report = manager.reconcile();
   TEST_ASSERT_EQ_INT(1, static_cast<int>(report.started));
   TEST_ASSERT_EQ_U64(launches_before_replace + 1, runtime.launched.size());
@@ -189,11 +200,16 @@ int test_manager_lifecycle(void) {
   TEST_ASSERT_EQ_U64(launches_before_reload + 1, runtime.launched.size());
   TEST_ASSERT_TRUE(!manager.start("MISS00001"));
 
+  const std::string manual_marker = manual_path + ".auto_start";
+  TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", true));
+  TEST_ASSERT_TRUE(access(manual_marker.c_str(), F_OK) == 0);
   TEST_ASSERT_TRUE(manager.remove("MANU00001"));
   TEST_ASSERT_TRUE(access(manual_path.c_str(), F_OK) != 0);
+  TEST_ASSERT_TRUE(access(manual_marker.c_str(), F_OK) != 0);
   TEST_ASSERT_TRUE(find_entry(manager.inventory(), "MANU00001") == nullptr);
 
   unlink(auto_path.c_str());
+  unlink(auto_marker.c_str());
   const int stops_before_remove = runtime.stop_count;
   report = manager.reconcile();
   TEST_ASSERT_EQ_INT(stops_before_remove + 1, runtime.stop_count);

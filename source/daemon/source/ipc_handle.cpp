@@ -59,7 +59,8 @@ std::string plugin_inventory_page(size_t offset) {
 }
 
 onion::plugin::OperationResult plugin_operation(DaemonCommands command,
-                                                std::string_view plugin_id) {
+                                                std::string_view plugin_id,
+                                                bool enabled = false) {
   switch (command) {
   case BREW_PLUGIN_START:
     return onion::daemon::plugins::start_plugin(plugin_id);
@@ -69,6 +70,8 @@ onion::plugin::OperationResult plugin_operation(DaemonCommands command,
     return onion::daemon::plugins::reload_plugin(plugin_id);
   case BREW_PLUGIN_DELETE:
     return onion::daemon::plugins::remove_plugin(plugin_id);
+  case BREW_PLUGIN_SET_AUTO_START:
+    return onion::daemon::plugins::set_auto_start(plugin_id, enabled);
   default:
     return {false, "unsupported plugin operation"};
   }
@@ -129,6 +132,19 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     }
     const onion::plugin::OperationResult result =
         plugin_operation(command, plugin_id);
+    reply(sender_app, !result.success,
+          result.success ? std::string("ok") : result.error);
+    break;
+  }
+  case BREW_PLUGIN_SET_AUTO_START: {
+    const char *plugin_id =
+        onion_cjson::string_item(my_json.get(), "plugin_id");
+    if (!plugin_id || !*plugin_id) {
+      reply(sender_app, true, "missing plugin_id");
+      break;
+    }
+    const onion::plugin::OperationResult result = plugin_operation(
+        command, plugin_id, onion_cjson::bool_item(my_json.get(), "enabled"));
     reply(sender_app, !result.success,
           result.success ? std::string("ok") : result.error);
     break;

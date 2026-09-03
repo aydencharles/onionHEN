@@ -155,4 +155,8 @@ plugin::OperationResult remove_plugin(std::string_view plugin_id) {
   return manager().remove(plugin_id);
 }
 
+plugin::OperationResult set_auto_start(std::string_view plugin_id, bool enabled) {
+  return manager().set_auto_start(plugin_id, enabled);
+}
+
 } // namespace onion::daemon::plugins

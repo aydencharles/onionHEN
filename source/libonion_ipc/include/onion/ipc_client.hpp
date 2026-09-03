@@ -109,6 +109,7 @@ public:
   bool StopPlugin(const std::string &plugin_id);
   bool ReloadPlugin(const std::string &plugin_id);
   bool DeletePlugin(const std::string &plugin_id);
+  bool SetPluginAutoStart(const std::string &plugin_id, bool enabled);
 
   // Kept for call-site readability (matches historical public field).
   // Prefer is_util(); do not reassign after construction.

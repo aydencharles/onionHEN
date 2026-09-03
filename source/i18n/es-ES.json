@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "El inventario de plugins no está disponible",
     "plugins.external.run": "En ejecución",
     "plugins.external.run.sub": "Iniciar o detener este plugin para la sesión actual",
+    "plugins.external.autostart": "Inicio automático",
+    "plugins.external.autostart.sub": "Iniciar automáticamente este plugin con OnionHEN",
     "plugins.external.reload": "Recargar plugin",
     "plugins.external.delete": "Eliminar plugin ELF",
     "plugins.external.delete.confirm": "¿Detener este plugin y eliminar su ELF permanentemente?",

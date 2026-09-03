@@ -98,6 +98,8 @@ static int test_plugin_commands_stable(void) {
   TEST_ASSERT_EQ_U64(0x9000102u, static_cast<unsigned>(BREW_PLUGIN_STOP));
   TEST_ASSERT_EQ_U64(0x9000103u, static_cast<unsigned>(BREW_PLUGIN_RELOAD));
   TEST_ASSERT_EQ_U64(0x9000104u, static_cast<unsigned>(BREW_PLUGIN_DELETE));
+  TEST_ASSERT_EQ_U64(0x9000105u,
+                     static_cast<unsigned>(BREW_PLUGIN_SET_AUTO_START));
   return 0;
 }
 

@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "ไม่สามารถแสดงรายการปลั๊กอินได้",
     "plugins.external.run": "กำลังทำงาน",
     "plugins.external.run.sub": "เริ่มหรือหยุดปลั๊กอินนี้สำหรับเซสชันปัจจุบัน",
+    "plugins.external.autostart": "เริ่มอัตโนมัติ",
+    "plugins.external.autostart.sub": "เริ่มปลั๊กอินนี้โดยอัตโนมัติพร้อม OnionHEN",
     "plugins.external.reload": "โหลดปลั๊กอินใหม่",
     "plugins.external.delete": "ลบปลั๊กอิน ELF",
     "plugins.external.delete.confirm": "ต้องการหยุดปลั๊กอินนี้และลบไฟล์ ELF ถาวรหรือไม่",

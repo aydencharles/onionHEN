@@ -581,3 +581,13 @@ bool IPC_Client::ReloadPlugin(const std::string &plugin_id) {
 bool IPC_Client::DeletePlugin(const std::string &plugin_id) {
   return PluginOperation(BREW_PLUGIN_DELETE, plugin_id);
 }
+
+bool IPC_Client::SetPluginAutoStart(const std::string &plugin_id, bool enabled) {
+  if (!require_crit("SetPluginAutoStart")) return false;
+  cJSON *request = cJSON_CreateObject();
+  cJSON_AddStringToObject(request, "plugin_id", plugin_id.c_str());
+  cJSON_AddBoolToObject(request, "enabled", enabled);
+  std::string response;
+  return IPCSendCommand(BREW_PLUGIN_SET_AUTO_START, response,
+                        json_object_str(request));
+}

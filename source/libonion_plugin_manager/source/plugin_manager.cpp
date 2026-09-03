@@ -19,6 +19,26 @@ bool has_elf_suffix(std::string_view name) {
   return name.size() > 4 && name.substr(name.size() - 4) == ".elf";
 }
 
+std::string auto_start_marker_path(std::string_view plugin_path) {
+  return std::string(plugin_path) + ".auto_start";
+}
+
+bool auto_start_enabled(std::string_view plugin_path) {
+  const std::string marker = auto_start_marker_path(plugin_path);
+  struct stat entry {};
+  return stat(marker.c_str(), &entry) == 0;
+}
+
+bool write_auto_start_marker(std::string_view plugin_path, bool enabled) {
+  const std::string marker = auto_start_marker_path(plugin_path);
+  if (!enabled)
+    return unlink(marker.c_str()) == 0 || errno == ENOENT;
+  const int descriptor =
+      open(marker.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+  if (descriptor < 0) return false;
+  return close(descriptor) == 0;
+}
+
 bool read_file(const std::string &path, size_t limit, std::vector<uint8_t> &out,
                std::string &error) {
   struct stat entry {};
@@ -83,7 +103,8 @@ void rebuild_inventory(const Discovery &discovery,
           return instance.descriptor.plugin_id == plugin.descriptor.plugin_id;
         });
     inventory.push_back({plugin.descriptor, plugin.path, plugin.fingerprint,
-                         running == instances.end() ? -1 : running->pid});
+                         running == instances.end() ? -1 : running->pid,
+                         auto_start_enabled(plugin.path)});
   }
 }
 
@@ -282,9 +303,8 @@ ReconcileReport Manager::reconcile() {
   for (auto &[plugin_id, plugin] : discovered) {
     if (find_instance(instances_, plugin_id) != instances_.end()) continue;
     const bool replacing_running = restart.contains(plugin_id);
-    const bool auto_start =
-        (plugin->descriptor.flags & kFlagAutoStart) != 0 &&
-        !suppressed_.contains(plugin_id);
+    const bool auto_start = auto_start_enabled(plugin->path) &&
+                            !suppressed_.contains(plugin_id);
     if (!replacing_running && !auto_start && !relaunch.contains(plugin_id))
       continue;
     const OperationResult launched = launch_plugin(
@@ -342,6 +362,18 @@ OperationResult Manager::stop(std::string_view plugin_id) {
   return {true, {}};
 }
 
+OperationResult Manager::set_auto_start(std::string_view plugin_id, bool enabled) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  Discovery discovery = repository_.discover();
+  PluginFile *plugin = find_plugin(discovery, plugin_id);
+  if (!plugin) return {false, "plugin is not installed"};
+  if (!write_auto_start_marker(plugin->path, enabled))
+    return {false, std::string("cannot update auto-start marker: ") +
+                       std::strerror(errno)};
+  rebuild_inventory(discovery, instances_, inventory_);
+  return {true, {}};
+}
+
 OperationResult Manager::reload(std::string_view plugin_id) {
   std::lock_guard<std::mutex> lock(mutex_);
   Discovery discovery = repository_.discover();
@@ -379,6 +411,7 @@ OperationResult Manager::remove(std::string_view plugin_id) {
     return {false, std::string("cannot delete plugin: ") +
                        std::strerror(errno)};
   }
+  (void)unlink(auto_start_marker_path(path).c_str());
   suppressed_.erase(std::string(plugin_id));
   inventory_.erase(known);
   return {true, {}};

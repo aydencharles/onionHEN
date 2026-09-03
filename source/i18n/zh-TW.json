@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "暫時無法讀取插件清單",
     "plugins.external.run": "執行狀態",
     "plugins.external.run.sub": "啟動或停止目前工作階段中的插件",
+    "plugins.external.autostart": "自動啟動",
+    "plugins.external.autostart.sub": "隨 OnionHEN 啟動此插件",
     "plugins.external.reload": "重新載入插件",
     "plugins.external.delete": "刪除插件 ELF",
     "plugins.external.delete.confirm": "停止此插件並永久刪除其 ELF？",

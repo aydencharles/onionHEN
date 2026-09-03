@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "قائمة الإضافات غير متاحة",
     "plugins.external.run": "قيد التشغيل",
     "plugins.external.run.sub": "تشغيل هذه الإضافة أو إيقافها للجلسة الحالية",
+    "plugins.external.autostart": "التشغيل التلقائي",
+    "plugins.external.autostart.sub": "تشغيل هذه الإضافة تلقائيًا مع OnionHEN",
     "plugins.external.reload": "إعادة تحميل الإضافة",
     "plugins.external.delete": "حذف ملف ELF الخاص بالإضافة",
     "plugins.external.delete.confirm": "هل تريد إيقاف هذه الإضافة وحذف ملف ELF الخاص بها نهائيًا؟",

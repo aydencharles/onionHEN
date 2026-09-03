@@ -13,6 +13,11 @@ OnPressResult external_plugin_control(OnPressContext &ctx) {
       onion::shellui::external_plugins::dispatch(ctx.id, ctx.value);
   if (!result.owned) return OnPressResult::NotMine;
 
+  if (result.action ==
+          onion::shellui::external_plugins::Action::AutoStartChanged &&
+      result.success)
+    return OnPressResult::Consumed;
+
   const char *key = "plugins.external.operation_failed_fmt";
   if (result.success) {
     using onion::shellui::external_plugins::Action;
@@ -28,6 +33,8 @@ OnPressResult external_plugin_control(OnPressContext &ctx) {
       break;
     case Action::Deleted:
       key = "plugins.external.deleted_fmt";
+      break;
+    case Action::AutoStartChanged:
       break;
     case Action::None:
       break;

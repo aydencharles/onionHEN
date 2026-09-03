@@ -83,6 +83,7 @@ enum DaemonCommands : unsigned int {
   BREW_PLUGIN_STOP = 0x9000102u,
   BREW_PLUGIN_RELOAD = 0x9000103u,
   BREW_PLUGIN_DELETE = 0x9000104u,
+  BREW_PLUGIN_SET_AUTO_START = 0x9000105u,
 
   // Legacy: manual elfldr launch removed (embedded 9020 is bootstrapper-managed)
   BREW_UTIL_LAUNCH_ELFLDR = 0xE1F1D8u,

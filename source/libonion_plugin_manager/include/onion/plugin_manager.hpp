@@ -19,10 +19,9 @@ inline constexpr size_t kNameCapacity = 64;
 inline constexpr size_t kDescriptorV1Size = 128;
 inline constexpr size_t kDefaultMaxElfSize = 64u * 1024u * 1024u;
 inline constexpr uint32_t kKnownCapabilities = (1u << 6) - 1u;
-inline constexpr uint32_t kKnownFlags = (1u << 3) - 1u;
-inline constexpr uint32_t kFlagAutoStart = 1u << 0;
 inline constexpr uint32_t kFlagLongRunning = 1u << 1;
 inline constexpr uint32_t kFlagStopSupported = 1u << 2;
+inline constexpr uint32_t kKnownFlags = kFlagLongRunning | kFlagStopSupported;
 
 #if defined(ONION_HOST_TEST)
 #ifndef ONION_DATA_ROOT
@@ -114,11 +113,10 @@ struct InventoryEntry {
   std::string path;
   uint64_t fingerprint = 0;
   pid_t pid = -1;
+  bool auto_start_marker = false;
 
   bool running() const { return pid > 1; }
-  bool auto_start() const {
-    return (descriptor.flags & kFlagAutoStart) != 0;
-  }
+  bool auto_start() const { return auto_start_marker; }
   bool long_running() const {
     return (descriptor.flags & kFlagLongRunning) != 0;
   }
@@ -149,6 +147,7 @@ public:
   ReconcileReport reconcile();
   OperationResult start(std::string_view plugin_id);
   OperationResult stop(std::string_view plugin_id);
+  OperationResult set_auto_start(std::string_view plugin_id, bool enabled);
   OperationResult reload(std::string_view plugin_id);
   OperationResult remove(std::string_view plugin_id);
   void stop_all();

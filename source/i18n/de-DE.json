@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "Plugin-Liste ist nicht verfügbar",
     "plugins.external.run": "Läuft",
     "plugins.external.run.sub": "Dieses Plugin für die aktuelle Sitzung starten oder stoppen",
+    "plugins.external.autostart": "Autostart",
+    "plugins.external.autostart.sub": "Dieses Plugin automatisch mit OnionHEN starten",
     "plugins.external.reload": "Plugin neu laden",
     "plugins.external.delete": "Plugin-ELF löschen",
     "plugins.external.delete.confirm": "Dieses Plugin stoppen und seine ELF-Datei dauerhaft löschen?",

@@ -14,6 +14,8 @@ namespace {
 constexpr std::string_view kRunPrefix = "id_external_plugin_run_";
 constexpr std::string_view kReloadPrefix = "id_external_plugin_reload_";
 constexpr std::string_view kDeletePrefix = "id_external_plugin_delete_";
+constexpr std::string_view kAutoStartPrefix =
+    "id_external_plugin_autostart_";
 
 bool split_control(std::string_view control_id, std::string_view prefix,
                    std::string &plugin_id) {
@@ -61,7 +63,11 @@ std::vector<std::string> append_inventory(
                         std::nullopt, std::nullopt, std::nullopt,
                         ps5ui::Style::None,
                         toolbox_i18n::tr("plugins.external.delete.confirm"),
-                        toolbox_i18n::tr("account.activate.confirm_phrase"));
+                        toolbox_i18n::tr("account.activate.confirm_phrase"))
+                    .toggle(std::string(kAutoStartPrefix) + plugin.plugin_id,
+                            toolbox_i18n::tr("plugins.external.autostart"),
+                            plugin.auto_start,
+                            toolbox_i18n::tr("plugins.external.autostart.sub"));
                 for (const dynamic_ui::PluginSettingsLink &link : settings) {
                   if (link.plugin_id != plugin.plugin_id) continue;
                   controls.link("id_external_plugin_settings_" + plugin.plugin_id,
@@ -101,6 +107,13 @@ DispatchResult dispatch(std::string_view control_id, std::string_view value) {
     result.owned = true;
     result.success = client.DeletePlugin(result.plugin_id);
     result.action = Action::Deleted;
+    return result;
+  }
+  if (split_control(control_id, kAutoStartPrefix, result.plugin_id)) {
+    result.owned = true;
+    const bool enabled = value == "1" || value == "true";
+    result.success = client.SetPluginAutoStart(result.plugin_id, enabled);
+    result.action = Action::AutoStartChanged;
   }
   return result;
 }

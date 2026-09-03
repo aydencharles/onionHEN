@@ -9,7 +9,14 @@
 
 namespace onion::shellui::external_plugins {
 
-enum class Action { None, Started, Stopped, Reloaded, Deleted };
+enum class Action {
+  None,
+  Started,
+  Stopped,
+  Reloaded,
+  Deleted,
+  AutoStartChanged,
+};
 
 struct DispatchResult {
   bool owned = false;

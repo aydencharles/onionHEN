@@ -15,5 +15,6 @@ plugin::OperationResult start_plugin(std::string_view plugin_id);
 plugin::OperationResult stop_plugin(std::string_view plugin_id);
 plugin::OperationResult reload_plugin(std::string_view plugin_id);
 plugin::OperationResult remove_plugin(std::string_view plugin_id);
+plugin::OperationResult set_auto_start(std::string_view plugin_id, bool enabled);
 
 } // namespace onion::daemon::plugins

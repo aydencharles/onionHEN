@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "Список плагинов недоступен",
     "plugins.external.run": "Запущен",
     "plugins.external.run.sub": "Запустить или остановить этот плагин для текущего сеанса",
+    "plugins.external.autostart": "Автозапуск",
+    "plugins.external.autostart.sub": "Автоматически запускать этот плагин вместе с OnionHEN",
     "plugins.external.reload": "Перезагрузить плагин",
     "plugins.external.delete": "Удалить ELF-плагин",
     "plugins.external.delete.confirm": "Остановить этот плагин и навсегда удалить его ELF?",

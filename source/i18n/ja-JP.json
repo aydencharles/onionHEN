@@ -246,6 +246,8 @@
     "plugins.external.unavailable": "プラグインの一覧を取得できません",
     "plugins.external.run": "実行中",
     "plugins.external.run.sub": "現在のセッションでこのプラグインを起動または停止します",
+    "plugins.external.autostart": "自動起動",
+    "plugins.external.autostart.sub": "OnionHEN の起動時にこのプラグインを自動起動します",
     "plugins.external.reload": "プラグインを再読み込み",
     "plugins.external.delete": "プラグインの ELF を削除",
     "plugins.external.delete.confirm": "このプラグインを停止し、ELF を完全に削除しますか？",

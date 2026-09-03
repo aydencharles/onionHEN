@@ -61,8 +61,9 @@ size_t SessionDirectory::size() const {
 
 ConnectionSession::ConnectionSession(SessionDirectory &directory,
                                      plugin_ui::ProtocolBroker &ui_broker,
-                                     EventSource *events)
-    : directory_(directory), ui_broker_(ui_broker), events_(events) {}
+                                     EventSource *events, HostServices *host)
+    : directory_(directory), ui_broker_(ui_broker), events_(events),
+      host_(host) {}
 
 ConnectionSession::~ConnectionSession() { disconnect(); }
 
@@ -102,6 +103,59 @@ ConnectionSession::dispatch(uint16_t command, std::span<const uint8_t> payload) 
     return events_ ? events_->poll(owner_)
                    : plugin_ui::WireResponse{plugin_ui::Status::NotSupported,
                                              {}};
+  }
+  if (command == kLogCommand) {
+    if (payload.size() < 4) return {};
+    const uint32_t level = read_u32(payload, 0);
+    if (level > 3) return {};
+    const std::string_view message(
+        reinterpret_cast<const char *>(payload.data() + 4),
+        payload.size() - 4);
+    if (message.find('\0') != std::string_view::npos) return {};
+    if (host_)
+      return plugin_ui::WireResponse{host_->log(owner_, level, message), {}};
+    return plugin_ui::WireResponse{plugin_ui::Status::NotSupported, {}};
+  }
+  if (command == kNotifyCommand) {
+    if ((capabilities_ & Notify) == 0)
+      return {plugin_ui::Status::PermissionDenied, {}};
+    if (payload.empty()) return {};
+    const std::string_view message(
+        reinterpret_cast<const char *>(payload.data()), payload.size());
+    if (message.find('\0') != std::string_view::npos) return {};
+    if (host_)
+      return plugin_ui::WireResponse{host_->notify(owner_, message), {}};
+    return plugin_ui::WireResponse{plugin_ui::Status::NotSupported, {}};
+  }
+  if (command == kConfigGetCommand) {
+    if (payload.empty() || payload.back() != 0) return {};
+    const std::string_view key(
+        reinterpret_cast<const char *>(payload.data()), payload.size() - 1);
+    if (key.empty() || key.find('\0') != std::string_view::npos) return {};
+    plugin_ui::WireResponse response{plugin_ui::Status::NotSupported, {}};
+    if (host_) response.status = host_->config_get(owner_, key, response.data);
+    return response;
+  }
+  if (command == kConfigSetCommand) {
+    size_t key_end = payload.size();
+    for (size_t index = 0; index < payload.size(); ++index) {
+      if (payload[index] == 0) {
+        key_end = index;
+        break;
+      }
+    }
+    if (key_end == 0 || key_end == payload.size() || key_end + 2 > payload.size() ||
+        payload.back() != 0)
+      return {};
+    const std::string_view key(
+        reinterpret_cast<const char *>(payload.data()), key_end);
+    const std::string_view value(
+        reinterpret_cast<const char *>(payload.data() + key_end + 1),
+        payload.size() - key_end - 2);
+    if (value.find('\0') != std::string_view::npos) return {};
+    if (host_)
+      return plugin_ui::WireResponse{host_->config_set(owner_, key, value), {}};
+    return plugin_ui::WireResponse{plugin_ui::Status::NotSupported, {}};
   }
   if (!is_ui_command(command))
     return {plugin_ui::Status::NotSupported, {}};

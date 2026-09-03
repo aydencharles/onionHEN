@@ -67,7 +67,8 @@ bool write_all(int descriptor, std::span<const uint8_t> image) {
 }
 
 void stop_instance(ProcessRuntime &runtime, const Instance &instance) {
-  if (runtime.alive(instance.pid)) runtime.stop(instance.pid);
+  if (runtime.alive(instance.pid))
+    runtime.stop(instance.pid, instance.descriptor.flags);
   runtime.persist(instance.descriptor.plugin_id, -1);
 }
 
@@ -246,6 +247,7 @@ ReconcileReport Manager::reconcile() {
       ++suppressed;
   }
   std::set<std::string> restart;
+  std::set<std::string> relaunch;
 
   for (auto instance = instances_.begin(); instance != instances_.end();) {
     const auto found = discovered.find(instance->descriptor.plugin_id);
@@ -266,6 +268,10 @@ ReconcileReport Manager::reconcile() {
     }
     if (!runtime_.alive(instance->pid)) {
       runtime_.persist(instance->descriptor.plugin_id, -1);
+      const bool supervised =
+          (current->descriptor.flags & kFlagLongRunning) != 0 &&
+          !suppressed_.contains(instance->descriptor.plugin_id);
+      if (supervised) relaunch.insert(instance->descriptor.plugin_id);
       instance = instances_.erase(instance);
       continue;
     }
@@ -279,7 +285,8 @@ ReconcileReport Manager::reconcile() {
     const bool auto_start =
         (plugin->descriptor.flags & kFlagAutoStart) != 0 &&
         !suppressed_.contains(plugin_id);
-    if (!replacing_running && !auto_start) continue;
+    if (!replacing_running && !auto_start && !relaunch.contains(plugin_id))
+      continue;
     const OperationResult launched = launch_plugin(
         runtime_, *plugin, instances_, !replacing_running);
     if (!launched) {

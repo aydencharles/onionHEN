@@ -1,5 +1,6 @@
 #include "plugin_ipc_server.hpp"
 #include "plugin_ui_bridge_server.hpp"
+#include "plugin_host_services.hpp"
 
 #include <onion/ipc_server.hpp>
 #include <onion/log.h>
@@ -58,7 +59,8 @@ void *client_thread(void *opaque) {
 
   LOG_DEBUG("[plugin-ipc][client %u] connected fd=%d", number, socket);
   serve_connection(socket, g_sessions, g_ui_broker,
-                   &plugin_ui_bridge::event_source());
+                   &plugin_ui_bridge::event_source(),
+                   &plugin_host::host_services());
   forget_client(socket);
   ipc_network_close(socket);
   LOG_DEBUG("[plugin-ipc][client %u] disconnected", number);
@@ -125,8 +127,10 @@ void *server_thread(void *) {
 
 void serve_connection(int socket, plugin_session::SessionDirectory &directory,
                       plugin_ui::ProtocolBroker &ui_broker,
-                      plugin_session::EventSource *events) {
-  plugin_session::ConnectionProtocol protocol(directory, ui_broker, events);
+                      plugin_session::EventSource *events,
+                      plugin_session::HostServices *host) {
+  plugin_session::ConnectionProtocol protocol(directory, ui_broker, events,
+                                              host);
   while (true) {
     plugin_session::Frame request;
     const int received = ipc_network_recv_full(

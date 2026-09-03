@@ -86,11 +86,13 @@ public:
     close(descriptor);
   }
 
-  void stop(pid_t pid) override {
+  void stop(pid_t pid, uint32_t flags) override {
     if (pid <= 1 || pid == getpid()) return;
-    (void)kill(pid, SIGTERM);
-    for (int attempt = 0; attempt < 10 && onion_proc_is_alive(pid); ++attempt)
-      usleep(50 * 1000);
+    if (flags & plugin::kFlagStopSupported) {
+      (void)kill(pid, SIGTERM);
+      for (int attempt = 0; attempt < 10 && onion_proc_is_alive(pid); ++attempt)
+        usleep(50 * 1000);
+    }
     if (onion_proc_is_alive(pid)) (void)kill(pid, SIGKILL);
   }
 };

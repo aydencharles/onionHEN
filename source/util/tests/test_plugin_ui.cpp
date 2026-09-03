@@ -10,6 +10,7 @@
 #include <onion/plugin_ui_bridge.hpp>
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <sys/socket.h>
 #include <thread>
@@ -43,6 +44,42 @@ public:
   std::vector<uint8_t> event;
   std::string polled_owner;
   std::string disconnected_owner;
+};
+
+class TestHostServices final : public onion::plugin_session::HostServices {
+public:
+  onion::plugin_ui::Status log(std::string_view owner, uint32_t level,
+                               std::string_view message) override {
+    logged.push_back(std::string(owner) + ":" + std::to_string(level) + ":" +
+                     std::string(message));
+    return onion::plugin_ui::Status::Ok;
+  }
+
+  onion::plugin_ui::Status notify(std::string_view owner,
+                                  std::string_view message) override {
+    notifications.push_back(std::string(owner) + ":" + std::string(message));
+    return onion::plugin_ui::Status::Ok;
+  }
+
+  onion::plugin_ui::Status config_get(std::string_view owner,
+                                      std::string_view key,
+                                      std::vector<uint8_t> &value) override {
+    const auto found = config.find(std::string(owner) + "/" + std::string(key));
+    if (found == config.end()) return onion::plugin_ui::Status::NotFound;
+    value.assign(found->second.begin(), found->second.end());
+    return onion::plugin_ui::Status::Ok;
+  }
+
+  onion::plugin_ui::Status config_set(std::string_view owner,
+                                      std::string_view key,
+                                      std::string_view value) override {
+    config[std::string(owner) + "/" + std::string(key)] = std::string(value);
+    return onion::plugin_ui::Status::Ok;
+  }
+
+  std::vector<std::string> logged;
+  std::vector<std::string> notifications;
+  std::map<std::string, std::string> config;
 };
 
 bool action_sink(onion::plugin_ui::Handle, const onion::plugin_ui::Node &node,
@@ -743,6 +780,101 @@ int test_plugin_socket_connection(void) {
   return 0;
 }
 
+int test_connection_host_services(void) {
+  using onion::plugin_session::ConnectionSession;
+  using onion::plugin_session::SessionDirectory;
+  using onion::plugin_ui::ProtocolBroker;
+  using onion::plugin_ui::Status;
+  using onion::plugin_session::kLogCommand;
+  using onion::plugin_session::kNotifyCommand;
+  using onion::plugin_session::kConfigGetCommand;
+  using onion::plugin_session::kConfigSetCommand;
+
+  onion::plugin_ui::Registry registry;
+  ProtocolBroker broker(registry);
+  SessionDirectory directory;
+  TestHostServices host;
+
+  /* Notify capability is required before the NOTIFY command is accepted. */
+  ConnectionSession without_notify(directory, broker, nullptr, &host);
+  auto response = without_notify.dispatch(
+      onion::plugin_session::kHelloCommand,
+      make_hello("TEST00001", onion::plugin_session::Ui));
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+  const std::string notify_text = "plugin says hi";
+  std::vector<uint8_t> notify_payload(notify_text.begin(), notify_text.end());
+  response = without_notify.dispatch(kNotifyCommand, notify_payload);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::PermissionDenied),
+                     static_cast<int>(response.status));
+  TEST_ASSERT_TRUE(host.notifications.empty());
+
+  /* LOG is a baseline service: accepted without an extra capability. */
+  std::vector<uint8_t> log_payload;
+  put_u32(log_payload, 2);
+  const std::string log_text = "boom";
+  log_payload.insert(log_payload.end(), log_text.begin(), log_text.end());
+  response = without_notify.dispatch(kLogCommand, log_payload);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+  TEST_ASSERT_EQ_U64(1, host.logged.size());
+  TEST_ASSERT_STREQ("TEST00001:2:boom", host.logged[0].c_str());
+
+  /* Configuration round-trips through the host config store. */
+  const std::string config_key = "port";
+  const std::string config_value = "1337";
+  std::vector<uint8_t> set_payload;
+  set_payload.insert(set_payload.end(), config_key.begin(), config_key.end());
+  set_payload.push_back(0);
+  set_payload.insert(set_payload.end(), config_value.begin(),
+                     config_value.end());
+  set_payload.push_back(0);
+  response = without_notify.dispatch(kConfigSetCommand, set_payload);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+
+  std::vector<uint8_t> get_payload;
+  get_payload.insert(get_payload.end(), config_key.begin(), config_key.end());
+  get_payload.push_back(0);
+  response = without_notify.dispatch(kConfigGetCommand, get_payload);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+  const std::string fetched_value(response.data.begin(), response.data.end());
+  TEST_ASSERT_STREQ(config_value.c_str(), fetched_value.c_str());
+
+  const std::string missing_key = "absent";
+  std::vector<uint8_t> missing_payload(missing_key.begin(), missing_key.end());
+  missing_payload.push_back(0);
+  response = without_notify.dispatch(kConfigGetCommand, missing_payload);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::NotFound),
+                     static_cast<int>(response.status));
+
+  /* A session declaring Notify can send notifications. */
+  ConnectionSession with_notify(directory, broker, nullptr, &host);
+  response = with_notify.dispatch(
+      onion::plugin_session::kHelloCommand,
+      make_hello("TEST00002",
+                 onion::plugin_session::Notify | onion::plugin_session::Ui));
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+  response = with_notify.dispatch(kNotifyCommand, notify_payload);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::Ok),
+                     static_cast<int>(response.status));
+  TEST_ASSERT_EQ_U64(1, host.notifications.size());
+  TEST_ASSERT_STREQ("TEST00002:plugin says hi",
+                    host.notifications[0].c_str());
+
+  /* Malformed host-service payloads fail closed. */
+  response = with_notify.dispatch(kConfigSetCommand, {});
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::InvalidArgument),
+                     static_cast<int>(response.status));
+  const std::vector<uint8_t> short_log = {1, 2, 3};
+  response = with_notify.dispatch(kLogCommand, short_log);
+  TEST_ASSERT_EQ_INT(static_cast<int>(Status::InvalidArgument),
+                     static_cast<int>(response.status));
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_plugin_ui_suite(void) {
@@ -765,5 +897,7 @@ extern "C" int test_plugin_ui_suite(void) {
                              test_connection_frame_protocol);
   failures += onion_test_run("plugin_ui_socket_connection",
                              test_plugin_socket_connection);
+  failures += onion_test_run("plugin_ui_host_services",
+                             test_connection_host_services);
   return failures;
 }

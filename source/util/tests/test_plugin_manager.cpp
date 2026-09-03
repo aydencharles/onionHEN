@@ -96,6 +96,7 @@ public:
   pid_t launch(const onion::plugin::PluginFile &plugin) override {
     const pid_t pid = next_pid++;
     alive_pids[pid] = true;
+    last_pid = pid;
     launched.push_back(plugin.fingerprint);
     return pid;
   }
@@ -103,13 +104,16 @@ public:
   bool alive(pid_t pid) override { return alive_pids[pid]; }
   void persist(std::string_view, pid_t) override {}
 
-  void stop(pid_t pid) override {
+  void stop(pid_t pid, uint32_t flags) override {
     alive_pids[pid] = false;
+    last_stop_flags = flags;
     ++stop_count;
   }
 
   pid_t next_pid = 100;
+  pid_t last_pid = -1;
   int stop_count = 0;
+  uint32_t last_stop_flags = 0;
   std::map<pid_t, bool> alive_pids;
   std::vector<uint64_t> launched;
 };
@@ -198,6 +202,69 @@ int test_manager_lifecycle(void) {
   return 0;
 }
 
+int test_manager_flags(void) {
+  const std::string root = onion::plugin::kInstallRoot;
+  (void)mkdir(ONION_DATA_ROOT, 0777);
+  (void)mkdir(root.c_str(), 0777);
+  const std::string long_path = root + "/long.elf";
+  const std::string stop_path = root + "/stop.elf";
+  unlink(long_path.c_str());
+  unlink(stop_path.c_str());
+
+  FakeRuntime runtime;
+  onion::plugin::Manager manager(onion::plugin::Repository(root), runtime);
+
+  TEST_ASSERT_TRUE(write_plugin(
+      long_path,
+      make_plugin("LONG00001", onion::plugin::kFlagLongRunning, 1)));
+  onion::plugin::ReconcileReport report = manager.reconcile();
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(report.discovered));
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(report.started));
+  auto inventory = manager.inventory();
+  const auto *long_entry = find_entry(inventory, "LONG00001");
+  TEST_ASSERT_TRUE(long_entry != nullptr);
+  TEST_ASSERT_TRUE(long_entry->long_running());
+  TEST_ASSERT_TRUE(!long_entry->auto_start());
+  TEST_ASSERT_TRUE(!long_entry->running());
+
+  TEST_ASSERT_TRUE(manager.start("LONG00001"));
+  inventory = manager.inventory();
+  TEST_ASSERT_TRUE(find_entry(inventory, "LONG00001")->running());
+
+  /* Simulate an unexpected crash: a long-running plugin is relaunched. */
+  runtime.alive_pids[runtime.last_pid] = false;
+  const size_t launches_before_crash = runtime.launched.size();
+  report = manager.reconcile();
+  TEST_ASSERT_EQ_U64(launches_before_crash + 1, runtime.launched.size());
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(report.started));
+  inventory = manager.inventory();
+  TEST_ASSERT_TRUE(find_entry(inventory, "LONG00001")->running());
+
+  /* STOP_SUPPORTED reaches the runtime stop call with its flag set. */
+  TEST_ASSERT_TRUE(write_plugin(
+      stop_path,
+      make_plugin("STOP00001", onion::plugin::kFlagStopSupported, 1)));
+  (void)manager.reconcile();
+  TEST_ASSERT_TRUE(manager.start("STOP00001"));
+  inventory = manager.inventory();
+  const auto *stop_entry = find_entry(inventory, "STOP00001");
+  TEST_ASSERT_TRUE(stop_entry != nullptr && stop_entry->stop_supported());
+  runtime.last_stop_flags = 0;
+  TEST_ASSERT_TRUE(manager.stop("STOP00001"));
+  TEST_ASSERT_EQ_U64(onion::plugin::kFlagStopSupported,
+                     runtime.last_stop_flags);
+
+  /* A non-stop-supported plugin stops without the graceful flag. */
+  runtime.last_stop_flags = 0;
+  TEST_ASSERT_TRUE(manager.stop("LONG00001"));
+  TEST_ASSERT_EQ_U64(onion::plugin::kFlagLongRunning, runtime.last_stop_flags);
+
+  unlink(long_path.c_str());
+  unlink(stop_path.c_str());
+  (void)manager.reconcile();
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_plugin_manager_suite(void) {
@@ -206,5 +273,7 @@ extern "C" int test_plugin_manager_suite(void) {
                              test_fingerprint_changes_with_content);
   failures += onion_test_run("plugin_manager.lifecycle",
                              test_manager_lifecycle);
+  failures += onion_test_run("plugin_manager.flags",
+                             test_manager_flags);
   return failures;
 }

@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 namespace onion::plugin_session {
 
@@ -17,6 +18,12 @@ inline constexpr uint32_t kFrameMagic = 0x4F504943u;
 inline constexpr uint16_t kWireVersion = 1;
 inline constexpr uint16_t kPingCommand = 1;
 inline constexpr uint16_t kResponseCommand = 2;
+inline constexpr uint16_t kLogCommand = 3;
+inline constexpr uint16_t kNotifyCommand = 4;
+inline constexpr uint16_t kConfigGetCommand = 5;
+inline constexpr uint16_t kConfigSetCommand = 6;
+inline constexpr uint16_t kGetStatusCommand = 7;
+inline constexpr uint16_t kStopCommand = 8;
 inline constexpr uint16_t kEventCommand = 9;
 inline constexpr uint16_t kHelloCommand = 16;
 inline constexpr size_t kMaxPayloadSize = 4096;
@@ -70,12 +77,42 @@ public:
   virtual void disconnect(std::string_view owner) = 0;
 };
 
+/*
+ * Host-side services a plugin can reach over the session protocol. Injected by
+ * the daemon so libonion_plugin_session stays free of platform dependencies
+ * (logging, notifications, and configuration persistence all live in the
+ * host). A null pointer means the corresponding commands return NotSupported.
+ */
+class HostServices {
+public:
+  virtual ~HostServices() = default;
+
+  /* LOG payload is a 32-bit little-endian level followed by UTF-8 text. */
+  virtual plugin_ui::Status log(std::string_view owner, uint32_t level,
+                                std::string_view message) = 0;
+
+  /* Requires the Notify capability; enforced by ConnectionSession. */
+  virtual plugin_ui::Status notify(std::string_view owner,
+                                   std::string_view message) = 0;
+
+  /* CONFIG_GET: value bytes are returned raw (no trailing NUL). */
+  virtual plugin_ui::Status config_get(std::string_view owner,
+                                       std::string_view key,
+                                       std::vector<uint8_t> &value) = 0;
+
+  /* CONFIG_SET: key/value are NUL-terminated strings on the wire. */
+  virtual plugin_ui::Status config_set(std::string_view owner,
+                                       std::string_view key,
+                                       std::string_view value) = 0;
+};
+
 /* One instance is owned by one accepted transport connection. */
 class ConnectionSession {
 public:
   ConnectionSession(SessionDirectory &directory,
                     plugin_ui::ProtocolBroker &ui_broker,
-                    EventSource *events = nullptr);
+                    EventSource *events = nullptr,
+                    HostServices *host = nullptr);
   ~ConnectionSession();
 
   ConnectionSession(const ConnectionSession &) = delete;
@@ -94,6 +131,7 @@ private:
   SessionDirectory &directory_;
   plugin_ui::ProtocolBroker &ui_broker_;
   EventSource *events_ = nullptr;
+  HostServices *host_ = nullptr;
   mutable std::mutex mutex_;
   std::string owner_;
   uint32_t capabilities_ = 0;
@@ -110,8 +148,9 @@ class ConnectionProtocol {
 public:
   ConnectionProtocol(SessionDirectory &directory,
                      plugin_ui::ProtocolBroker &ui_broker,
-                     EventSource *events = nullptr)
-      : session_(directory, ui_broker, events) {}
+                     EventSource *events = nullptr,
+                     HostServices *host = nullptr)
+      : session_(directory, ui_broker, events, host) {}
 
   FrameResult handle(const Frame &request);
   ConnectionSession &session() { return session_; }

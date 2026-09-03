@@ -21,6 +21,8 @@ inline constexpr size_t kDefaultMaxElfSize = 64u * 1024u * 1024u;
 inline constexpr uint32_t kKnownCapabilities = (1u << 6) - 1u;
 inline constexpr uint32_t kKnownFlags = (1u << 3) - 1u;
 inline constexpr uint32_t kFlagAutoStart = 1u << 0;
+inline constexpr uint32_t kFlagLongRunning = 1u << 1;
+inline constexpr uint32_t kFlagStopSupported = 1u << 2;
 
 #if defined(ONION_HOST_TEST)
 #ifndef ONION_DATA_ROOT
@@ -97,7 +99,7 @@ public:
   virtual pid_t launch(const PluginFile &plugin) = 0;
   virtual bool alive(pid_t pid) = 0;
   virtual void persist(std::string_view plugin_id, pid_t pid) = 0;
-  virtual void stop(pid_t pid) = 0;
+  virtual void stop(pid_t pid, uint32_t flags) = 0;
 };
 
 struct Instance {
@@ -116,6 +118,12 @@ struct InventoryEntry {
   bool running() const { return pid > 1; }
   bool auto_start() const {
     return (descriptor.flags & kFlagAutoStart) != 0;
+  }
+  bool long_running() const {
+    return (descriptor.flags & kFlagLongRunning) != 0;
+  }
+  bool stop_supported() const {
+    return (descriptor.flags & kFlagStopSupported) != 0;
   }
 };
 

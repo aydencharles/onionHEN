@@ -177,6 +177,7 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_bridge/plugin_ui_bridge.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_session/plugin_session.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_ipc_server.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_ui_bridge_server.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_host_services.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/dynamic_ui_xml.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/dynamic_ui_runtime.o
 
@@ -280,6 +281,10 @@ $(BUILD_DIR)/prod/daemon/plugin_ipc_server.o: $(REPO_ROOT)/source/daemon/source/
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/daemon/plugin_ui_bridge_server.o: $(REPO_ROOT)/source/daemon/source/plugin_ui_bridge_server.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/daemon/plugin_host_services.o: $(REPO_ROOT)/source/daemon/source/plugin_host_services.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

@@ -9,6 +9,7 @@
 #include "progress_dialog.hpp"
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
+#include "dynamic_ui_runtime.hpp"
 #include <onion/platform.h>
 #include <string>
 
@@ -22,8 +23,6 @@ void generate_plugin_config_xml(std::string &xml_buffer);
 void generate_account_xml(std::string &xml_buffer);
 void generate_plapps_xml(std::string &new_xml);
 void generate_toolbox_xml(std::string &new_xml);
-void generate_pkg_installer_xml(std::string &xml_buffer);
-void generate_pkg_net_xml(std::string &xml_buffer);
 void generate_cheats_xml(std::string &new_xml, std::string &not_open_tid,
                          bool running_as_debug_settings,
                          bool show_while_not_open);
@@ -41,6 +40,8 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   std::string new_xml_string;
   std::string resourceName = Mono_to_String(FileName);
   MonoDomain *domain = current_mono_domain();
+  const bool dynamic_page =
+      onion::shellui::dynamic_ui::render_resource(resourceName, new_xml_string);
 
 #if SHELL_DEBUG == 1
   LOG_DEBUG("GetManifestResourceStream_Hook: %s domain=%p root=%p",
@@ -50,20 +51,25 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   const bool shortcut = g_ui.any_cheat_shortcut();
   const bool shortcut_not_open = g_ui.cheats_shortcut_activated_not_open;
 
-  toolbox::RouteResult route = toolbox::resolve_resource({
-      .resource = resourceName,
-      .names =
-          {
-              .payloads_xml = payloads_xml,
-              .debug_settings_xml = debug_settings_xml,
-              .cheats_xml = cheats_xml,
-          },
-      .cheats_shortcut = g_ui.cheats_shortcut_activated,
-      .cheats_shortcut_not_open = g_ui.cheats_shortcut_activated_not_open,
-  });
+  toolbox::RouteResult route{};
+  if (dynamic_page) {
+    g_ui.set_active_page(toolbox::Page::DynamicPlugin);
+  } else {
+    route = toolbox::resolve_resource({
+        .resource = resourceName,
+        .names =
+            {
+                .payloads_xml = payloads_xml,
+                .debug_settings_xml = debug_settings_xml,
+                .cheats_xml = cheats_xml,
+            },
+        .cheats_shortcut = g_ui.cheats_shortcut_activated,
+        .cheats_shortcut_not_open = g_ui.cheats_shortcut_activated_not_open,
+    });
 
-  g_ui.set_active_page(toolbox::active_page_after_resource(
-      g_ui.active_page, route.page, resourceName));
+    g_ui.set_active_page(toolbox::active_page_after_resource(
+        g_ui.active_page, route.page, resourceName));
+  }
 
   if (route.page == toolbox::Page::RedirectOgDebug) {
     MonoString *debug_resource =
@@ -74,8 +80,8 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
         inst, debug_resource);
   }
 
-  if (route.page == toolbox::Page::None ||
-      route.page == toolbox::Page::SuperuserPass) {
+  if (!dynamic_page && (route.page == toolbox::Page::None ||
+                        route.page == toolbox::Page::SuperuserPass)) {
     return GetManifestResourceStream_Original(inst, FileName);
   }
 
@@ -104,7 +110,8 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     }
   }
 
-  switch (route.page) {
+  if (!dynamic_page) {
+    switch (route.page) {
   case toolbox::Page::DebugSettings:
     LoadSettings();
     generate_toolbox_xml(new_xml_string);
@@ -147,14 +154,9 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   case toolbox::Page::RemotePlay:
     generate_remote_play_xml(new_xml_string);
     break;
-  case toolbox::Page::PkgInstaller:
-    generate_pkg_installer_xml(new_xml_string);
-    break;
-  case toolbox::Page::PkgNet:
-    generate_pkg_net_xml(new_xml_string);
-    break;
   default:
     return GetManifestResourceStream_Original(inst, FileName);
+    }
   }
 
   MemoryStream_Instance = New_Mono_XML_From_String(new_xml_string, domain);

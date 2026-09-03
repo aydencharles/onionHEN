@@ -33,8 +33,6 @@ Sync OnionHEN external dependencies from open-source upstreams.
 
 Submodules (under third_party/):
   kstuff-lite      https://github.com/EchoStretch/kstuff-lite
-  ftpsrv           compiled from the pinned source directly into util
-
 Runtime-only external dependency:
   elfldr @ 9021    https://github.com/ps5-payload-dev/elfldr
                   Required only for initial bootstrap; OnionHEN starts

@@ -16,11 +16,13 @@ along with this program; see the file COPYING. If not, see
 
 #include "detour.h"
 #include "debug_settings_route_runtime.hpp"
+#include "dynamic_ui_runtime.hpp"
 #include "hooked_funcs.hpp"
 #include "defs.h"
 #include "external_symbols.hpp"
 #include "homeui_top_nav_patch.hpp"
 #include "ipc.hpp"
+#include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
 #include "ucred.h"
@@ -732,6 +734,9 @@ int main(int argc, char const* argv[]) {
   is_3xx = (sw.version < kFw3xxMaxExclusive);
   is_6xx = (sw.version >= kFw6xxMin);
   shellui_configure_debug_settings_route(sw.version);
+  onion::shellui::dynamic_ui::configure(sw.version);
+  if (!onion::shellui::plugin_ui_bridge::start())
+    LOG_ERROR("Failed to start dynamic plugin UI bridge");
   LOG_DEBUG("System Software Version: %s is_3xx: %s debug_settings_old: %s",
               sw.version_str, is_3xx ? "Yes" : "No",
               shellui_debug_settings_uses_old_route() ? "Yes" : "No");

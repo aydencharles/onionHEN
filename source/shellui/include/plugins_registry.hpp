@@ -18,9 +18,9 @@ inline constexpr std::string_view kConfigResourcePrefix =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.";
 
 struct Descriptor {
-  const char *key;        /* stable plugin key, e.g. "ftpsrv" */
+  const char *key;        /* stable plugin key, e.g. "kstuff" */
   const char *toggle_id;  /* XML list_item id on the plugins page, "id_plugin_*" */
-  const char *config_xml; /* relative config page resource, e.g. "ftpsrv.xml" */
+  const char *config_xml; /* relative config page resource, e.g. "kstuff.xml" */
   const char *title_key;  /* i18n key for the entry title */
   const char *sub_key;    /* i18n key for the entry description */
 };
@@ -29,10 +29,6 @@ struct Descriptor {
 inline constexpr Descriptor kRegistry[] = {
     {"kstuff", "id_plugin_kstuff", "kstuff.xml", "plugin.kstuff.title",
      "plugin.kstuff.sub"},
-    {"ftpsrv", "id_plugin_ftpsrv", "ftpsrv.xml", "plugin.ftpsrv.title",
-     "plugin.ftpsrv.sub"},
-    {"shadowmount", "id_plugin_shadowmount", "shadowmount.xml",
-     "plugin.shadowmount.title", "plugin.shadowmount.sub"},
 };
 
 inline constexpr std::size_t kRegistrySize =

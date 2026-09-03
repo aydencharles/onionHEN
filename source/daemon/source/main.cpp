@@ -45,6 +45,8 @@ along with this program; see the file COPYING. If not, see
 #include "globalconf.hpp"
 #include "launcher.hpp"
 #include "ipc.hpp"
+#include "plugin_ipc_server.hpp"
+#include "plugin_manager_runtime.hpp"
 #include "startup_navigation.hpp"
 #include "welcome_toast.hpp"
 #include <onion/debug_settings_route_policy.hpp>
@@ -147,6 +149,8 @@ void install_crash_handlers() {
 void start_worker_threads(pthread_t* fifo_thr, pthread_t* msg_thr) {
   pthread_create(fifo_thr, nullptr, fifo_and_dumper_thread, nullptr);
   pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
+  if (!onion::daemon::plugin_ipc::start())
+    LOG_ERROR("plugin IPC server failed to start");
   pthread_t ctrl_thr = nullptr;
   pthread_create(&ctrl_thr, nullptr, control_tcp_loop, nullptr);
   pthread_detach(ctrl_thr);
@@ -284,6 +288,13 @@ int main() {
 
   (void)onion_net_get_ip_address(&buz[0], sizeof(buz));
   start_worker_threads(&fifo_thr, &msg_thr);
+  for (int attempt = 0;
+       attempt < 20 && !onion::daemon::plugin_ipc::is_listening(); ++attempt)
+    usleep(50 * 1000);
+  if (onion::daemon::plugin_ipc::is_listening())
+    onion::daemon::plugins::start();
+  else
+    LOG_ERROR("[plugins] startup skipped because plugin IPC is not listening");
   onion_ready_signal_pid(ONION_READY_DAEMON, getpid());
 
   LOG_DEBUG("is toolbox only: %s | ver: %x", toolbox_only ? "Yes" : "No",

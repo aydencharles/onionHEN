@@ -22,6 +22,7 @@ along with this program; see the file COPYING. If not, see
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Shared injectee-side IPC client (crit + util daemons).
@@ -40,6 +41,14 @@ along with this program; see the file COPYING. If not, see
 // Optional: host may install a notify sink (e.g. shellui bubble). Default: none.
 using OnionIpcNotifyFn = void (*)(const char *text);
 void onion_ipc_set_notify(OnionIpcNotifyFn fn);
+
+struct PluginInventoryItem {
+  std::string plugin_id;
+  std::string version;
+  std::string name;
+  bool running = false;
+  bool auto_start = false;
+};
 
 class IPC_Client {
 public:
@@ -72,14 +81,6 @@ public:
   // High-level commands
   int GetDaemonPid();
   IPC_Ret ToggleSetting(DaemonCommands cmd, bool turn_on);
-  /** Query the in-process FTP module without inspecting a PID marker. */
-  bool FtpStatus();
-  /** Ask util to rebind an enabled FTP listener after network resume. */
-  bool RecoverFtp();
-  /** Query the in-process ShadowMount+ module without inspecting a PID marker. */
-  bool ShadowMountStatus();
-  /** Query the in-process DPI package install server without a PID marker. */
-  bool PkgNetStatus();
   /** Push a fresh console system language to util for live re-apply. */
   bool SetSystemLanguage(int language);
   void KillDaemon();
@@ -104,6 +105,11 @@ public:
   bool Set_Fan_Threshold(int temp, bool enabled);
   /** Crit: inject ShellUI toolbox (BREW_ENABLE_TOOLBOX). */
   bool EnableToolbox();
+  bool ListPlugins(std::vector<PluginInventoryItem> &plugins);
+  bool StartPlugin(const std::string &plugin_id);
+  bool StopPlugin(const std::string &plugin_id);
+  bool ReloadPlugin(const std::string &plugin_id);
+  bool DeletePlugin(const std::string &plugin_id);
 
   // Kept for call-site readability (matches historical public field).
   // Prefer is_util(); do not reassign after construction.
@@ -120,6 +126,8 @@ private:
   const char *socket_path() const;
   bool require_util(const char *what) const;
   bool require_crit(const char *what) const;
+  bool PluginOperation(DaemonCommands command,
+                       const std::string &plugin_id);
 
   /** Unlocked: full-frame send of IPCMessage. */
   int send_frame_unlocked(const IPCMessage &msg);

@@ -48,9 +48,9 @@ enum DaemonCommands : unsigned int {
   BREW_UTIL_TEST_CONNECTION = 0x8000000u,
   BREW_UTIL_RETURN_VALUE = 0x8000002u,
   BREW_UTIL_DAEMON_PID,
-  BREW_UTIL_TOGGLE_FTP,  // Stable ordinal retained from the former FTP toggle.
+  BREW_UTIL_UNUSED_FTP_TOGGLE, // was built-in FTP toggle; keep released ordinal
   BREW_UTIL_UNUSED_KLOG, // was BREW_UTIL_TOGGLE_KLOG (service removed)
-  BREW_UTIL_TOGGLE_PKGNET, // stable ordinal retained from the former DPI toggle
+  BREW_UTIL_UNUSED_DPI_TOGGLE, // was built-in DPI toggle; keep released ordinal
   BREW_UTIL_LAUNCH_PAYLOAD,
   BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY, // was SHELLUI_ON_STANDBY; toolbox follows SceSysCore EXEC
   BREW_UTIL_GET_GAME_VER,
@@ -66,16 +66,23 @@ enum DaemonCommands : unsigned int {
   BREW_UTIL_UNUSED_LEGACY_SERVICE_SCAN,
   BREW_UTIL_UNUSED_LEGACY_SERVICE_TOGGLE,
 
-  // New command uses an explicit value so adding it cannot shift the legacy
-  // sequential command block above.
-  BREW_UTIL_FTP_STATUS = 0x8000014u,
-  BREW_UTIL_RECOVER_FTP = 0x8000015u,
-  BREW_UTIL_TOGGLE_SHADOWMOUNT = 0x8000016u,
-  BREW_UTIL_SHADOWMOUNT_STATUS = 0x8000017u,
-  BREW_UTIL_PKGNET_STATUS = 0x8000018u,
+  // Explicit values preserve the released ordinals after removing built-in FTP.
+  BREW_UTIL_UNUSED_FTP_STATUS = 0x8000014u,
+  BREW_UTIL_UNUSED_FTP_RECOVER = 0x8000015u,
+  BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE = 0x8000016u,
+  BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS = 0x8000017u,
+  BREW_UTIL_UNUSED_DPI_STATUS = 0x8000018u,
   // Daemon pushes a live console system language so util re-applies it without
   // needing a SystemService query (util is under PTRACE_AUTHID after launch).
   BREW_UTIL_SET_SYSTEM_LANG = 0x8000019u,
+
+  // Crit daemon plugin management. Payloads contain only validated plugin IDs;
+  // filesystem paths never cross the IPC boundary.
+  BREW_PLUGIN_LIST = 0x9000100u,
+  BREW_PLUGIN_START = 0x9000101u,
+  BREW_PLUGIN_STOP = 0x9000102u,
+  BREW_PLUGIN_RELOAD = 0x9000103u,
+  BREW_PLUGIN_DELETE = 0x9000104u,
 
   // Legacy: manual elfldr launch removed (embedded 9020 is bootstrapper-managed)
   BREW_UTIL_LAUNCH_ELFLDR = 0xE1F1D8u,

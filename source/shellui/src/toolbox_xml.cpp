@@ -12,8 +12,9 @@
 #include "plugins_registry.hpp"
 #include "ps5_settings_ui.hpp"
 #include "toolbox_i18n.hpp"
-#include "toolbox_pkg_xml.hpp"
 #include "toolbox_values.hpp"
+#include "dynamic_ui_runtime.hpp"
+#include "external_plugin_ui.hpp"
 #include "onion_cjson.hpp"
 
 #include <dirent.h>
@@ -318,6 +319,9 @@ void generate_plugins_xml(std::string& xml_buffer) {
     page.link(d.toggle_id, toolbox_i18n::tr(d.title_key), d.config_xml,
               toolbox_i18n::tr(d.sub_key));
 
+  onion::shellui::external_plugins::append_inventory(page);
+  onion::shellui::dynamic_ui::append_plugin_links(page);
+
   xml_buffer = page.build();
 }
 
@@ -332,57 +336,8 @@ void generate_kstuff_config_xml(std::string &xml_buffer) {
   xml_buffer = page.build();
 }
 
-void generate_ftpsrv_config_xml(std::string &xml_buffer) {
-  using namespace onion::plugins;
-  const Descriptor *d = find_by_key("ftpsrv");
-  ps5ui::Page page("id_plugin_config", toolbox_i18n::tr(d->title_key));
-  page.toggle("id_plugin_ftpsrv_run", toolbox_i18n::tr("ftp.run"), /*on=*/false,
-              toolbox_i18n::tr("ftp.run.sub"))
-      .toggle("id_plugin_ftpsrv_autoload", toolbox_i18n::tr("ftp.autoload"),
-              /*on=*/false, toolbox_i18n::tr("ftp.autoload.sub"))
-      .text_field("id_plugin_ftpsrv_port", toolbox_i18n::tr("ftp.port"),
-                  toolbox_i18n::tr("ftp.port.sub"), "number", "1", "5",
-                  std::nullopt, std::nullopt, std::nullopt,
-                  toolbox_val("id_plugin_ftpsrv_port", "1337"));
-  xml_buffer = page.build();
-}
-
-void generate_shadowmount_config_xml(std::string &xml_buffer) {
-  using namespace onion::plugins;
-  const Descriptor *d = find_by_key("shadowmount");
-  ps5ui::Page page("id_plugin_config", toolbox_i18n::tr(d->title_key));
-  page.toggle("id_plugin_shadowmount_autoload",
-              toolbox_i18n::tr("shadowmount.autoload"), /*on=*/false,
-              toolbox_i18n::tr("shadowmount.autoload.sub"))
-      .button("id_plugin_shadowmount_run", toolbox_i18n::tr("shadowmount.run"),
-              std::nullopt, toolbox_i18n::tr("shadowmount.run.sub"));
-  xml_buffer = page.build();
-}
-
-void generate_pkg_installer_xml(std::string &xml_buffer) {
-  toolbox_pkg::generate_pkg_installer_xml(xml_buffer);
-}
-
-void generate_pkg_net_xml(std::string &xml_buffer) {
-  /* Like the FTP config page: toggles start off and OnPreCreate binds the
-   * real state through resolve_toolbox_control_value (kExactValues). */
-  toolbox_pkg::generate_pkg_net_xml(xml_buffer, /*run_on=*/false,
-                                    /*autoload_on=*/false);
-}
-
 void generate_plugin_config_xml(std::string &xml_buffer) {
-  using namespace onion::plugins;
-
-  const Descriptor *d = find_by_key(g_ui.active_plugin);
-  if (!d)
-    d = &kRegistry[0];
-
-  if (std::string_view(d->key) == "kstuff")
-    generate_kstuff_config_xml(xml_buffer);
-  else if (std::string_view(d->key) == "ftpsrv")
-    generate_ftpsrv_config_xml(xml_buffer);
-  else
-    generate_shadowmount_config_xml(xml_buffer);
+  generate_kstuff_config_xml(xml_buffer);
 }
 
 void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
@@ -570,7 +525,8 @@ std::string toolbox_val(const char* id, const char* fallback = "0") {
 
 void append_toolbox_pkg_group(ps5ui::Group& g) {
   g.link("id_game_package_installer", toolbox_i18n::tr("pkg.installer"),
-         "pkg_installer.xml", toolbox_i18n::tr("pkg.installer.sub"))
+         "PkgInstaller/data/pkginstaller.xml",
+         toolbox_i18n::tr("pkg.installer.sub"))
       .link("id_game_add_content_manager", toolbox_i18n::tr("pkg.add_content"),
             "Addcontent/data/addcontent.xml",
             toolbox_i18n::tr("pkg.add_content.sub"));
@@ -909,15 +865,7 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                        ps5ui::Style::Center)
                 .label("id_project_9",
                        "miniz / Keystone (cheats engine)",
-                    ps5ui::Style::Center)
-                  .label("id_project_10",
-                    "ftpsrv (drakmor) — "
-                    "https://github.com/drakmor/ftpsrv/tree/nexgen",
-                    ps5ui::Style::Center)
-                  .label("id_project_11",
-                    "ShadowMountPlus (Drakmor / VoidWhisper) — "
-                    "https://github.com/drakmor/ShadowMountPlus",
-                    ps5ui::Style::Center);
+                       ps5ui::Style::Center);
           },
           toolbox_i18n::tr("about.projects.sub"), kIconProject);
 }

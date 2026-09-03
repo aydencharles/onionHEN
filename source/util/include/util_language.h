@@ -30,10 +30,6 @@ void util_store_system_language(int language);
 /** Apply an explicit or system-backed Toolbox language to util notifications. */
 void util_apply_ui_language(int ui_language);
 
-/** Resolved UI language code for the web UI (one of the catalog locales,
- *  e.g. "zh-Hans", "en", "es", "pt-BR"). */
-const char *util_webui_language_code(void);
-
 #ifdef __cplusplus
 }
 #endif

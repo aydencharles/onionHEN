@@ -18,9 +18,6 @@ along with this program; see the file COPYING. If not, see
 #include "cheats/cheat_service.hpp"
 #include "util_language.h"
 #include "util_toolbox.h"
-#include "service_facade.hpp"
-#include "pkgserver_adapter.h"
-#include <onion/builtin_services.h>
 #include <onion/settings.hpp>
 #include <onion/log_settings.hpp>
 #include <onion/platform.h>
@@ -59,7 +56,6 @@ extern "C" {
 extern bool is_handler_enabled;
 
 onion::SettingsStore g_settings;
-static bool g_services_initialized = false;
 void start_ip_thread(void);
 void* IPC_loop(void* args);
 bool shellui_patch(void);
@@ -78,7 +74,6 @@ void __stack_chk_fail(void) {
 }
 
 bool LoadSettings() {
-    const onion::Settings previous = g_settings.snapshot();
     onion::Settings s{};
     if (!onion::settings_load(&s)) {
         LOG_ERROR("config.ini missing; using defaults (path primary=%s)",
@@ -97,33 +92,6 @@ bool LoadSettings() {
     g_settings.store(s);
     util_apply_ui_language(s.ui_lang);
 
-    if (!g_services_initialized) {
-        g_services_initialized = true;
-        if (s.ftp_autoload &&
-            !onion::services::ftpService().start(
-                static_cast<uint16_t>(s.ftp_port))) {
-            LOG_WARN("FTP autoload failed on TCP %d", s.ftp_port);
-        }
-        if (s.shadowmount_autoload &&
-            !onion::services::shadowMountService().running() &&
-            !onion::services::shadowMountService().start()) {
-            LOG_WARN("ShadowMount autoload failed");
-        }
-        if (s.pkgnet_autoload && !onion::services::pkgNetService().running() &&
-            !onion::services::pkgNetService().start()) {
-            LOG_WARN("pkg-server autoload failed on TCP %u",
-                     static_cast<unsigned>(ONION_PKGNET_PORT));
-        }
-    } else if (previous.ftp_port != s.ftp_port) {
-        if (!onion::services::ftpService().reconfigure(
-                static_cast<uint16_t>(s.ftp_port))) {
-            LOG_WARN("FTP port reconfigure failed on TCP %d", s.ftp_port);
-        }
-    }
-    /* Re-sync on every settings load (boot and IPC reloads) so a Toolbox
-       language change reaches the running pkg-server without a restart;
-       pkgnet_start_thread() also syncs on each (re)start. */
-    pkg_server_set_webui_lang(util_webui_language_code());
     /* Missing file is not an error — defaults were applied. */
     return true;
 }

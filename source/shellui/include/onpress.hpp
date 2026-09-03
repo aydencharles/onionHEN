@@ -68,6 +68,7 @@ const OnPressPrefixEntry *onpress_cheats_prefix(size_t *count);
 const OnPressPrefixEntry *onpress_packages_prefix(size_t *count);
 
 const OnPressExactEntry *onpress_plugins_exact(size_t *count);
+const OnPressPrefixEntry *onpress_plugins_prefix(size_t *count);
 
 /**
  * Shared built-in plugin handlers (root page + plugins page).
@@ -75,14 +76,7 @@ const OnPressExactEntry *onpress_plugins_exact(size_t *count);
  * the next OnionHEN start and do not start or stop the service now.
  */
 OnPressResult onpress_kstuff_autoload(OnPressContext &ctx);
-OnPressResult onpress_ftp_run(OnPressContext &ctx);
-OnPressResult onpress_ftp_autoload(OnPressContext &ctx);
-OnPressResult onpress_ftp_port(OnPressContext &ctx);
 OnPressResult onpress_delete_kstuff(OnPressContext &ctx);
-OnPressResult onpress_shadowmount_run(OnPressContext &ctx);
-OnPressResult onpress_shadowmount_autoload(OnPressContext &ctx);
-OnPressResult onpress_pkgnet_run(OnPressContext &ctx);
-OnPressResult onpress_pkgnet_autoload(OnPressContext &ctx);
 
 /** Shared toggle helpers. */
 inline bool value_as_int(const OnPressContext &ctx) {

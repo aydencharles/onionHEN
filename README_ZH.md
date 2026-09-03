@@ -63,14 +63,15 @@ OnionHEN 面向已越狱的 PS5，提供一套能日常使用、也方便维护�
 - **ShellUI 工具箱** — 注入 PS5 ShellUI 的设置页
 - **系统准备** — 提权、重新挂载文件系统、阻断系统更新分区
 - **fSELF / fPKG** — 内嵌 kstuff，用来跑自制 SELF / PKG；默认加载，可在工具箱关掉
-- **PS5 FTP 服务器** — 内置源码模块，端口可配置
-- **ShadowMount+** — 内置插件，扫描并挂载来自内置或外置存储的游戏
+- **插件运行时** — 发现、校验、启动、停止、重载和删除带 descriptor 的插件 ELF
+- **PS5 FTP 服务器** — 由可选的外部 `onionHEN-ftpsrv-plugin` 提供
+- **ShadowMount+** — 由可选的外部 `onionHEN-shadowmountplus-plugin` 提供
 - **远程游玩配对** — 在网络菜单中启用 PS5 原生远程游玩服务、生成配对 PIN 并注册客户端
 - **用户 Payload 管理** — 启动和停止用户添加的普通 `.elf` payload，可选自动启动
 - **游戏监控条** — 游戏中显示 FPS、CPU、GPU、内存、温度和网络信息
 - **金手指** — 本地 JSON、SHN、MC4、ShnExt 文件，运行中即可开关
 - **主机工具** — 账号激活、外接硬盘、Title ID、风扇、快捷键和游戏选项
-- **DPI（网络包安装器）** — 控制台上的浏览器 pkg 安装器：拖放上传 PS4/PS5 的 `.pkg`，逐文件识别包类型并复用暂存文件以便重试，SSE 实时进度（速度与预计剩余时间），可排序的安装队列（支持上移/下移与逐文件重试），每次状态变化都有桌面通知。界面与工具箱一样支持 14 种语言，跟随 `toolbox.language`，控制台系统语言在运行中变化时即时同步
+- **DPI v2** — 由可选的外部 `onionHEN-dpiv2-plugin` 提供
 - **应用越狱** — 白名单自制软件可通过守护进程沙盒 FIFO 申请提权
 - **可恢复运行时** — 关键守护进程和工具守护进程分开；主进程可以拉起工具进程
 - **统一配置** — 工具箱和守护进程共用一份带版本号的 `config.ini`
@@ -101,36 +102,32 @@ OnionHEN 不内置内核漏洞。第一次引导仍需要外部 **9021** 上的 
 OnionHEN.elf → bootstrapper → onion_elfldr.elf (:9020) → util.elf → kstuff.elf → daemon.elf → Toolbox
 ```
 
-若 `ftp.autoload` 已启用，内置 FTP 模块会在 `kstuff` 之后、daemon 之前启动。
-`shadowmount.autoload` 启用时，ShadowMount+ 模块同样按此顺序启动。
+`kstuff` 就绪后，daemon 会发现并启动外部插件。
 
 ### FTP 服务器
 
-PS5 FTP 服务器位于 **工具箱 → Payload 与内核 → 插件 → FTP 服务器**。一个开关控制本次会话启停，
-另一个开关控制下次 OnionHEN 启动时是否自动运行。插件页支持 `1` 到 `65535` 的端口，
-修改端口时会重启内置监听线程，并包含上游 `ftpsrv` 的 `KILL`、`SELF`、`SCHK`、
-`MTRW`、`AUTHID` 等命令（视固件支持而定）。
+FTP 由独立的
+[`onionHEN-ftpsrv-plugin`](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin)
+提供。将其安装为 `/data/OnionHEN/plugins/FTPS00001.elf` 后，OnionHEN 会自动发现
+并启动；插件动态设置页提供启用、端口和重启控制。插件保留上游 `ftpsrv` 的
+`KILL`、`SELF`、`SCHK`、`MTRW`、`AUTHID` 等命令（视固件支持而定）。
 
 ### ShadowMount+
 
-ShadowMount+ 位于 **工具箱 → Payload 与内核 → 插件 → ShadowMount+**。一个按钮控制本次会话启停，
-另一个开关控制下次 OnionHEN 启动时是否自动运行。该模块会扫描内置与外置存储中
-受支持的游戏镜像（`.ffpkg`、UFS、exFAT、PFS 以及嵌套压缩 PFS 容器），后台完成
-挂载和安装。它依赖 `kstuff`，自身选项保存在 `/data/shadowmount/config.ini`；
-可用 `scanpath=` 条目覆盖扫描目录。
+ShadowMount+ 由可选的外部
+[`onionHEN-shadowmountplus-plugin`](https://github.com/OnionBuddies/onionHEN-shadowmountplus-plugin)
+提供。将带 descriptor 的 ELF 安装到 `/data/OnionHEN/plugins/` 后，daemon 统一负责
+发现、启动、停止、重载、替换和删除；插件动态页面提供立即扫描操作。它依赖
+`kstuff`，自身选项保存在 `/data/shadowmount/config.ini`。
 
 ### DPI（网络包安装器）
 
-网络包安装器位于 **工具箱 → 内容安装与管理 → 软件包安装器 → 从网络安装内容**
-（打开后的页面标题为"网络安装器"）。一个按钮控制本次会话启停，
-另一个开关控制下次 OnionHEN 启动时是否自动运行（配置项 `pkgnet.autoload`）。
-它监听 TCP **9090**（上传 / 安装分块 API）和 **12800**（Web UI + 状态流）。
-浏览器打开 `http://<console>:12800`，拖入 `.pkg`，页面实时显示进度、传输速度和
-预计剩余时间，随后由系统执行安装。
-
-Web UI 与工具箱一样支持 14 种语言。`toolbox.language=system` 时跟随控制台
-系统语言，并在运行中系统语言变化时实时更新。完整 API 见
-[docs/api.md](docs/api.md)。
+DPI v2 由可选的外部
+[`onionHEN-dpiv2-plugin`](https://github.com/OnionBuddies/onionHEN-dpiv2-plugin)
+提供。将其安装为 `/data/OnionHEN/plugins/DPIV00001.elf` 后，OnionHEN 会自动发现
+并启动；插件动态设置页提供启用、API 端口、WebUI 端口和重启控制。浏览器仍是
+安装操作界面，保留分块上传、队列管理、暂存文件复用和 SSE 实时进度。默认 WebUI
+地址是 `http://<console>:12800`。
 
 ### 远程游玩
 
@@ -153,11 +150,9 @@ Web UI 与工具箱一样支持 14 种语言。`toolbox.language=system` 时跟�
 只支持普通 `.elf`。可在工具箱里打开自动启动；OnionHEN 会在 ELF 旁边写一个
 同名的 `.auto_start` 文件记住这个选择。
 
-所有 `.elf` 文件名都使用相同的 Payload 页面、加载器和自动启动流程，包括
-`kstuff`、`ftpsrv` 和 `ftpsrv-ps5`。已有有效 PID 记录的用户 Payload 会保持运行，
-后续启动和自动启动请求直接跳过。内置服务只管理自身运行时，不会停止同名用户
-Payload。若两个 FTP 服务使用相同 TCP 端口，只有一个服务能够绑定成功。
-`shadowmountplus` 是内置模块的保留名称，用户 Payload 自动启动扫描会忽略它。
+所有 `.elf` 文件名都使用相同的 Payload 页面、加载器和自动启动流程。已有有效 PID
+记录的用户 Payload 会保持运行，后续启动和自动启动请求直接跳过。
+OnionHEN 插件属于独立类别，应放在 `/data/OnionHEN/plugins/`。
 
 ### 金手指
 
@@ -189,12 +184,6 @@ Payload。若两个 FTP 服务使用相同 TCP 端口，只有一个服务能够
 | Clang / LLVM | 编译 `x86_64-sie-ps5` 目标 |
 | `lzma` 或 `xz` | 压缩 bootstrapper |
 | Git 与 `curl` 或 `wget` | 初始化 submodule 并获取外部 payload 输入 |
-
-固定版本的 [`drakmor/ftpsrv`](https://github.com/drakmor/ftpsrv) `nexgen`
-源码作为 FTP 模块编译进 `util.elf`。
-同时编译进 util 的还有固定版本
-[`drakmor/ShadowMountPlus`](https://github.com/drakmor/ShadowMountPlus)
-`1.6beta16` 源码（游戏扫描/挂载模块）以及它使用的 SQLite amalgamation。
 
 ### 完整构建
 
@@ -289,26 +278,19 @@ OnionHEN 在下面两处读写同一份配置：
 | `overlay.show_ip_address` | `false` | `true`, `false` |
 | `shortcuts.cheats_menu` | `off` | `off`, `r3_l3`, `l2_triangle`, `long_options`, `long_share`, `share` |
 | `shortcuts.toolbox` | `off` | `off`, `l2_r3`, `long_share`, `share` |
-| `ftp.autoload` | `false` | `true`, `false` |
-| `ftp.port` | `1337` | `1` 到 `65535` |
-| `shadowmount.autoload` | `false` | `true`, `false` |
-| `pkgnet.autoload` | `false` | `true`, `false` |
 
 ### 运行时数据
 
 | 路径 | 用途 |
 | --- | --- |
 | `/data/OnionHEN/payloads/` | 用户 payload ELF |
+| `/data/OnionHEN/plugins/` | 带 descriptor 的 OnionHEN 插件 ELF |
 | `/data/OnionHEN/cheats/` | 金手指文件 |
 | `/data/OnionHEN/cheats_tmp/` | HTTPS ZIP 与解压临时文件（同步后清理） |
 | `/data/OnionHEN/kstuff.elf` | 可选的运行时覆盖文件，优先于内嵌 `kstuff` |
-| `ftpsrv` | util 内置 FTP 源码模块，默认端口 `1337` |
-| `/data/shadowmount/config.ini` | ShadowMount+ 模块选项（首次运行时由内置模板生成） |
-| `/data/shadowmount/debug.log` | ShadowMount+ 模块日志 |
 | `/data/OnionHEN/OnionHEN.log` | 主运行日志 |
 | `/data/OnionHEN/OnionHEN_crash.log` | 保留的 daemon 崩溃信号与回溯日志 |
 | `/data/OnionHEN/OnionHEN_util_daemon.log` | Utility daemon 日志 |
-| `/user/data/tmp/` | DPI 暂存的上传 pkg（安装完成后保留以供复用） |
 
 <br>
 
@@ -335,7 +317,6 @@ OnionHEN 在下面两处读写同一份配置：
 │   ├── daemon/                关键守护进程与工具箱注入
 │   ├── util/                  工具守护进程、IPC 与金手指
 │   ├── shellui/               工具箱与 ShellUI 挂钩
-│   ├── webui/                 Web UI 源码（单文件打包的浏览器安装界面）
 │   ├── i18n/                  共享的工具箱 / 通知多语言目录
 │   ├── unpacker/              最终 OnionHEN payload 包装
 │   ├── libonion_*/            本仓库共享库
@@ -410,9 +391,8 @@ OnionHEN 离不开 PS5 自制软件与逆向工程社区。
 - [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) — Prospero 工具链与头文件
 - [elfldr](https://github.com/ps5-payload-dev/elfldr) — 端口 9021 的首次引导加载器；不打进 payload
 - [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) — EchoStretch、sleirsgoevy 与贡献者；可选的 `kstuff.elf`
-- [ftpsrv](https://github.com/drakmor/ftpsrv) — drakmor 与上游贡献者；来自 `nexgen` 的内置 PS5 FTP 源码模块
-- [ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) — Drakmor；由 VoidWhisper 的 ShadowMount 演进而来；内置游戏扫描/挂载模块，固定在 `1.6beta16`
-- [SQLite](https://www.sqlite.org/) — ShadowMount+ 模块使用的公有领域 amalgamation
+- [onionHEN-ftpsrv-plugin](https://github.com/OnionBuddies/onionHEN-ftpsrv-plugin) — 基于 drakmor/ftpsrv 的可选外部 FTP 插件
+- [onionHEN-shadowmountplus-plugin](https://github.com/OnionBuddies/onionHEN-shadowmountplus-plugin) — 基于 Drakmor 项目的可选外部 ShadowMount+ 扫描/挂载插件
 - [libhijacker](https://github.com/astrelsky/libhijacker) — astrelsky；进程劫持与内核读写
 - [NineS](https://github.com/buzzer-re/NineS) — buzzer-re；注入 ShellUI
 - [cJSON](https://github.com/DaveGamble/cJSON) — JSON 解析

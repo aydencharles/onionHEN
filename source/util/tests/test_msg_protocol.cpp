@@ -11,6 +11,8 @@
 static int test_ipc_paths_and_magic(void) {
   TEST_ASSERT_STREQ("/tmp/onionhen/ipc/crit_service", CRIT_IPC_SOC);
   TEST_ASSERT_STREQ("/tmp/onionhen/ipc/util_service", UTIL_IPC_SOC);
+  TEST_ASSERT_STREQ("/tmp/onionhen/ipc/plugin_service",
+                    ONION_SYSTEM_TMP_PLUGIN_SOCKET);
   TEST_ASSERT_EQ_INT(0x1000, DAEMON_BUFF_MAX);
 
   IPCMessage msg{};
@@ -52,25 +54,27 @@ static int test_crit_command_base_and_order(void) {
 static int test_util_command_base(void) {
   TEST_ASSERT_EQ_U64(0x8000000u, static_cast<unsigned>(BREW_UTIL_TEST_CONNECTION));
   TEST_ASSERT_EQ_U64(0x8000002u, static_cast<unsigned>(BREW_UTIL_RETURN_VALUE));
-  TEST_ASSERT_TRUE(static_cast<unsigned>(BREW_UTIL_TOGGLE_PKGNET) >
+  TEST_ASSERT_EQ_U64(0x8000004u,
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_TOGGLE));
+  TEST_ASSERT_TRUE(static_cast<unsigned>(BREW_UTIL_UNUSED_DPI_TOGGLE) >
                    static_cast<unsigned>(BREW_UTIL_RETURN_VALUE));
   /* Retains the former DirectPKGInstaller toggle ordinal. */
   TEST_ASSERT_EQ_U64(0x8000006u,
-                     static_cast<unsigned>(BREW_UTIL_TOGGLE_PKGNET));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_DPI_TOGGLE));
   TEST_ASSERT_EQ_U64(0x8000010u,
                      static_cast<unsigned>(BREW_UTIL_CHEAT_SYNC_STATUS));
   TEST_ASSERT_EQ_U64(0x8000011u,
                      static_cast<unsigned>(BREW_UTIL_CANCEL_CHEAT_SYNC));
   TEST_ASSERT_EQ_U64(0x8000014u,
-                     static_cast<unsigned>(BREW_UTIL_FTP_STATUS));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_STATUS));
   TEST_ASSERT_EQ_U64(0x8000015u,
-                     static_cast<unsigned>(BREW_UTIL_RECOVER_FTP));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_FTP_RECOVER));
   TEST_ASSERT_EQ_U64(0x8000016u,
-                     static_cast<unsigned>(BREW_UTIL_TOGGLE_SHADOWMOUNT));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE));
   TEST_ASSERT_EQ_U64(0x8000017u,
-                     static_cast<unsigned>(BREW_UTIL_SHADOWMOUNT_STATUS));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS));
   TEST_ASSERT_EQ_U64(0x8000018u,
-                     static_cast<unsigned>(BREW_UTIL_PKGNET_STATUS));
+                     static_cast<unsigned>(BREW_UTIL_UNUSED_DPI_STATUS));
   TEST_ASSERT_EQ_U64(0x8000019u,
                      static_cast<unsigned>(BREW_UTIL_SET_SYSTEM_LANG));
   return 0;
@@ -85,6 +89,15 @@ static int test_special_commands_stable(void) {
   TEST_ASSERT_EQ_U64(0xDEADCAFEu, static_cast<unsigned>(BREW_FORCE_KILL_PID));
   TEST_ASSERT_EQ_INT(9048, ONION_CTRL_TCP_PORT);
   TEST_ASSERT_EQ_U64(0x4F4E494Fu, static_cast<unsigned>(ONION_CTRL_TCP_MAGIC));
+  return 0;
+}
+
+static int test_plugin_commands_stable(void) {
+  TEST_ASSERT_EQ_U64(0x9000100u, static_cast<unsigned>(BREW_PLUGIN_LIST));
+  TEST_ASSERT_EQ_U64(0x9000101u, static_cast<unsigned>(BREW_PLUGIN_START));
+  TEST_ASSERT_EQ_U64(0x9000102u, static_cast<unsigned>(BREW_PLUGIN_STOP));
+  TEST_ASSERT_EQ_U64(0x9000103u, static_cast<unsigned>(BREW_PLUGIN_RELOAD));
+  TEST_ASSERT_EQ_U64(0x9000104u, static_cast<unsigned>(BREW_PLUGIN_DELETE));
   return 0;
 }
 
@@ -126,6 +139,7 @@ extern "C" int test_msg_protocol_suite(void) {
   failures += onion_test_run("crit_cmd_base_order", test_crit_command_base_and_order);
   failures += onion_test_run("util_cmd_base", test_util_command_base);
   failures += onion_test_run("special_cmds_stable", test_special_commands_stable);
+  failures += onion_test_run("plugin_cmds_stable", test_plugin_commands_stable);
   failures += onion_test_run("ipc_ret_distinct", test_ipc_ret_distinct);
   failures += onion_test_run("message_pod_layout", test_message_pod_layout);
   failures += onion_test_run("ipc_format_reply_body", test_ipc_format_reply_body);

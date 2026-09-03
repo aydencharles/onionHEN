@@ -142,11 +142,7 @@ Checked against call sites (not just the JSON files):
 - Welcome toast still concatenates `version + notify.boot.made_by + author`.
   That word order is correct for current zh and en; the other locales use
   the same concatenation.
-- ShadowMount+ and PkgNet toolbox keys (`shadowmount.*`, `pkgnet.*`) and
-  notification keys (`notify.shadowmount.*`, `notify.pkgnet.*`) are
-  translated across all 14 locales.
-- The Web UI (`source/webui/src/i18n.js`) carries its own dictionaries for
-  the same 14 locales; its language resolves identically to the Toolbox and
-  updates live on `BREW_UTIL_SET_SYSTEM_LANG`.
+- External plugins own their dynamic UI and service-specific translations;
+  the OnionHEN catalog contains only host-owned strings.
 
 Arabic is a complete key-for-key trial locale, not a native RTL layout.

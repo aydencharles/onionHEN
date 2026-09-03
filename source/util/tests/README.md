@@ -35,7 +35,6 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_git_mirror_factory` | archive URL factory; zh-Hans → cnb |
 | `test_cheat_catalog` | registry + catalog layout/slug (no host URLs) |
 | `test_cheat_sync` | mocked HTTPS ZIP download, miniz extraction, fallback, install and cleanup |
-| `test_multipart` | DPI HTTP multipart upload: offset-based streaming, Content-Length validation, hex encoding |
 | `test_payload` | `libonion_payload` ELF magic, package header, pid path/file, read_file |
 | `test_base64` | encode / decode / round-trip (MC4 codec) |
 | `test_aes_cbc` | AES-256-CBC encrypt/decrypt with MC4 key/IV |
@@ -49,19 +48,17 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_overlay_layout` | monitor-bar packing: top/bottom × left/right, hidden metrics, per-core width |
 | `test_settings` | semantic schema serialize/round-trip, partial INI defaults |
 | `test_fps_formula` | broad PS4 BC classification: PPSA/PPSB/CUSA/PCAS/PCJS/PCKS/CUHJ prefix detection |
-| `test_builtin_services` | builtin service key lookup, reserved-name protection, port allocation for ftp/shadowmount/pkgnet |
 | `test_ready` | ready markers, PID-bound process instances, path builder, name rejection, **fps_overlay / util_booted** flags, toolbox runtime-root marker |
 | `test_toolbox_injection` | same-PID skip, new-PID reinject, failure cleanup, concurrent request serialization |
 | `test_platform_fs` | `if_exists` / `touch_file` / `rmtree` (libonion_platform) |
 | `test_platform_log` | `onion_log_configure` + file sink |
 | `test_platform_notify` | `onion_notify_format` prefix/truncate + send stub |
 | `test_msg_protocol` | IPC paths, magic, command ordinals, `IPC_Ret`, message POD, reply JSON body |
-| `test_util_language` | system-language cache/refresh + `util_webui_language_code` maps all 14 selectable locales to web-UI BCP-47 codes |
+| `test_util_language` | system-language cache/refresh and notification language selection |
 | `test_app_jailbreak_policy` | configurable app-jailbreak exact/prefix Title ID allowlist, including the Itemzflow compatibility ID `ITEM00001` |
 | `test_ps5_settings_ui` | fluent XML builder + escaping |
-| `test_toolbox_route` | resource → page routing + dynamic cheat enabled-state, ShadowMount+ and PkgNet descriptors |
-| `test_toolbox_i18n` | locale-key parity for toolbox groups (zh-Hans, en) including shadowmount and pkgnet keys |
-| `test_toolbox_pkg_xml` | PkgInstaller chooser XML, PkgNet toggle XML, shadowmount config XML, resource identifiers |
+| `test_toolbox_route` | resource → page routing + dynamic cheat enabled-state and Kstuff descriptors |
+| `test_toolbox_i18n` | locale-key parity for toolbox groups (zh-Hans, en) |
 | `test_onpress_policy` | page-scoped OnPress ownership, stock-page pass-through, unrelated-resource stability |
 
 ## Intentionally not host-tested

@@ -301,42 +301,6 @@ IPC_Ret IPC_Client::ToggleSetting(DaemonCommands cmd, bool turn_on) {
   return IPC_Ret::NO_ERROR;
 }
 
-bool IPC_Client::FtpStatus() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_FTP_STATUS, ipc_msg)) {
-    LOG_ERROR("Failed to query FTP service status");
-    return false;
-  }
-  return ipc_msg == "1" || ipc_msg == "true";
-}
-
-bool IPC_Client::RecoverFtp() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_RECOVER_FTP, ipc_msg)) {
-    LOG_ERROR("Failed to recover FTP service");
-    return false;
-  }
-  return true;
-}
-
-bool IPC_Client::ShadowMountStatus() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_SHADOWMOUNT_STATUS, ipc_msg)) {
-    LOG_ERROR("Failed to query ShadowMount service status");
-    return false;
-  }
-  return ipc_msg == "1" || ipc_msg == "true";
-}
-
-bool IPC_Client::PkgNetStatus() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_PKGNET_STATUS, ipc_msg)) {
-    LOG_ERROR("Failed to query pkg-server service status");
-    return false;
-  }
-  return ipc_msg == "1" || ipc_msg == "true";
-}
-
 bool IPC_Client::SetSystemLanguage(int language) {
   if (!require_util("SetSystemLanguage")) {
     return false;
@@ -562,4 +526,61 @@ bool IPC_Client::EnableToolbox() {
     return false;
   }
   return true;
+}
+
+bool IPC_Client::ListPlugins(std::vector<PluginInventoryItem> &plugins) {
+  if (!require_crit("ListPlugins")) return false;
+  plugins.clear();
+  int offset = 0;
+  for (;;) {
+    cJSON *request = cJSON_CreateObject();
+    cJSON_AddNumberToObject(request, "offset", offset);
+    std::string response;
+    if (!IPCSendCommand(BREW_PLUGIN_LIST, response,
+                        json_object_str(request)))
+      return false;
+
+    onion_cjson::Root root(response);
+    cJSON *items = root ? onion_cjson::item(root.get(), "plugins") : nullptr;
+    if (!cJSON_IsArray(items)) return false;
+    cJSON *item = nullptr;
+    cJSON_ArrayForEach(item, items) {
+      const char *plugin_id = onion_cjson::string_item(item, "id");
+      const char *version = onion_cjson::string_item(item, "version");
+      const char *name = onion_cjson::string_item(item, "name");
+      if (!plugin_id || !version || !name) return false;
+      plugins.push_back({plugin_id, version, name,
+                         onion_cjson::bool_item(item, "running"),
+                         onion_cjson::bool_item(item, "auto_start")});
+    }
+
+    const int next = onion_cjson::int_item(root.get(), "next", -1);
+    if (next < 0) return true;
+    if (next <= offset) return false;
+    offset = next;
+  }
+}
+
+bool IPC_Client::PluginOperation(DaemonCommands command,
+                                 const std::string &plugin_id) {
+  if (!require_crit("PluginOperation")) return false;
+  std::string response;
+  return IPCSendCommand(command, response,
+                        json_kv_string("plugin_id", plugin_id.c_str()));
+}
+
+bool IPC_Client::StartPlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_START, plugin_id);
+}
+
+bool IPC_Client::StopPlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_STOP, plugin_id);
+}
+
+bool IPC_Client::ReloadPlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_RELOAD, plugin_id);
+}
+
+bool IPC_Client::DeletePlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_DELETE, plugin_id);
 }

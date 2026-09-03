@@ -31,7 +31,7 @@ OnionHEN 是 PS5 的 All-in-One Homebrew Enabler，提供提权、后台服务�
         │  3. unmount /update（阻止系统更新）
         │  4. 经 9021 启动内嵌 onion_elfldr.elf（监听 9020）
         │  5. 将内嵌 ELF 字节经 9020 顺序启动：util → kstuff → daemon
-        │  6. 加载 /data/OnionHEN/payloads/ 下 .elf
+        │  6. 扫描并启动 /data/OnionHEN/plugins/ 下带 descriptor 的 .elf
         ▼
 ┌───────────────┬────────────────┬──────────────────┐
 │  util.elf     │  kstuff.elf    │  daemon.elf      │
@@ -52,7 +52,7 @@ OnionHEN 是 PS5 的 All-in-One Homebrew Enabler，提供提权、后台服务�
 
 - util 先提供网络/IPC 等服务
 - kstuff 需先完成 ShellUI 补丁
-- `ftp.autoload` / `shadowmount.autoload` 为 true 时，util 在进程内创建对应服务工作线程
+- daemon 启动插件管理器，发现并管理 `/data/OnionHEN/plugins/` 中的外部插件
 - daemon 再注入 Toolbox
 
 若并行 ptrace 同一进程，容易导致 Toolbox 超时或崩溃。
@@ -82,7 +82,8 @@ onion_elfldr.elf ──┘                       │
 6. `unpacker` → `OnionHEN.elf`
 
 > 用户 Payload 使用裸 `.elf` 文件，存放在 `/data/OnionHEN/payloads/`
-> 或 USB 的 `.../payloads/` 目录。
+> 或 USB 的 `.../payloads/` 目录。插件也是标准 `.elf`，但必须包含
+> `.onion_plugin` descriptor，并存放在 `/data/OnionHEN/plugins/`。
 
 产物落在仓库根目录 `build/bin/`（静态库 `build/lib/`；CMake 树 `build/`）。
 
@@ -134,7 +135,9 @@ OnionHEN/
 2. 启动内置 `onion_elfldr.elf`，并通过握手确认 `127.0.0.1:9020`
 3. 顺序发送内部 ELF 字节：util → kstuff → daemon；9020 是正常路径，9021 仅承担引导/恢复职责
 4. 各子 ELF 启动后把主线程名设为稳定进程名（`onion_util.elf` / `kstuff.elf` / `onion_daemon.elf`）
-5. 仅在 9020 健康时加载 `/data/OnionHEN/payloads/` 下带 `.auto_start` 的 `.elf`；已有有效 PID 记录时保持现有实例，否则必须取得精确 PID
+5. 仅在 9020 健康时加载 `/data/OnionHEN/payloads/` 下带 `.auto_start` 的用户 `.elf`；插件由
+   `libonion_plugin_manager` 扫描 `/data/OnionHEN/plugins/`，校验 `.onion_plugin`
+   descriptor 后按 `AUTO_START` 启动。已有有效 PID 记录时保持现有实例，否则必须取得精确 PID
 
 可用 Toolbox「启动时自动加载 Kstuff」（默认开启）关闭，或放 `/mnt/usb0/no_kstuff` 跳过 kstuff。
 
@@ -166,9 +169,6 @@ OnionHEN/
 |------|-------------|------|
 | Cheats | IPC | flat-file cheat engine（multi-source `TITLE_VERSION[_PROCESS][_SOURCE_ID].ext` + mdbg/kdirect）；详见 [util_arch](util_arch/) |
 | Toolbox 请求 | IPC | util 崩溃重拉后向 crit 请求 `BREW_ENABLE_TOOLBOX`；休息恢复在 daemon |
-| FTP | TCP `ftp.port`（默认 1337） | util 内部 `ftpsrv` 源码模块；插件页提供启停、自启和端口修改；待机恢复时由 util 重绑已启用监听 |
-| ShadowMount+ | 进程内线程 | 固定版本 `ShadowMountPlus 1.6beta16` 源码模块；插件页提供本次按钮启停与下次开机自启；扫描/挂载/安装游戏镜像并写自身日志与配置到 `/data/shadowmount/` |
-| DPI（网络包安装器 / Web UI） | TCP **9090** + **12800** | 进程内 pkg 上传/安装服务（`third_party/pkgserver`，配置 `[pkgnet]`）；Web UI 内嵌 `source/webui/dist` 单文件页面，SSE 推送状态与进度，界面语言与工具箱一致（14 种） |
 
 `ps5/klog.h` 的 `klog_printf` / `klog_puts` 用于写入内核日志，不提供 TCP 网络服务。
 
@@ -181,7 +181,7 @@ OnionHEN/
 主要菜单能力：
 
 - 内容安装与管理（系统 PkgInstaller UI、附加内容管理）
-- Payload 与内核组件（用户 Payload；插件：kstuff、FTP、ShadowMount+）
+- Payload 与内核组件（用户 Payload；插件：kstuff 及已安装外部插件）
 - 游戏辅助（金手指引擎、OnionHEN 游戏选项）
 - 监控与显示（ShellUI 监控条、Title ID）
 - 账号激活
@@ -332,19 +332,22 @@ struct IPCMessage {
 - `BREW_UTIL_LAUNCH_PAYLOAD`
 - `BREW_UTIL_GET_GAME_VER` / `BREW_UTIL_GET_GAME_CHEAT` / `BREW_UTIL_TOGGLE_CHEAT`
 - `BREW_UTIL_DOWNLOAD_CHEATS` / `BREW_UTIL_CHEAT_SYNC_STATUS` / `BREW_UTIL_CANCEL_CHEAT_SYNC`（git catalog 同步）
-- `BREW_UTIL_TOGGLE_FTP`（Toolbox 本次启停 ftpsrv）
-- `BREW_UTIL_FTP_STATUS`（查询 util 内部 FTP 线程状态）
-- `BREW_UTIL_TOGGLE_SHADOWMOUNT`（Toolbox 按钮启停 ShadowMount+ 模块）
-- `BREW_UTIL_SHADOWMOUNT_STATUS`（查询 util 内部 ShadowMount+ 线程状态）
-- `BREW_UTIL_SET_SYSTEM_LANG`（daemon 轮询到控制台系统语言变化时经 IPC 推送；util 重新存储 SCE 语言并刷新 notify 与 Web UI 语言）
+- `BREW_UTIL_SET_SYSTEM_LANG`（daemon 轮询到控制台系统语言变化时经 IPC 推送；util 重新存储 SCE 语言并刷新通知语言）
 
 **ABI 占位命令：**
+
+- `BREW_UTIL_UNUSED_FTP_TOGGLE` / `BREW_UTIL_UNUSED_FTP_STATUS` /
+  `BREW_UTIL_UNUSED_FTP_RECOVER` 保留旧版已发布数值，不再处理
+- `BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE` /
+  `BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS` 保留旧版已发布数值，不再处理
+- `BREW_UTIL_UNUSED_DPI_TOGGLE` / `BREW_UTIL_UNUSED_DPI_STATUS`
+  保留旧版已发布数值，不再处理
 
 | 命令 | 当前行为 |
 |------|----------|
 | `BREW_UNUSED_ACTIVATE_DUMPER` | 固定占用 `0x9000004` 并返回 unsupported，保持后续命令序号稳定 |
 | `BREW_UNUSED_DECRYPT_DIR` / `BREW_UNUSED_TESTKIT_CHECK` | 返回 unsupported |
-| `BREW_UTIL_UNUSED_KLOG` / `BREW_UTIL_UNUSED_DPI` | 返回 unsupported |
+| `BREW_UTIL_UNUSED_KLOG` / `BREW_UTIL_UNUSED_DPI_TOGGLE` / `BREW_UTIL_UNUSED_DPI_STATUS` | 返回 unsupported |
 | `BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY` | 返回 unsupported；休息恢复由 daemon 的 SceSysCore `NOTE_EXEC` 处理 |
 | `BREW_UTIL_UNUSED_RELOAD_CHEATS` | 返回 unsupported；金手指按文件签名热重载 |
 | `BREW_UTIL_UNUSED_DOWNLOAD_KSTUFF` / `BREW_UTIL_UNUSED_LEGACY_CMD_SERVER` | 返回 unsupported |
@@ -359,13 +362,13 @@ struct IPCMessage {
 | `/data/OnionHEN/config.ini` | 配置 |
 | `/data/OnionHEN/OnionHEN.log` | 日志 |
 | `/data/OnionHEN/OnionHEN_crash.log` | daemon 崩溃信号与回溯日志；跨重启追加保留 |
-| `/data/OnionHEN/payloads/` | payload `.elf`（唯一扩展包格式；启动时 stage 到同目录） |
+| `/data/OnionHEN/payloads/` | 用户 payload `.elf`（启动时 stage 到同目录） |
+| `/data/OnionHEN/plugins/` | OnionHEN plugin `.elf`（含 `.onion_plugin` descriptor） |
 | `/system_tmp/onionhen/ipc/*` | Unix IPC socket |
 | `/system_tmp/onionhen/ready/<name>` | ready/runtime 标记；`toolbox` 内容为 SceShellUI PID |
 | `/system_tmp/onionhen/pid/<key>.PID` | 用户 Payload PID 状态 |
 | `/system_tmp/onionhen/app_launched` | ShellUI LaunchApp 返回值 |
 | `/system_tmp/onionhen/patch_plugin` | LaunchApp patch gate（外部标记；ShellUI 只读取） |
-| `/user/data/tmp/` | DPI 暂存的上传 pkg（校验通过后由系统安装） |
 
 ### 3.4 Itemzflow 兼容状态
 
@@ -402,22 +405,19 @@ struct IPCMessage {
 ### 4.3 网络服务
 
 - 首跳依赖外部 **9021 elfldr**；它同时是私有 9020 的恢复根。用户 Payload 严格使用内置 **9020 onion_elfldr**，不回退 9021
-- **FTP**：util 内置 `ftpsrv` 源码模块，默认监听 **1337**；Toolbox 插件页提供本次启停、下次开机自启和端口配置
-- **ShadowMount+**：util 内置 `ShadowMountPlus` 源码模块；Toolbox 插件页提供本次按钮启停与下次开机自启；依赖 kstuff，配置与日志位于 `/data/shadowmount/`
+- **FTP**：由可选的外部 `onionHEN-ftpsrv-plugin` 提供；daemon 负责进程生命周期，插件通过动态 UI 提供启用、端口与重启控制
+- **ShadowMount+**：由可选的外部 `onionHEN-shadowmountplus-plugin` 提供；daemon 负责进程生命周期，插件通过动态 UI 提供立即扫描操作
+- **DPI v2**：由可选的外部 `onionHEN-dpiv2-plugin` 提供；浏览器负责上传与安装操作，插件动态 UI 提供启停、API/WebUI 端口与重启配置
 - **Remote Play**：ShellUI 调用 PS5 原生 Remote Play API 完成 PIN 生成和客户端注册确认
-- **DPI（网络安装器 / Web UI）**：util 内嵌 pkg-server；浏览器上传 `.pkg` 以分块安装（TCP 9090），实时进度经 SSE（TCP 12800）刷新，UI 语言跟随工具箱/控制台系统语言（14 种）
 
-所有 `.elf` 文件名都使用相同的 Payload 页面、自动启动扫描和共享加载器，包括
-`kstuff`、`ftpsrv` 与 `ftpsrv-ps5`。内置服务只管理自身进程或线程，不停止同名
-用户 Payload；用户 Payload 仅由 Payload 页的明确停止操作终止。已有有效 PID
-记录时，后续启动和自动启动请求保持现有实例。相同端口的服务由 socket bind
-结果决定唯一端口所有者。
-名称 `shadowmountplus` 为内置模块保留，自动启动扫描
-忽略同名用户 Payload。
+用户 Payload 的所有 `.elf` 文件名都使用相同的 Payload 页面、自动启动扫描和共享
+加载器。用户 Payload 仅由 Payload 页的明确停止操作终止；已有有效 PID 记录时，
+后续启动和自动启动请求保持现有实例。带 `.onion_plugin` descriptor 的插件则放在
+`/data/OnionHEN/plugins/`，由插件管理器独立发现、校验和管理。
 
 ### 4.4 扩展
 
-- 自定义插件（兼容 [etaHEN SDK](https://github.com/LightningMods/etaHEN-SDK)）
+- 自定义插件（使用 [OnionHEN Plugin SDK](https://github.com/OnionBuddies/onionHEN-plugin-sdk)）
 - `config.ini` 驱动的开关（overlay、快捷键等）
 
 ## 5. 依赖组件
@@ -437,8 +437,6 @@ struct IPCMessage {
 | 组件 | 上游 | 角色 |
 |------|------|------|
 | **kstuff-lite** | [EchoStretch/kstuff-lite](https://github.com/EchoStretch/kstuff-lite) | 提供 `kstuff.elf`；休息后 Toolbox 恢复也参考其 ShellUI PID 监视 |
-| **ftpsrv** | [drakmor/ftpsrv](https://github.com/drakmor/ftpsrv) | 编译进 `util.elf` 的 FTP 源码模块 |
-| **ShadowMountPlus** | [drakmor/ShadowMountPlus](https://github.com/drakmor/ShadowMountPlus) | 编译进 `util.elf` 的游戏扫描/挂载源码模块（固定 `1.6beta16`） |
 
 ```bash
 git submodule update --init --recursive
@@ -451,7 +449,6 @@ git submodule update --init --recursive
 |----|------|
 | **7zip-sdk (LZMA)** | unpacker 解压 bootstrapper |
 | **cJSON** | JSON（通知、IPC 载荷等） |
-| **sqlite** | 公有领域 amalgamation；ShadowMount+ 模块的 app 数据库 |
 
 金手指解析器使用 `third_party/cheat_support/` 内直接编译的 AES、base64、miniz、SHA-256 实现。
 
@@ -487,6 +484,48 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 | **Python3** | 构建辅助脚本（如 `encryptver.py`） |
 | **lzma / xz** | bootstrapper 打包 |
 
+### 5.7 SDK 动态 XML UI
+
+动态 UI 分为三个职责边界：
+
+1. SDK 用稳定 C ABI 构造 neutral UI document，并通过 10–15 号插件 IPC 命令
+   执行分块注册、提交、取消注册和状态更新。
+2. `libonion_plugin_ui` 校验 wire document、维护 owner 隔离的 registry，并在
+   事务提交后发布不可变 snapshot。`ProtocolBroker` 只接收连接会话绑定的
+   owner，不使用 document 自报的 `plugin_id` 进行路由。
+3. `libonion_plugin_session` 为每条连接处理一次 `HELLO`，绑定插件自报的 ID
+   与 capability；连接存活期间身份不可改变，重复的活跃 ID 会被拒绝，断连时
+   自动清理该 owner 的 transfer 和 contribution。
+4. ShellUI adapter 将 snapshot 中的页面、菜单、分组、标签、按钮、开关、列表
+   和输入框转换为 Legacy Settings XML；resource/control ID 使用稳定 hash，
+   页面返回由动态页面栈恢复。
+5. daemon 通过独立的 `shellui_plugin_bridge` Unix stream 向 ShellUI 发布完整
+   snapshot。ShellUI 将动作送回 daemon 校验，daemon 按 registry 中解析出的
+   owner 入队；插件在原有 `plugin_service` 连接上用 9 号命令轮询事件。
+
+```text
+SDK plugin -> HELLO -> connection session -> ProtocolBroker -> Registry snapshot
+                                           -> bridge -> ShellUI XML adapter
+ShellUI action -> bridge -> ProtocolBroker validation -> owner event queue
+                                                  -> command 9 -> SDK UI event
+```
+
+文档上限为 256 KiB、256 节点、8 层深度；注册采用 ordered chunk 与 FNV-1a
+checksum，只有完整 commit 才替换可见 contribution。断连通过 owner 一次性清理
+未完成 transfer 和所有 UI contribution。当前 ShellUI profile 对 2.30–12.x
+开放，未知固件 fail closed。
+
+这里采用的是适合自制软件生态的协作式身份，不是安全认证：`HELLO` 不校验签名、
+ELF、PID 或启动来源，capability 也只是功能协商与 API 门禁，不能防御恶意插件。
+它解决的是误用、连接中途换 ID、重复 ID 和断连遗留 UI。daemon 中的
+`/system_tmp/onionhen/ipc/plugin_service` 使用独立持久连接 listener，每条
+accepted stream 拥有一个 `ConnectionSession`。它处理完整 SDK frame、`HELLO`、
+`PING`、9 号非阻塞事件轮询和 10–15 号 UI 命令。跨进程 snapshot 使用独立
+`/system_tmp/onionhen/ipc/shellui_plugin_bridge` stream，避免异步消息破坏插件
+socket 的 request/response 配对。休眠恢复会关闭旧连接并重新监听，整体关停会
+停止 listener 并触发 contribution 与待处理事件清理。日志、通知、配置等其它
+Host Service handler 仍属于后续集成。
+
 ---
 
 ## 6. 架构特点小结
@@ -509,6 +548,10 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 6. **IPC 协议稳定**  
    Unix socket；ABI 占位命令保持已发布的命令序号稳定。
 
+7. **动态 UI 与固件隔离**
+   插件只提交 neutral document；owner registry、ShellUI XML 与固件 profile
+   分层实现，未知固件不生成动态页面。
+
 ---
 
 ## 7. 相关文档
@@ -517,7 +560,6 @@ miniz 定向提取 HTTPS ZIP 中的 `cheats/`。用户 Payload 通过
 |------|------|
 | [../README.md](../README.md) | 项目总览、功能列表、配置、加载方式 |
 | [shellui-injection.md](shellui-injection.md) | ShellUI 注入路径、安全契约与失败行为 |
-| [api.md](api.md) | DPI pkg-server API：上传、SSE 进度、Web UI |
 | [pkg-writeup.md](pkg-writeup.md) | PS5 PKG 技术说明 |
 | [../source/README.md](../source/README.md) | 源码树与构建说明 |
 | [../third_party/README.md](../third_party/README.md) | 第三方源码、子模块与运行时依赖 |

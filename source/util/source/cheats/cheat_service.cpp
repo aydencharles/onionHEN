@@ -82,7 +82,7 @@ void CheatService::onGameExit(pid_t pid) {
 }
 
 int CheatService::fillGame(game_context_t &game, const std::string &title_id,
-                           const std::string &version, int pid, int appid) {
+                           int pid, int appid) {
   if (title_id.empty()) {
     return -1;
   }
@@ -93,10 +93,8 @@ int CheatService::fillGame(game_context_t &game, const std::string &title_id,
   util_game_platform_from_title_id(title_id.c_str(), game.platform,
                                    sizeof(game.platform));
 
-  if (!version.empty() && version != "unknown") {
-    std::snprintf(game.version, sizeof(game.version), "%s", version.c_str());
-  } else if (util_resolve_game_version(title_id.c_str(), game.version,
-                                       sizeof(game.version)) < 0) {
+  if (util_resolve_game_version(title_id.c_str(), game.version,
+                                sizeof(game.version)) < 0) {
     std::snprintf(game.version, sizeof(game.version), "unknown");
   }
 
@@ -335,11 +333,10 @@ int CheatService::writeListJson(const std::string &out_path) const {
   return ofs.good() ? 0 : -1;
 }
 
-int CheatService::exportList(const std::string &title_id,
-                             const std::string &version, int pid, int appid,
+int CheatService::exportList(const std::string &title_id, int pid, int appid,
                              const std::string &out_path) {
   game_context_t game{};
-  if (fillGame(game, title_id, version, pid, appid) < 0) {
+  if (fillGame(game, title_id, pid, appid) < 0) {
     return -1;
   }
   std::lock_guard<std::mutex> lock(mu_);
@@ -350,11 +347,10 @@ int CheatService::exportList(const std::string &title_id,
 }
 
 int CheatService::toggle(int pid, int appid, const std::string &title_id,
-                         const std::string &version, int index,
-                         std::string &status) {
+                         int index, std::string &status) {
   game_context_t game{};
   status.clear();
-  if (fillGame(game, title_id, version, pid, appid) < 0) {
+  if (fillGame(game, title_id, pid, appid) < 0) {
     status = status_tr("notify.cheats.invalid_game");
     return -1;
   }

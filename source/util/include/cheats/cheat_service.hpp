@@ -27,11 +27,11 @@ public:
   void onGameExit(pid_t pid);
 
   /** Write ShellUI list JSON to outPath. 0 = ok. */
-  int exportList(const std::string &title_id, const std::string &version,
-                 int pid, int appid, const std::string &out_path);
+  int exportList(const std::string &title_id, int pid, int appid,
+                 const std::string &out_path);
 
-  int toggle(int pid, int appid, const std::string &title_id,
-             const std::string &version, int index, std::string &status);
+  int toggle(int pid, int appid, const std::string &title_id, int index,
+             std::string &status);
 
   CheatService(const CheatService &) = delete;
   CheatService &operator=(const CheatService &) = delete;
@@ -57,8 +57,8 @@ private:
   CheatService();
   ~CheatService();
 
-  int fillGame(game_context_t &game, const std::string &title_id,
-               const std::string &version, int pid, int appid);
+  int fillGame(game_context_t &game, const std::string &title_id, int pid,
+               int appid);
   int refreshLocked(const game_context_t &game);
   bool disableEnabledLocked(const char *reason);
   void clearFilesLocked();

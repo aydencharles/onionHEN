@@ -363,12 +363,13 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
   IPC_Client& client = IPC_Client::getInstance(true);
 
   std::string game_ver;
-  if (!client.GameVerFromTid(g_ui.running_tid, game_ver))
-    game_ver = toolbox_i18n::tr("cheats.ver_unknown");
+  const bool have_version = client.GameVerFromTid(g_ui.running_tid, game_ver);
+  const std::string display_ver =
+      have_version ? game_ver : toolbox_i18n::tr("cheats.ver_unknown");
 
   ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
                                       g_ui.running_tid.c_str(),
-                                      game_ver.c_str()));
+                                      display_ver.c_str()));
 
   if (!g_ui.is_game_open && show_while_not_open) {
     page.label("id_cheat_disclaimer",
@@ -381,8 +382,7 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       g_ui.is_game_open ? onion_find_pid_ex(g_ui.running_tid.c_str(), false,
                                              true, true)
                          : 0;
-  if (!client.GetGameCheats(g_ui.running_tid, game_ver, cheat_path, cheat_pid,
-                            appid)) {
+  if (!client.GetGameCheats(g_ui.running_tid, cheat_path, cheat_pid, appid)) {
     page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
                ps5ui::Style::Center);
     new_xml = page.build();

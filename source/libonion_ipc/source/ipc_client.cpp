@@ -397,14 +397,13 @@ bool IPC_Client::Remount(const char *src, const char *dest) {
   return true;
 }
 
-bool IPC_Client::GetGameCheats(const std::string &tid, const std::string &ver,
-                               std::string &cheats, int pid, int appid) {
+bool IPC_Client::GetGameCheats(const std::string &tid, std::string &cheats,
+                               int pid, int appid) {
   if (!require_util("GetGameCheats")) {
     return false;
   }
   cJSON *request = cJSON_CreateObject();
   cJSON_AddStringToObject(request, "tid", tid.c_str());
-  cJSON_AddStringToObject(request, "version", ver.c_str());
   if (pid > 0) {
     cJSON_AddNumberToObject(request, "pid", pid);
   }
@@ -420,8 +419,7 @@ bool IPC_Client::GetGameCheats(const std::string &tid, const std::string &ver,
 }
 
 bool IPC_Client::ToggleGameCheat(int pid, const std::string &tid,
-                                 int cheat_index, std::string &cheat_enabled,
-                                 const std::string &version) {
+                                 int cheat_index, std::string &cheat_enabled) {
   if (!require_util("ToggleGameCheat")) {
     return false;
   }
@@ -429,7 +427,6 @@ bool IPC_Client::ToggleGameCheat(int pid, const std::string &tid,
   cJSON_AddStringToObject(j, "tid", tid.c_str());
   cJSON_AddNumberToObject(j, "cheat_id", cheat_index);
   cJSON_AddNumberToObject(j, "pid", pid);
-  cJSON_AddStringToObject(j, "version", version.c_str());
   std::string json = json_object_str(j);
   if (!IPCSendCommand(BREW_UTIL_TOGGLE_CHEAT, cheat_enabled, json)) {
     LOG_ERROR("Failed to enable cheats for %s", tid.c_str());

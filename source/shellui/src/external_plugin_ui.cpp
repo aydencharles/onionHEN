@@ -1,5 +1,6 @@
 #include "external_plugin_ui.hpp"
 
+#include "shellui_state.hpp"
 #include "toolbox_i18n.hpp"
 #include "dynamic_ui_runtime.hpp"
 
@@ -34,6 +35,11 @@ std::vector<std::string> append_inventory(
   std::vector<std::string> matched;
   std::vector<PluginInventoryItem> plugins;
   const bool loaded = IPC_Client::getInstance(false).ListPlugins(plugins);
+  if (loaded) {
+    g_ui.external_plugins = plugins;
+  } else {
+    g_ui.external_plugins.clear();
+  }
   if (loaded && plugins.empty()) return matched;
 
   page.group(

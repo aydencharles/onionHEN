@@ -127,7 +127,7 @@ void onion_notify_rich(const char *message, const char *sub_message,
   const char *msg = onion_notify_tr(message ? message : "notify.brand");
   const char *sub = onion_notify_tr(sub_message ? sub_message : "");
   const char *icon_url_value =
-      icon_url ? icon_url : "/user/data/OnionHEN/onionhen.png";
+      icon_url ? icon_url : ONION_NOTIFY_ICON_PATH;
   const char *preview_icon_value = preview_icon ? preview_icon : "download";
   const char *notification_id_value =
       notification_id ? notification_id : "588193127";

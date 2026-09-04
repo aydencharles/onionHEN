@@ -1,6 +1,7 @@
 #pragma once
 
 #include <onion/debug_settings_route_policy.hpp>
+#include <onion/notify.h>
 #include <onion/notify_i18n.h>
 #include <onion/version.h>
 
@@ -70,8 +71,7 @@ inline std::string make_welcome_toast_json(std::string_view toolbox_uri) {
       cJSON_AddBoolToObject(raw, "isImmediate", true) &&
       cJSON_AddNumberToObject(raw, "priority", 100) &&
       cJSON_AddStringToObject(icon, "type", "Url") &&
-      cJSON_AddStringToObject(icon_params, "url",
-                             "/user/data/OnionHEN/onionhen.png") &&
+      cJSON_AddStringToObject(icon_params, "url", ONION_NOTIFY_ICON_PATH) &&
       cJSON_AddStringToObject(message_obj, "body", message.c_str()) &&
       cJSON_AddStringToObject(sub_message_obj, "body", sub_message) &&
       cJSON_AddStringToObject(action_obj, "actionName", action_name) &&

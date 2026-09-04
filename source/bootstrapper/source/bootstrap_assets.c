@@ -3,6 +3,7 @@
 #include "bootstrap_assets.h"
 
 #include <onion/log.h>
+#include <onion/notify.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -79,9 +80,11 @@ static bool write_blob_file(const char *path, const void *data, size_t size) {
 bool bootstrap_assets_write(void) {
   mkdir("/data/OnionHEN", 0777);
   mkdir("/data/OnionHEN/assets", 0777);
+  mkdir("/user/data", 0777);
+  mkdir("/user/data/OnionHEN", 0777);
 
   const bool startup_icon_ready = write_blob_file(
-      "/data/OnionHEN/onionhen.png", sicon_start, sicon_size);
+      ONION_NOTIFY_ICON_PATH, sicon_start, sicon_size);
 
   for (size_t i = 0; i < sizeof(kEmbeddedIcons) / sizeof(kEmbeddedIcons[0]);
        ++i) {

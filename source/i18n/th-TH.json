@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "ไปที่ OnionHEN Toolbox",
     "notify.boot.made_by": " สร้างโดย ",
     "notify.boot.cleaned_up": "OnionHEN ถูกเคลียร์แล้ว",
+    "notify.boot.conflict": "OnionHEN ปฏิเสธการเริ่มต้น: %s กำลังทำงานอยู่แล้ว",
     "notify.kstuff.no_elf_header": "Kstuff '%s' ไม่มีส่วนหัว ELF",
     "notify.kstuff.loading": "กำลังโหลด Kstuff จาก: %s",
     "notify.net.socket_create": "สร้าง socket ไม่สำเร็จ: %s",

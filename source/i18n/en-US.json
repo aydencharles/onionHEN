@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "Go to the OnionHEN Toolbox",
     "notify.boot.made_by": " made by ",
     "notify.boot.cleaned_up": "OnionHEN has been cleaned up.",
+    "notify.boot.conflict": "OnionHEN refused to start: %s is already running",
     "notify.kstuff.no_elf_header": "Kstuff '%s' doesn't have a valid ELF header.",
     "notify.kstuff.loading": "Loading Kstuff from: %s",
     "notify.net.socket_create": "Failed to create socket: %s",

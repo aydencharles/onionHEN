@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "الانتقال إلى صندوق أدوات OnionHEN",
     "notify.boot.made_by": " من عمل ",
     "notify.boot.cleaned_up": "تم تنظيف OnionHEN.",
+    "notify.boot.conflict": "رفض OnionHEN البدء: %s قيد التشغيل بالفعل",
     "notify.kstuff.no_elf_header": "Kstuff '%s' لا يحتوي على ترويسة ELF.",
     "notify.kstuff.loading": "جاري تحميل Kstuff من: %s",
     "notify.net.socket_create": "فشل إنشاء المقبس: %s",

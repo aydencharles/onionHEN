@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "OnionHEN ツールボックスへ",
     "notify.boot.made_by": " · 作者：",
     "notify.boot.cleaned_up": "OnionHEN の後始末が完了しました。",
+    "notify.boot.conflict": "OnionHEN の起動を中止しました。%s が既に実行中です",
     "notify.kstuff.no_elf_header": "Kstuff「%s」に有効な ELF ヘッダーがありません。",
     "notify.kstuff.loading": "次の場所から Kstuff を読み込んでいます：%s",
     "notify.net.socket_create": "ソケットの作成に失敗しました：%s",

@@ -28,6 +28,7 @@ COMMON_FLAGS := -Wall -Wextra -g -O0 $(DEPFLAGS) -DONION_HOST_TEST=1 -DCBC=1 \
 	-I$(REPO_ROOT)/source/libonion_settings/include \
 	-I$(REPO_ROOT)/source/libonion_platform/include \
 	-I$(REPO_ROOT)/source/libonion_payload/include \
+	-I$(REPO_ROOT)/source/libonion_conflict/include \
 	-I$(REPO_ROOT)/source/libonion_proc/include \
 	-I$(REPO_ROOT)/source/libonion_ipc/include \
 	-I$(REPO_ROOT)/source/libonion_detour/include \
@@ -70,7 +71,8 @@ PROD_C_SRCS := \
 	$(REPO_ROOT)/source/libonion_platform/source/notify.c \
 	$(REPO_ROOT)/source/libonion_platform/source/notify_i18n.c \
 	$(REPO_ROOT)/source/libonion_ready/source/ready.c \
-	$(REPO_ROOT)/source/libonion_payload/source/payload.c
+	$(REPO_ROOT)/source/libonion_payload/source/payload.c \
+	$(REPO_ROOT)/source/libonion_conflict/source/conflict.c
 
 PROD_CXX_SRCS := \
 	$(UTIL_ROOT)/source/cheats/json_cheat_parser.cpp \
@@ -110,6 +112,7 @@ TEST_C_SRCS := \
 	test_cheat_utils.c \
 	test_cheat_flatten.c \
 	test_payload.c \
+	test_conflict.c \
 	test_base64.c \
 	test_aes_cbc.c \
 	test_hde64.c \
@@ -163,6 +166,7 @@ PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_ready/ready.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_conflict/conflict.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_detour/hde64.o
 
 CHEAT_SUPPORT_SRCS := $(wildcard $(THIRD_PARTY_ROOT)/cheat_support/*.c)
@@ -365,6 +369,10 @@ $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o: $(REPO_ROOT)/source/libonion_
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/libonion_payload/payload.o: $(REPO_ROOT)/source/libonion_payload/source/payload.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_conflict/conflict.o: $(REPO_ROOT)/source/libonion_conflict/source/conflict.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 

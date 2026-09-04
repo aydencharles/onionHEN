@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "Aller à la boîte à outils OnionHEN",
     "notify.boot.made_by": " · par ",
     "notify.boot.cleaned_up": "OnionHEN a été nettoyé.",
+    "notify.boot.conflict": "OnionHEN a refusé de démarrer : %s est déjà en cours d’exécution",
     "notify.kstuff.no_elf_header": "Kstuff « %s » n’a pas d’en-tête ELF valide.",
     "notify.kstuff.loading": "Chargement de Kstuff depuis : %s",
     "notify.net.socket_create": "Échec de la création du socket : %s",

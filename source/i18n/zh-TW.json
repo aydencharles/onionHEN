@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "前往 OnionHEN 工具箱",
     "notify.boot.made_by": " · 作者：",
     "notify.boot.cleaned_up": "OnionHEN 已清理完成。",
+    "notify.boot.conflict": "OnionHEN 已拒絕啟動：%s 正在執行",
     "notify.kstuff.no_elf_header": "Kstuff「%s」沒有有效的 ELF 檔頭。",
     "notify.kstuff.loading": "正在從以下位置載入 Kstuff：%s",
     "notify.net.socket_create": "建立通訊端失敗：%s",

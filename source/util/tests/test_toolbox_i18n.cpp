@@ -51,6 +51,9 @@ static int test_default_zh(void) {
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.cheats.conflict"),
                   "%s 与 %s 冲突（%s）于 0x%s") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.boot.conflict"),
+                  "OnionHEN 已拒绝启动：%s 正在运行") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.game_menu"),
                                "★ OnionHEN 金手指") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download"),
@@ -108,6 +111,9 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.cheats.conflict"),
                   "%s conflicts with %s (%s) at 0x%s") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.boot.conflict"),
+                  "OnionHEN refused to start: %s is already running") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("payload.start_stop_fmt"),
                                "Start/stop %s (path: %s) (%s)") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("debug.np_env.sub"),

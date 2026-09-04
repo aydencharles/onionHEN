@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "Перейти к инструментам OnionHEN",
     "notify.boot.made_by": " · автор: ",
     "notify.boot.cleaned_up": "OnionHEN очищен.",
+    "notify.boot.conflict": "OnionHEN не запускается: %s уже работает",
     "notify.kstuff.no_elf_header": "У Kstuff «%s» нет допустимого заголовка ELF.",
     "notify.kstuff.loading": "Загрузка Kstuff из: %s",
     "notify.net.socket_create": "Не удалось создать сокет: %s",

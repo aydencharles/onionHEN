@@ -37,6 +37,7 @@ along with this program; see the file COPYING. If not, see
 
 #include "LzmaLib.h"
 #include <elf.h>
+#include <onion/conflict.h>
 #include <unistd.h>
 
 #define LZMA_CLI_HEADER_SIZE 13
@@ -168,6 +169,13 @@ bool send_to_elfldr(const void* buffer, size_t buffer_size) {
 }
 
 int main() {
+  const char *conflict = onion_conflict_detect();
+  if (conflict) {
+    LOG_ERROR("refusing start: %s already running", conflict);
+    notify("OnionHEN refused to start: %s is already running", conflict);
+    return 0;
+  }
+
   if (onionhen_compressed_size <= 0) {
     LOG_ERROR("Invalid OnionHEN payload! unable to unpack it!");
     return 0;

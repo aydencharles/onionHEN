@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "前往 OnionHEN 工具箱",
     "notify.boot.made_by": " · 作者：",
     "notify.boot.cleaned_up": "OnionHEN 已清理完成。",
+    "notify.boot.conflict": "OnionHEN 已拒绝启动：%s 正在运行",
     "notify.kstuff.no_elf_header": "Kstuff“%s”没有有效的 ELF 文件头。",
     "notify.kstuff.loading": "正在从以下位置加载 Kstuff：%s",
     "notify.net.socket_create": "创建套接字失败：%s",

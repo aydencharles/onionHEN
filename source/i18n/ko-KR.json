@@ -282,6 +282,7 @@
     "notify.boot.goto_toolbox": "OnionHEN 툴박스로 이동",
     "notify.boot.made_by": " · 제작: ",
     "notify.boot.cleaned_up": "OnionHEN 정리가 끝났습니다.",
+    "notify.boot.conflict": "OnionHEN 시작이 거부되었습니다: %s이(가) 이미 실행 중입니다",
     "notify.kstuff.no_elf_header": "Kstuff '%s'에 유효한 ELF 헤더가 없습니다.",
     "notify.kstuff.loading": "다음 위치에서 Kstuff를 불러오는 중: %s",
     "notify.net.socket_create": "소켓을 만들지 못했습니다: %s",

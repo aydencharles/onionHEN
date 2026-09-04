@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.20)
 
 set(basename "unpacker")
-project(${basename} C ASM)
+project(${basename} C CXX ASM)
 
 onion_module_prologue(C_STANDARD 11 CXX_STANDARD 20)
 
@@ -49,8 +49,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 	"${LZMA_ROOT}"
 	"${PROJECT_ROOT}/libonion_platform/include"
 )
-target_link_libraries(${PROJECT_NAME} PRIVATE onion_platform)
-add_dependencies(${PROJECT_NAME} onion_platform)
+target_link_libraries(${PROJECT_NAME} PRIVATE onion_platform onion_conflict)
+add_dependencies(${PROJECT_NAME} onion_platform onion_conflict)
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
 	ONIONHEN_BOOTSTRAPPER_LZMA="${ONIONHEN_OUT_BIN}/bootstrapper.elf.lzma"
 	ONIONHEN_BOOTSTRAPPER_SIZE="${ONIONHEN_OUT_BIN}/bootstrapper.elf.lzma.size"

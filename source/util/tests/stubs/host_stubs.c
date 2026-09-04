@@ -58,6 +58,12 @@ bool elfldr_remote_send_bytes_to(uint16_t port, const uint8_t *elf,
   return false;
 }
 
+bool elfldr_remote_send_file_to(uint16_t port, const char *abs_path) {
+  (void)port;
+  (void)abs_path;
+  return false;
+}
+
 pid_t elfldr_remote_onion_write_and_launch_get_pid(const char *abs_path,
                                                    const uint8_t *elf,
                                                    size_t size) {

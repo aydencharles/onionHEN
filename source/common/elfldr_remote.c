@@ -208,6 +208,14 @@ static int send_file_uri(uint16_t port, const char *abs_path,
   return fd;
 }
 
+bool elfldr_remote_send_file_to(uint16_t port, const char *abs_path) {
+  int fd = send_file_uri(port, abs_path, NULL);
+  if (fd < 0)
+    return false;
+  close(fd);
+  return true;
+}
+
 static pid_t read_pid_response(int fd) {
   char buf[64];
   size_t used = 0;

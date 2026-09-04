@@ -405,6 +405,23 @@ main() {
     fi
   fi
 
+  if [[ ! -f "${BIN}/bootstrapper.elf.sha1" && -f "${BIN}/bootstrapper.elf" ]]; then
+    local hash=""
+    if command -v shasum >/dev/null 2>&1; then
+      hash="$(shasum -a 1 "${BIN}/bootstrapper.elf" | awk '{print $1}')"
+    elif command -v sha1sum >/dev/null 2>&1; then
+      hash="$(sha1sum "${BIN}/bootstrapper.elf" | awk '{print $1}')"
+    elif command -v openssl >/dev/null 2>&1; then
+      hash="$(openssl dgst -sha1 "${BIN}/bootstrapper.elf" | awk '{print $NF}')"
+    fi
+    hash="$(printf '%s' "${hash}" | tr 'A-F' 'a-f')"
+    if [[ "${hash}" =~ ^[0-9a-f]{40}$ ]]; then
+      printf '%s\n' "${hash}" > "${BIN}/bootstrapper.elf.sha1"
+    else
+      die "failed to produce bootstrapper.elf.sha1"
+    fi
+  fi
+
   if [[ "${SKIP_UNPACKER}" -eq 1 ]]; then
     log "Skip unpacker (--skip-unpacker)"
   else

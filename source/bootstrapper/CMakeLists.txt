@@ -183,14 +183,15 @@ onion_strip_debug(${PROJECT_NAME})
 # a second Ninja invocation.
 set(_bootstrapper_lzma "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootstrapper.elf.lzma")
 set(_bootstrapper_lzma_size "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootstrapper.elf.lzma.size")
+set(_bootstrapper_sha1 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootstrapper.elf.sha1")
 add_custom_command(
-	OUTPUT "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}"
+	OUTPUT "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}" "${_bootstrapper_sha1}"
 	COMMAND ${CMAKE_COMMAND} -E env "TARGET_ELF=$<TARGET_FILE:${PROJECT_NAME}>"
 			${PROJECT_ROOT}/../scripts/pack_bootstrapper.sh
 	DEPENDS ${PROJECT_NAME}
-	COMMENT "Recording size and compressing bootstrapper with lzma"
+	COMMENT "Packing bootstrapper (lzma + size + sha1 of uncompressed ELF)"
 	VERBATIM
 )
 add_custom_target(${PROJECT_NAME}_packed
-	DEPENDS "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}")
+	DEPENDS "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}" "${_bootstrapper_sha1}")
 add_dependencies(${PROJECT_NAME}_packed ${PROJECT_NAME})

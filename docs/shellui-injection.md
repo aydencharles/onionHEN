@@ -54,13 +54,15 @@ then runs the same serialized injection flow.
 | Authid | `inject_elf` enters one `PTRACE_AUTHID` window and restores the caller's authid on every exit path |
 | ptrace | Calls execute inside that credential window without per-call authid changes |
 | Remote calls | `pt_call`, `pt_call2`, and `pt_syscall` use an ABI-aligned private stack below the interrupted frame and outside the 128-byte red zone |
-| Register restore | `pt_call2` waits for the stager stop before restoring saved registers |
+| Syscall completion | `pt_syscall` single-steps only the `syscall` opcode at `getpid+0xa` and maps FreeBSD CF to `-1`; it does not step the libc stub |
+| Function completion | `pt_call` RETs into a process-lifetime RWX INT3 gadget, then `waitpid` for `SIGTRAP` |
+| Register restore | `pt_call2` / `pt_call` wait for the INT3 stop before restoring saved registers |
 | Mapping | Null, `MAP_FAILED`, mprotect, and copyin failures abort injection |
 | Attach state | A successful detach clears the attached state; cleanup detaches whenever an attach completed |
 | Return value | Any failed stage returns failure to the daemon and cannot publish Toolbox readiness |
 
-Single-step return detection compares against the private entry stack pointer.
-The invariant is `rsp % 16 == 8` at the remote call boundary.
+The invariant is `rsp % 16 == 8` at the remote call boundary. Return traps
+are never planted on the NX stack.
 
 ## Hook installation safety
 

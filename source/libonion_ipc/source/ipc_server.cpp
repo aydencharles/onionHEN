@@ -169,7 +169,7 @@ int ipc_network_recv_full(int socket_fd, void *buffer, int32_t size) {
     }
     got += n;
   }
-  LOG_DEBUG("got %i bytes (full frame)", got);
+  LOG_TRACE("got %i bytes (full frame)", got);
   return got;
 }
 

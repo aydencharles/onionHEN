@@ -113,6 +113,27 @@ void Widget_Append_Child(MonoObject* widget, MonoObject* child)
     mono_runtime_invoke(appendChild, widget, args, nullptr);
 }
 
+/*
+ * ShellUI methods are AOT. Prefer that image so we patch the code the UI
+ * thread is already running. compile_method from the inject worker can take
+ * the JIT lock and emit a second copy — then the detour misses live calls.
+ */
+static uint64_t address_of_compiled_method(MonoMethod *method) {
+  if (!method)
+    return 0;
+
+  MonoDomain *domain = Root_Domain;
+  if (!domain && mono_get_root_domain)
+    domain = mono_get_root_domain();
+
+  uint64_t addr = 0;
+  if (mono_aot_get_method && domain)
+    addr = mono_aot_get_method(domain, method);
+  if (!addr && mono_compile_method)
+    addr = mono_compile_method(method);
+  return addr;
+}
+
 uint64_t Get_Address_of_Method(MonoImage *Assembly_Image, const char *Name_Space, const char *Class_Name, const char *Method_Name, int Param_Count)
 {
   MonoClass *klass = mono_class_from_name(Assembly_Image, Name_Space, Class_Name);
@@ -133,8 +154,7 @@ uint64_t Get_Address_of_Method(MonoImage *Assembly_Image, const char *Name_Space
     return 0;
   }
 
-  // return (uint64_t)mono_aot_get_method(Root_Domain, Method);
-  return mono_compile_method(Method);
+  return address_of_compiled_method(Method);
 }
 
 uint64_t Get_Address_of_Method(MonoImage* Assembly_Image, MonoClass* klass, const char* Method_Name, int Param_Count)
@@ -151,8 +171,7 @@ uint64_t Get_Address_of_Method(MonoImage* Assembly_Image, MonoClass* klass, cons
 		return 0;
 	}
 
-	//return (uint64_t)mono_aot_get_method(mono_get_root_domain(), Method);
-  return mono_compile_method(Method);
+  return address_of_compiled_method(Method);
 }
 
 MonoObject *Get_Instance(MonoClass *klass, const char *Instance)

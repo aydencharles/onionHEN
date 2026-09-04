@@ -1,5 +1,6 @@
 #include <onion/log.h>
 #include <errno.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../include/injector.h"
@@ -102,6 +103,8 @@ int inject_elf(struct proc* proc, void* elf)
     int ptrace_authid_changed = 0;
     uint64_t sce_ptr_mem;
     uint64_t shellcode_size = get_shellcode_size();
+    struct timespec inject_t0 = {0}, inject_t1 = {0};
+    int inject_timed = 0;
 
     LOG_DEBUG("[+] Elevating for ptrace (PTRACE_AUTHID)...[+]");
 
@@ -135,6 +138,9 @@ int inject_elf(struct proc* proc, void* elf)
 
     LOG_DEBUG("[+] Attached to %d! [+]", proc->pid);
     attached = true;
+
+    clock_gettime(CLOCK_MONOTONIC, &inject_t0);
+    inject_timed = 1;
 
     init_remote_function_pointers(proc->pid);
 
@@ -233,7 +239,12 @@ detach:
         LOG_ERROR("[-] pt_detach failed pid=%d errno=%d", proc->pid, errno);
     }
 
-    LOG_DEBUG("[+] ELF injection finished! [+]");
+    if (inject_timed && clock_gettime(CLOCK_MONOTONIC, &inject_t1) == 0) {
+        const long ms =
+            (inject_t1.tv_sec - inject_t0.tv_sec) * 1000L +
+            (inject_t1.tv_nsec - inject_t0.tv_nsec) / 1000000L;
+        LOG_DEBUG("[+] ELF injection finished in %ld ms [+]", ms);
+    }
     LOG_DEBUG("[+] Detached [+]");
 exit:
     if (ptrace_authid_changed)

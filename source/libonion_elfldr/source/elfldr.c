@@ -327,6 +327,35 @@ elfldr_load(pid_t pid, uint8_t *elf) {
 }
 
 
+static intptr_t
+elfldr_payload_args_fill(pid_t pid, intptr_t buf, int pipe0, int pipe1,
+                         int master_sock, int victim_sock,
+                         intptr_t kpipe_addr) {
+  intptr_t args = buf;
+  intptr_t rwpipe = buf + 0x100;
+  intptr_t rwpair = buf + 0x200;
+  intptr_t payloadout = buf + 0x300;
+  intptr_t getpid = pt_resolve(pid, "HoLVWNanBBc");
+
+  if (!getpid) {
+    return 0;
+  }
+
+  pt_setlong(pid, args + 0x00, getpid);
+  pt_setlong(pid, args + 0x08, rwpipe);
+  pt_setlong(pid, args + 0x10, rwpair);
+  pt_setlong(pid, args + 0x18, kpipe_addr);
+  pt_setlong(pid, args + 0x20, KERNEL_ADDRESS_DATA_BASE);
+  pt_setlong(pid, args + 0x28, payloadout);
+  pt_setint(pid, rwpipe + 0, pipe0);
+  pt_setint(pid, rwpipe + 4, pipe1);
+  pt_setint(pid, rwpair + 0, master_sock);
+  pt_setint(pid, rwpair + 4, victim_sock);
+  pt_setint(pid, payloadout, 0);
+  return args;
+}
+
+
 /**
  * Create payload args in the address space of the process with the given pid.
  **/
@@ -387,26 +416,9 @@ elfldr_payload_args(pid_t pid) {
   pipe0 = pt_getint(pid, buf);
   pipe1 = pt_getint(pid, buf+4);
 
-  intptr_t args       = buf;
-  intptr_t rwpipe     = buf + 0x100;
-  intptr_t rwpair     = buf + 0x200;
-  intptr_t kpipe_addr = kernel_get_proc_file(pid, pipe0);
-  intptr_t payloadout = buf + 0x300;
-  intptr_t getpid      = pt_resolve(pid, "HoLVWNanBBc");
-
-  pt_setlong(pid, args + 0x00, getpid);
-  pt_setlong(pid, args + 0x08, rwpipe);
-  pt_setlong(pid, args + 0x10, rwpair);
-  pt_setlong(pid, args + 0x18, kpipe_addr);
-  pt_setlong(pid, args + 0x20, KERNEL_ADDRESS_DATA_BASE);
-  pt_setlong(pid, args + 0x28, payloadout);
-  pt_setint(pid, rwpipe + 0, pipe0);
-  pt_setint(pid, rwpipe + 4, pipe1);
-  pt_setint(pid, rwpair + 0, master_sock);
-  pt_setint(pid, rwpair + 4, victim_sock);
-  pt_setint(pid, payloadout, 0);
-
-  return args;
+  return elfldr_payload_args_fill(pid, buf, pipe0, pipe1, master_sock,
+                                  victim_sock,
+                                  kernel_get_proc_file(pid, pipe0));
 }
 
 

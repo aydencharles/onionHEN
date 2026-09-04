@@ -63,6 +63,9 @@ bool has_hv_bypass = false;
 bool is_6xx = false;
 bool is_3xx = false;
 
+void (*g_pthread_suspend_all_np)(void) = nullptr;
+void (*g_pthread_resume_all_np)(void) = nullptr;
+
 extern "C" long ptr_syscall = 0;
 
 void __syscall() {
@@ -126,6 +129,35 @@ struct AuthIdGuard {
 
   AuthIdGuard(const AuthIdGuard&) = delete;
   AuthIdGuard& operator=(const AuthIdGuard&) = delete;
+};
+
+/*
+ * Controller input during hook install is a 100% SIGSEGV: the UI thread is in
+ * Mono/xotext while this worker calls mono_aot_get_method and mprotects live
+ * pages. Freeze every other LWP for the install window only.
+ */
+struct PauseOtherThreads {
+  bool paused = false;
+
+  PauseOtherThreads() {
+    if (!g_pthread_suspend_all_np) {
+      LOG_ERROR("pthread_suspend_all_np missing; hook install remains racy");
+      return;
+    }
+    g_pthread_suspend_all_np();
+    paused = true;
+    LOG_DEBUG("paused other ShellUI threads for hook install");
+  }
+
+  ~PauseOtherThreads() {
+    if (!paused || !g_pthread_resume_all_np)
+      return;
+    g_pthread_resume_all_np();
+    LOG_DEBUG("resumed other ShellUI threads");
+  }
+
+  PauseOtherThreads(const PauseOtherThreads &) = delete;
+  PauseOtherThreads &operator=(const PauseOtherThreads &) = delete;
 };
 
 // ---------------------------------------------------------------------------
@@ -200,6 +232,10 @@ bool resolve_native_symbols(pid_t pid) {
   KERNEL_DLSYM(libkernelsys, sceKernelGetAppInfo);
   KERNEL_DLSYM(libkernelsys, sceKernelGetProcessName);
   KERNEL_DLSYM(libkernelsys, sceKernelGetCurrentFanDuty);
+  g_pthread_suspend_all_np = reinterpret_cast<void (*)()>(
+      kernel_dynlib_dlsym(-1, libkernelsys, "pthread_suspend_all_np"));
+  g_pthread_resume_all_np = reinterpret_cast<void (*)()>(
+      kernel_dynlib_dlsym(-1, libkernelsys, "pthread_resume_all_np"));
 
   /* libonion_platform must not CALL sceKernelSendNotificationRequest by name —
    * here that symbol is a dlsym'd *function pointer*. Register a trampoline. */
@@ -770,7 +806,12 @@ int main(int argc, char const* argv[]) {
 
   LOG_DEBUG("Starting hooking...");
   shellui_hooks_begin_install();
-  if (!install_hooks(images)) {
+  bool hooks_ok = false;
+  {
+    PauseOtherThreads pause;
+    hooks_ok = install_hooks(images);
+  }
+  if (!hooks_ok) {
     shellui_hooks_publish_failed();
     return -1;
   }

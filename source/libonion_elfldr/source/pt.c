@@ -20,6 +20,7 @@ along with this program; see the file COPYING. If not, see
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 #include <unistd.h>
 
 #include <sys/ptrace.h>
@@ -34,6 +35,11 @@ along with this program; see the file COPYING. If not, see
 #include <onion/pt.h>
 
 
+#ifndef PSL_C
+#define PSL_C 0x00000001UL
+#endif
+
+
 /*
  * Private stack window for PT_SETREGS "calls".
  *
@@ -45,10 +51,121 @@ along with this program; see the file COPYING. If not, see
  * Subtract 0x108 from the 16-byte-aligned interrupted rsp:
  *   0x108 > 128 (clears red zone) and is 8 mod 16 (correct entry alignment).
  * bak_reg is always restored after the remote work completes.
+ *
+ * Do not plant executable traps on this window: PS5 stack pages are NX, and
+ * the callee's own frame would overwrite anything stored below entry_rsp.
  */
 static uintptr_t
 pt_private_entry_rsp(uintptr_t interrupted_rsp) {
   return (interrupted_rsp & ~(uintptr_t)0xf) - (uintptr_t)0x108;
+}
+
+
+static size_t
+pt_page_size(void) {
+  const long n = sysconf(_SC_PAGESIZE);
+  return n > 0 ? (size_t)n : (size_t)0x4000;
+}
+
+
+/*
+ * One RWX INT3 page per traced pid, used as the RET target for pt_call.
+ * Allocated with the fast pt_syscall path (single-step of `syscall`).
+ */
+static intptr_t
+pt_trap_gadget(pid_t pid) {
+  static pid_t cached_pid = 0;
+  static intptr_t cached_addr = 0;
+  const size_t page_size = pt_page_size();
+  intptr_t page;
+  const uint8_t int3 = 0xcc;
+
+  if (cached_pid == pid && cached_addr) {
+    return cached_addr;
+  }
+
+  page = pt_mmap(pid, 0, page_size, PROT_READ | PROT_WRITE,
+                 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  if (!page || page == (intptr_t)-1) {
+    return 0;
+  }
+  if (pt_copyin(pid, &int3, page, sizeof(int3))) {
+    return 0;
+  }
+  if (kernel_mprotect(pid, page, page_size,
+                      PROT_READ | PROT_WRITE | PROT_EXEC)) {
+    LOG_ERROR("[DEBUG-PT] trap gadget mprotect failed pid=%d addr=%#lx",
+              pid, (unsigned long)page);
+    return 0;
+  }
+
+  cached_pid = pid;
+  cached_addr = page;
+  return page;
+}
+
+
+static int
+pt_wait_sigtrap(pid_t pid, const char *what) {
+  int status = 0;
+
+  if (waitpid(pid, &status, 0) == -1) {
+    return -1;
+  }
+  if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGTRAP) {
+    LOG_ERROR("[DEBUG-PT] unexpected %s wait status=0x%x stopped=%d sig=%d",
+              what, status, WIFSTOPPED(status),
+              WIFSTOPPED(status) ? WSTOPSIG(status) : -1);
+    errno = EPROTO;
+    return -1;
+  }
+  return 0;
+}
+
+
+/*
+ * Continue until the remote function RETs into the planted INT3 gadget.
+ * jmp_reg must already have RIP/RSP/arguments filled; RSP is the private
+ * entry window. On a valid SIGTRAP, bak_reg is restored and rax is returned.
+ * Any other stop fails closed without restoring bak_reg.
+ */
+static long
+pt_run_until_int3_return(pid_t pid, struct reg *jmp_reg, struct reg *bak_reg) {
+  const intptr_t gadget = pt_trap_gadget(pid);
+  const uintptr_t entry_rsp = (uintptr_t)jmp_reg->r_rsp;
+  uintptr_t rip;
+
+  if (!gadget) {
+    errno = ENOMEM;
+    return -1;
+  }
+  if (pt_setlong(pid, (intptr_t)entry_rsp, (long)gadget)) {
+    return -1;
+  }
+  if (pt_setregs(pid, jmp_reg)) {
+    return -1;
+  }
+  if (pt_continue(pid, 0) != 0) {
+    return -1;
+  }
+  if (pt_wait_sigtrap(pid, "call") != 0) {
+    return -1;
+  }
+  if (pt_getregs(pid, jmp_reg)) {
+    return -1;
+  }
+
+  rip = (uintptr_t)jmp_reg->r_rip;
+  if (rip != (uintptr_t)gadget && rip != (uintptr_t)gadget + 1) {
+    LOG_ERROR("[DEBUG-PT] trap rip=%#lx not at planted int3 %#lx",
+              (unsigned long)rip, (unsigned long)gadget);
+    errno = EPROTO;
+    return -1;
+  }
+  if (pt_setregs(pid, bak_reg)) {
+    return -1;
+  }
+  return jmp_reg->r_rax;
 }
 
 
@@ -232,7 +349,6 @@ long
 pt_call(pid_t pid, intptr_t addr, ...) {
   struct reg jmp_reg;
   struct reg bak_reg;
-  uintptr_t entry_rsp;
   va_list ap;
 
   if(pt_getregs(pid, &bak_reg)) {
@@ -241,16 +357,7 @@ pt_call(pid_t pid, intptr_t addr, ...) {
 
   memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
   jmp_reg.r_rip = addr;
-
-  /*
-   * Keep the original stack for restoration, but enter the remote function
-   * on a private ABI-aligned window below it.  Compare single-step return
-   * detection against entry_rsp (not bak_reg.r_rsp): after `ret`, rsp becomes
-   * entry_rsp+8, which is still <= bak_reg.r_rsp when entry_rsp is lowered —
-   * using bak_reg would keep stepping into the garbage return target.
-   */
-  entry_rsp = pt_private_entry_rsp((uintptr_t)bak_reg.r_rsp);
-  jmp_reg.r_rsp = entry_rsp;
+  jmp_reg.r_rsp = pt_private_entry_rsp((uintptr_t)bak_reg.r_rsp);
 
   va_start(ap, addr);
   jmp_reg.r_rdi = va_arg(ap, uint64_t);
@@ -261,26 +368,7 @@ pt_call(pid_t pid, intptr_t addr, ...) {
   jmp_reg.r_r9  = va_arg(ap, uint64_t);
   va_end(ap);
 
-  if(pt_setregs(pid, &jmp_reg)) {
-    return -1;
-  }
-
-  /* Single-step until the remote function's final `ret` raises rsp past entry. */
-  while((uintptr_t)jmp_reg.r_rsp <= entry_rsp) {
-    if(pt_step(pid)) {
-      return -1;
-    }
-    if(pt_getregs(pid, &jmp_reg)) {
-      return -1;
-    }
-  }
-
-  // restore registers
-  if(pt_setregs(pid, &bak_reg)) {
-    return -1;
-  }
-
-  return jmp_reg.r_rax;
+  return pt_run_until_int3_return(pid, &jmp_reg, &bak_reg);
 }
 
 long 
@@ -335,20 +423,9 @@ pt_call2(pid_t pid, intptr_t addr, ...)
    * CRITICAL (kylin-core): wait for the target to actually stop on int3 before
    * restoring registers. Without waitpid, bak_reg is restored while bootstrap
    * is still running inside SceShellUI → crash / freeze / hard reboot.
+   * Only the stager's terminal INT3 is a valid synchronization point.
    */
-  int status = 0;
-  if (waitpid(pid, &status, 0) == -1) {
-    return -1;
-  }
-
-  /* Only the stager's terminal INT3 is a valid synchronization point.  If
-   * another stop/termination is observed, fail closed and never restore the
-   * old register set while bootstrap code may still be executing. */
-  if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGTRAP) {
-    LOG_ERROR("[DEBUG-PT] unexpected stager wait status=0x%x stopped=%d sig=%d",
-                status, WIFSTOPPED(status),
-                WIFSTOPPED(status) ? WSTOPSIG(status) : -1);
-    errno = EPROTO;
+  if (pt_wait_sigtrap(pid, "stager") != 0) {
     return -1;
   }
 
@@ -365,14 +442,13 @@ pt_syscall(pid_t pid, int sysno, ...) {
   intptr_t addr = pt_resolve(pid, "HoLVWNanBBc");
   struct reg jmp_reg;
   struct reg bak_reg;
-  uintptr_t entry_rsp;
   va_list ap;
+  uint8_t insn[2] = {0, 0};
 
   if(!addr) {
     return -1;
-  } else {
-    addr += 0xa;
   }
+  addr += 0xa;
 
   if(pt_getregs(pid, &bak_reg)) {
     return -1;
@@ -388,8 +464,7 @@ pt_syscall(pid_t pid, int sysno, ...) {
    * rsp clobbers the red zone and yields Mono "instruction pointer is NULL"
    * crashes on resume — before any ShellUI payload hook runs.
    */
-  entry_rsp = pt_private_entry_rsp((uintptr_t)bak_reg.r_rsp);
-  jmp_reg.r_rsp = entry_rsp;
+  jmp_reg.r_rsp = pt_private_entry_rsp((uintptr_t)bak_reg.r_rsp);
 
   va_start(ap, sysno);
   jmp_reg.r_rdi = va_arg(ap, uint64_t);
@@ -400,25 +475,39 @@ pt_syscall(pid_t pid, int sysno, ...) {
   jmp_reg.r_r9  = va_arg(ap, uint64_t);
   va_end(ap);
 
-  if(pt_setregs(pid, &jmp_reg)) {
+  /*
+   * HoLVWNanBBc+0xa is the `syscall` opcode (0f 05). One PT_STEP runs the
+   * whole kernel operation; the libc stub's jc/errno tail is not executed.
+   * Translate FreeBSD CF→error the same way libc would, so callers that
+   * compare against -1 keep working. Do not PT_CONTINUE here: other ShellUI
+   * threads must stay stopped while the remote mmap/mprotect happens.
+   */
+  /* xotext may refuse the 2-byte probe; the +0xa convention still holds. */
+  if (pt_copyout(pid, addr, insn, sizeof(insn)) == 0 &&
+      (insn[0] != 0x0f || insn[1] != 0x05)) {
+    LOG_ERROR("[DEBUG-PT] syscall stub+0xa is not syscall pid=%d addr=%#lx bytes=%02x %02x",
+              pid, (unsigned long)addr, insn[0], insn[1]);
+    errno = EPROTO;
     return -1;
   }
 
-  /* Single-step until the syscall stub's final `ret` raises rsp past entry. */
-  while((uintptr_t)jmp_reg.r_rsp <= entry_rsp) {
-    if(pt_step(pid)) {
-      return -1;
-    }
-    if(pt_getregs(pid, &jmp_reg)) {
-      return -1;
-    }
+  if(pt_setregs(pid, &jmp_reg)) {
+    return -1;
   }
-
-  // restore registers
+  if(sys_ptrace(PT_STEP, pid, (caddr_t)1, 0) ||
+     pt_wait_sigtrap(pid, "syscall") != 0 ||
+     pt_getregs(pid, &jmp_reg)) {
+    (void)pt_setregs(pid, &bak_reg);
+    return -1;
+  }
   if(pt_setregs(pid, &bak_reg)) {
     return -1;
   }
 
+  if (jmp_reg.r_rflags & PSL_C) {
+    errno = (int)jmp_reg.r_rax;
+    return -1;
+  }
   return jmp_reg.r_rax;
 }
 

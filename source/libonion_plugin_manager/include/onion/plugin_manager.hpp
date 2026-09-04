@@ -70,20 +70,12 @@ struct Discovery {
   std::vector<DiscoveryIssue> issues;
 };
 
-struct InstallResult {
-  bool installed = false;
-  std::string path;
-  Descriptor descriptor;
-  std::string error;
-};
-
 class Repository {
 public:
   explicit Repository(std::string root = kInstallRoot,
                       size_t max_elf_size = kDefaultMaxElfSize);
 
   Discovery discover() const;
-  InstallResult install(std::string_view source_path) const;
   const std::string &root() const { return root_; }
 
 private:

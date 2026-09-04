@@ -75,17 +75,6 @@ bool read_file(const std::string &path, size_t limit, std::vector<uint8_t> &out,
   return true;
 }
 
-bool write_all(int descriptor, std::span<const uint8_t> image) {
-  size_t offset = 0;
-  while (offset < image.size()) {
-    const ssize_t count = write(descriptor, image.data() + offset,
-                                image.size() - offset);
-    if (count <= 0) return false;
-    offset += static_cast<size_t>(count);
-  }
-  return true;
-}
-
 void stop_instance(ProcessRuntime &runtime, const Instance &instance) {
   if (runtime.alive(instance.pid))
     runtime.stop(instance.pid, instance.descriptor.flags);
@@ -208,43 +197,6 @@ Discovery Repository::discover() const {
     unique.push_back(std::move(plugin));
   }
   result.plugins = std::move(unique);
-  return result;
-}
-
-InstallResult Repository::install(std::string_view source_path) const {
-  InstallResult result;
-  std::vector<uint8_t> image;
-  if (!read_file(std::string(source_path), max_elf_size_, image, result.error))
-    return result;
-  Inspection inspection = inspect_elf(image);
-  if (!inspection) {
-    result.error = std::move(inspection.error);
-    return result;
-  }
-  result.descriptor = std::move(inspection.descriptor);
-  if (mkdir(root_.c_str(), 0777) != 0 && errno != EEXIST) {
-    result.error = std::string("cannot create plugin directory: ") +
-                   std::strerror(errno);
-    return result;
-  }
-
-  result.path = root_ + "/" + result.descriptor.plugin_id + ".elf";
-  const std::string temporary = result.path + ".installing";
-  unlink(temporary.c_str());
-  const int output = open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0755);
-  if (output < 0) {
-    result.error = std::string("cannot create staging file: ") +
-                   std::strerror(errno);
-    return result;
-  }
-  const bool written = write_all(output, image) && fsync(output) == 0;
-  const int close_result = close(output);
-  if (!written || close_result != 0 || rename(temporary.c_str(), result.path.c_str()) != 0) {
-    result.error = std::string("atomic install failed: ") + std::strerror(errno);
-    unlink(temporary.c_str());
-    return result;
-  }
-  result.installed = true;
   return result;
 }
 

@@ -127,7 +127,9 @@ void start() {
     LOG_ERROR("[plugins] directory watcher failed to start");
 }
 
-void reconcile() { log_report("reconcile", manager().reconcile()); }
+void reconcile() {
+  log_report("reconcile", manager().reconcile());
+}
 
 void stop() {
   watcher().stop();

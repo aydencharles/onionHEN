@@ -9,6 +9,7 @@
 #include "daemon_power_state.hpp"
 #include "plugin_ipc_server.hpp"
 #include "plugin_manager_runtime.hpp"
+#include "sprx_plugin_manager_runtime.hpp"
 #include <onion/ipc_client.hpp>
 #include <onion/platform.h>
 #include <atomic>
@@ -60,6 +61,7 @@ void *resume_recovery_thread(void *args) noexcept {
          * their SDK clients perform HELLO again on a fresh connection. */
         onion::daemon::plugins::stop();
         onion::daemon::plugins::start();
+        onion::daemon::sprx_plugins::reconcile();
       }
 
       /* NOTE_EXEC remains authoritative; this is only compensation. */

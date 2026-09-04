@@ -47,6 +47,7 @@ along with this program; see the file COPYING. If not, see
 #include "ipc.hpp"
 #include "plugin_ipc_server.hpp"
 #include "plugin_manager_runtime.hpp"
+#include "sprx_plugin_manager_runtime.hpp"
 #include "startup_navigation.hpp"
 #include "welcome_toast.hpp"
 #include <onion/debug_settings_route_policy.hpp>
@@ -295,6 +296,7 @@ int main() {
     onion::daemon::plugins::start();
   else
     LOG_ERROR("[plugins] startup skipped because plugin IPC is not listening");
+  onion::daemon::sprx_plugins::start();
   onion_ready_signal_pid(ONION_READY_DAEMON, getpid());
 
   LOG_DEBUG("is toolbox only: %s | ver: %x", toolbox_only ? "Yes" : "No",

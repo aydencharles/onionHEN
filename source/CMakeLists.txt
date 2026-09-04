@@ -73,6 +73,7 @@ add_subdirectory(libonion_plugin_session)
 add_subdirectory(libonion_plugin_manager)
 # Shared ptrace + ELF inject (authid elevated once at inject entry, not per syscall).
 add_subdirectory(libonion_elfldr)
+add_subdirectory(libonion_sprx)
 add_subdirectory(onion_elfldr_server)
 add_subdirectory(libNineS)
 add_subdirectory(shellui)

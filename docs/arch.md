@@ -214,6 +214,7 @@ RAM 与 IP。采样实现参考 [PHU Games Tools](https://github.com/ArkSama)（
 | **libonion_ipc** | **客户端**（injectee 双单例）+ **服务端传输环**（`ipc_server`：listen/accept/loop/reply；`accept` 失败重绑参考 ps5-payload-manager）；daemon/util/shellui 共用 |
 | **libonion_settings** | 统一 `config.ini` schema；各进程以 `onion::Settings g_settings` 为真相源 |
 | **libonion_fps** | skip-hook FPS 采样（PHU Tier 1A/1E/1F 公式、100 样本 multi-pass 校准、缓存 DMAP 物理地址、`/dev/dce` / AgcDriver / seqlock 发布）；实现来自 [PHU Games Tools](https://github.com/ArkSama) |
+| **libonion_sprx** | 标准 SPRX/PRX 加载用例与最小 INI `SprxCatalog`；策略层与 ptrace 运行时解耦，生产适配器通过远程 `pthread_create` 调用 `sceKernelLoadStartModule`，支持幂等检查、超时、返回码、依赖排序和临时内存清理 |
 | **libonion_detour** | 共享 Detour + hde64 钩子栈 |
 | **libonion_proc** | 共享 proc/ucred（allproc 遍历、dynlib、authid）+ **sysctl 进程查询**（`find_pid` / `onion_find_pid_ex` / `isProcessAlive`）；daemon / util / shellui / bootstrapper 共用 |
 | **libonion_platform** | 平台叶子：`if_exists` / `touch_file` / `rmtree`、`OnionHEN_log`（可配置 tag/路径）、`onion_notify`；修一处全树受益 |

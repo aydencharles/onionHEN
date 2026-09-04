@@ -59,6 +59,9 @@ void onion_notify_debug(const char *fmt, ...);
 void onion_notify_rich(const char *message, const char *sub_message,
                        const char *icon_url, const char *preview_icon,
                        const char *notification_id);
+/** Send a prebuilt rich JSON toast. Empty payload or send failure falls back
+ *  to onion_notify(plain_key). Callers do not branch. */
+void onion_notify_try_rich(const char *payload, const char *plain_key);
 
 /**
  * Format a notification body: onion_notify_tr(key) then vsnprintf.

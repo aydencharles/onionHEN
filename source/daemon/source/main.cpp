@@ -53,6 +53,7 @@ along with this program; see the file COPYING. If not, see
 #include "welcome_toast.hpp"
 #include <onion/debug_settings_route_policy.hpp>
 #include <onion/fault_frame.h>
+#include <onion/notify.h>
 #include <onion/ready.h>
 
 #define MSG_NOSIGNAL 0x20000 /* do not generate SIGPIPE on EOF. */
@@ -258,6 +259,8 @@ int main() {
   /* Real linked kernel export (not a dlsym function-pointer variable). */
   onion_notify_set_send(reinterpret_cast<onion_notify_send_fn>(
       sceKernelSendNotificationRequest));
+  onion_notify_set_rich_send(reinterpret_cast<onion_notify_rich_send_fn>(
+      sceNotificationSend));
 
   char buz[255];
   pthread_t app_jailbreak_thr = nullptr;
@@ -328,7 +331,7 @@ int main() {
   const std::string welcome_toast_json = onion::daemon::make_welcome_toast_json(
       debug_settings_route.toolbox_uri(
           onion::debug_settings_route::UriKind::Simple));
-  sceNotificationSend(0xFE, true, welcome_toast_json.c_str());
+  onion_notify_try_rich(welcome_toast_json.c_str(), "notify.boot.welcome");
   LOG_INFO("StartUp thread created!! - welcome to OnionHEN");
 
   onion::daemon::apply_startup_destination(boot_settings);

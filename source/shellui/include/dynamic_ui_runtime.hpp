@@ -48,6 +48,9 @@ void append_plugin_links(
 bool render_resource(std::string_view resource, std::string &out_xml);
 DispatchResult dispatch_control(std::string_view control_id,
                                 std::string_view value);
+/** Resolve the current value of the active page's control by its XML id. */
+bool resolve_control_value(std::string_view xml_control_id,
+                           std::string &out_value);
 /* Returns true when another page from the same dynamic stack becomes active. */
 bool leave_active_page();
 

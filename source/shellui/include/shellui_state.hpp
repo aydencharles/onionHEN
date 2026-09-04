@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include <onion/ipc_client.hpp>
+
 /** Settings page / resource-stream context for ShellUI hooks. */
 struct ToolboxUiState {
   toolbox::Page active_page = toolbox::Page::None;
@@ -33,6 +35,8 @@ struct ToolboxUiState {
   std::vector<PayloadEntry> auto_payloads_list;
   std::vector<Payloads_Apps> payloads_apps_list;
   std::vector<GameEntry> games_list;
+
+  std::vector<PluginInventoryItem> external_plugins;
 
   /* The plugin whose config page is active; a registry key ("kstuff"/…). */
   std::string active_plugin;

@@ -133,6 +133,29 @@ bool render_resource(std::string_view resource, std::string &out_xml) {
   return true;
 }
 
+bool resolve_control_value(std::string_view xml_control_id,
+                           std::string &out_value) {
+  RuntimeState &runtime = state();
+  std::lock_guard<std::mutex> lock(runtime.mutex);
+  if (runtime.page_stack.empty() ||
+      !runtime.page_stack.back().contribution.document)
+    return false;
+  const RuntimeState::ActivePage &page = runtime.page_stack.back();
+  const plugin_ui::Node *node =
+      resolve_control(*page.contribution.document, page.page_id, xml_control_id);
+  if (!node || !interactive(*node)) return false;
+  if (node->kind == plugin_ui::NodeKind::Toggle) {
+    out_value = (node->value == "1" || node->value == "true") ? "1" : "0";
+    return true;
+  }
+  if (node->kind == plugin_ui::NodeKind::List ||
+      node->kind == plugin_ui::NodeKind::Input) {
+    out_value = node->value;
+    return true;
+  }
+  return false;
+}
+
 DispatchResult dispatch_control(std::string_view control_id_value,
                                 std::string_view value) {
   plugin_ui::ContributionSnapshot active;

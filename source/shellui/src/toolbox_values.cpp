@@ -9,6 +9,7 @@
 #include "shellui_payload_state.hpp"
 #include "shellui_state.hpp"
 #include "toolbox_i18n.hpp"
+#include "dynamic_ui_runtime.hpp"
 
 #include <onion/platform.h>
 #include <onion/ipc_client.hpp>
@@ -133,6 +134,36 @@ bool try_cheat_value(const std::string &id, std::string &out) {
   return true;
 }
 
+constexpr std::string_view kRunPrefix = "id_external_plugin_run_";
+constexpr std::string_view kAutoStartPrefix = "id_external_plugin_autostart_";
+
+bool try_external_plugin_value(const std::string &id, std::string &out) {
+  const std::string_view sv(id);
+  std::string_view prefix;
+  bool is_run = false;
+  if (sv.starts_with(kRunPrefix)) {
+    prefix = kRunPrefix;
+    is_run = true;
+  } else if (sv.starts_with(kAutoStartPrefix)) {
+    prefix = kAutoStartPrefix;
+  } else {
+    return false;
+  }
+  const std::string_view suffix = sv.substr(prefix.size());
+  if (suffix.size() != 9) return false;
+  const std::string plugin_id(suffix);
+  for (const auto &plugin : g_ui.external_plugins) {
+    if (plugin.plugin_id != plugin_id) continue;
+    out = bool_str(is_run ? plugin.running : plugin.auto_start);
+    return true;
+  }
+  return false;
+}
+
+bool try_dynamic_control_value(const std::string &id, std::string &out) {
+  return onion::shellui::dynamic_ui::resolve_control_value(id, out);
+}
+
 } // namespace
 
 std::string resolve_toolbox_control_value(const std::string &id) {
@@ -145,6 +176,10 @@ std::string resolve_toolbox_control_value(const std::string &id) {
   if (try_exact_value(id, value))
     return value;
   if (try_cheat_value(id, value))
+    return value;
+  if (try_external_plugin_value(id, value))
+    return value;
+  if (try_dynamic_control_value(id, value))
     return value;
 
   return {};

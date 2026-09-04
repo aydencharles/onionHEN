@@ -35,6 +35,15 @@ dependency is included in the startup plan even if it is not auto-started
 itself. Dependencies must be declared and must also match the target Title
 ID; missing, mismatched, duplicate, or cyclic dependencies reject the plan.
 
+`enabled` defaults to `true` when it is absent, preserving existing catalogs.
+The SPRX page can persist it as `enabled=true` or `enabled=false`. Disabling a
+module only removes it from future Big App startup plans; it does not and
+cannot unload a module already injected into a game process.
+
+The SPRX page's Delete action removes only the `[plugin.<id>]` catalog entry.
+It never deletes the `.sprx` or `.prx` file, and it is rejected while that
+module is loaded in the current matching game.
+
 Startup order is a topological order. Among entries whose dependencies are
 already satisfied, larger `priority` values start first; ties are resolved by
 plugin ID for deterministic behavior. Dependencies always precede their

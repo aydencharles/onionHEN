@@ -80,6 +80,14 @@ static int test_plugins_page(void) {
   return 0;
 }
 
+static int test_sprx_page(void) {
+  RouteResult r = resolve_resource(make_in(kSprxXml));
+  TEST_ASSERT_TRUE(r.page == Page::Sprx);
+  TEST_ASSERT_TRUE(r.flags.is_sprx);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::Sprx);
+  return 0;
+}
+
 static std::string cfg_res(const char *rel) {
   return std::string(onion::plugins::kConfigResourcePrefix) + rel;
 }
@@ -308,6 +316,7 @@ extern "C" int test_toolbox_route_suite(void) {
   fails += onion_test_run("route.cheats", test_cheats_page);
   fails += onion_test_run("route.auto_plapps", test_auto_payloads_and_plapps);
   fails += onion_test_run("route.plugins", test_plugins_page);
+  fails += onion_test_run("route.sprx", test_sprx_page);
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);
   fails += onion_test_run("plugins.registry", test_plugins_registry);
   fails += onion_test_run("plugins.config_restores_parent",

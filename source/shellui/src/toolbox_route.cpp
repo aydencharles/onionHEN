@@ -18,6 +18,7 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_cheats = (in.resource == in.names.cheats_xml);
   out.flags.is_auto_payload = (in.resource == kAutoPayloadsXml);
   out.flags.is_plugins = (in.resource == kPluginsXml);
+  out.flags.is_sprx = (in.resource == kSprxXml);
   out.flags.is_plugin_config =
       (onion::plugins::find_by_config_xml_resource(in.resource) != nullptr);
   out.flags.is_account = (in.resource == kAccountXml);
@@ -38,6 +39,8 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::Payloads;
   } else if (out.flags.is_plugins) {
     out.page = Page::Plugins;
+  } else if (out.flags.is_sprx) {
+    out.page = Page::Sprx;
   } else if (out.flags.is_plugin_config) {
     out.page = Page::PluginConfig;
   } else if (out.flags.is_cheats) {

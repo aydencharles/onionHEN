@@ -50,6 +50,16 @@ struct PluginInventoryItem {
   bool auto_start = false;
 };
 
+struct SprxInventoryItem {
+  std::string id;
+  std::string path;
+  bool enabled = true;
+  bool auto_start = false;
+  int priority = 0;
+  bool matches_current_target = false;
+  bool loaded_for_current_target = false;
+};
+
 class IPC_Client {
 public:
   IPC_Client(const IPC_Client &) = delete;
@@ -110,6 +120,10 @@ public:
   bool ReloadPlugin(const std::string &plugin_id);
   bool DeletePlugin(const std::string &plugin_id);
   bool SetPluginAutoStart(const std::string &plugin_id, bool enabled);
+  bool ListSprx(std::vector<SprxInventoryItem> &sprx);
+  bool SetSprxEnabled(const std::string &id, bool enabled);
+  /** Removes the catalog entry; it does not delete or unload the SPRX file. */
+  bool DeleteSprx(const std::string &id);
 
   // Kept for call-site readability (matches historical public field).
   // Prefer is_util(); do not reassign after construction.
@@ -128,6 +142,8 @@ private:
   bool require_crit(const char *what) const;
   bool PluginOperation(DaemonCommands command,
                        const std::string &plugin_id);
+  bool SprxOperation(DaemonCommands command, const std::string &id,
+                     bool enabled = false);
 
   /** Unlocked: full-frame send of IPCMessage. */
   int send_frame_unlocked(const IPCMessage &msg);

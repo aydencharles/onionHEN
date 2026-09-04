@@ -13,10 +13,11 @@ struct FakeRuntime final : onion::sprx::IRemoteSprxRuntime {
   std::vector<onion::sprx::LoadStatus> responses;
   size_t index = 0;
   int calls = 0;
+  std::string loaded_module;
 
-  bool find_loaded(pid_t, std::string_view,
+  bool find_loaded(pid_t, std::string_view module_name,
                    onion::sprx::ModuleInfo *) const noexcept override {
-    return false;
+    return module_name == loaded_module;
   }
 
   onion::sprx::LoadResult load(pid_t pid, std::string_view,
@@ -100,9 +101,49 @@ int test_dependency_failure_isolated() {
   return 0;
 }
 
+int test_inventory_enable_and_remove_lifecycle() {
+  char manifest_path[256] = {};
+  char module_path[256] = {};
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_text_file(
+                            ".sprx", "module", module_path, sizeof(module_path)));
+  const std::string manifest =
+      "[plugin.overlay]\npath=" + std::string(module_path) +
+      "\nexact_title_ids=CUSA12345\nauto_start=true\n";
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_text_file(
+                            ".ini", manifest.c_str(), manifest_path,
+                            sizeof(manifest_path)));
+  FakeRuntime runtime;
+  FakeAccess access;
+  FakeTarget target;
+  onion::sprx::SprxPluginManager manager(runtime, access, target);
+  TEST_ASSERT_TRUE(manager.load_catalog(manifest_path));
+
+  const auto before = manager.inventory();
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(before.size()));
+  TEST_ASSERT_TRUE(before[0].matches_current_target);
+  TEST_ASSERT_TRUE(!before[0].loaded_for_current_target);
+  TEST_ASSERT_TRUE(manager.set_enabled("overlay", false));
+  const auto disabled_report = manager.start();
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(disabled_report.results.size()));
+
+  const size_t slash = std::string(module_path).find_last_of('/');
+  runtime.loaded_module = std::string(module_path).substr(slash + 1);
+  TEST_ASSERT_TRUE(!manager.remove("overlay"));
+  runtime.loaded_module.clear();
+  TEST_ASSERT_TRUE(manager.remove("overlay"));
+  TEST_ASSERT_TRUE(manager.inventory().empty());
+  unlink(manifest_path);
+  unlink(module_path);
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_sprx_plugin_manager_suite(void) {
-  return onion_test_run("sprx_manager_dependency_failure_isolated",
-                        test_dependency_failure_isolated);
+  int failures = 0;
+  failures += onion_test_run("sprx_manager_dependency_failure_isolated",
+                             test_dependency_failure_isolated);
+  failures += onion_test_run("sprx_manager_inventory_enable_remove",
+                             test_inventory_enable_and_remove_lifecycle);
+  return failures;
 }

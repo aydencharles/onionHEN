@@ -44,9 +44,12 @@ public:
                     std::vector<SprxCatalogIssue> *issues = nullptr);
   SprxStartupReport start();
   SprxStartupReport reconcile();
+  std::vector<SprxInventoryEntry> inventory() const;
+  SprxOperationResult set_enabled(std::string_view id, bool enabled);
+  SprxOperationResult remove(std::string_view id);
   void stop() noexcept;
 
-  const SprxCatalog &catalog() const noexcept { return catalog_; }
+  SprxCatalog catalog() const { return catalog_store_.snapshot(); }
 
 private:
   SprxStartupReport start_locked();
@@ -54,9 +57,7 @@ private:
   IRemoteSprxRuntime &runtime_;
   ITargetAccessPolicy &access_policy_;
   ISprxTargetProvider &target_provider_;
-  SprxCatalog catalog_;
-  std::string catalog_path_;
-  bool catalog_loaded_ = false;
+  SprxCatalogStore catalog_store_;
   mutable std::mutex mutex_;
 };
 

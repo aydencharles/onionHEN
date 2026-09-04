@@ -37,6 +37,7 @@ struct ToolboxUiState {
   std::vector<GameEntry> games_list;
 
   std::vector<PluginInventoryItem> external_plugins;
+  std::vector<SprxInventoryItem> external_sprx;
 
   /* The plugin whose config page is active; a registry key ("kstuff"/…). */
   std::string active_plugin;

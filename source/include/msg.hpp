@@ -85,6 +85,12 @@ enum DaemonCommands : unsigned int {
   BREW_PLUGIN_DELETE = 0x9000104u,
   BREW_PLUGIN_SET_AUTO_START = 0x9000105u,
 
+  // Crit daemon SPRX catalog management. SPRX modules are target-process
+  // modules, so this deliberately has no stop/reload/unload operation.
+  BREW_SPRX_LIST = 0x9000110u,
+  BREW_SPRX_SET_ENABLED = 0x9000111u,
+  BREW_SPRX_DELETE = 0x9000112u,
+
   // Legacy: manual elfldr launch removed (embedded 9020 is bootstrapper-managed)
   BREW_UTIL_LAUNCH_ELFLDR = 0xE1F1D8u,
   BREW_RELOAD_SETTINGS = 0xC0FFEEu,

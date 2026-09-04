@@ -10,6 +10,7 @@
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
 #include "dynamic_ui_runtime.hpp"
+#include "external_sprx_ui.hpp"
 #include <onion/platform.h>
 #include <string>
 
@@ -19,6 +20,7 @@ extern std::string payloads_xml, debug_settings_xml, cheats_xml;
 extern std::string UI3_dec, legacy_dec;
 void generate_payload_xml(std::string &xml_buffer, bool list_page);
 void generate_plugins_xml(std::string &xml_buffer);
+void generate_sprx_xml(std::string &xml_buffer);
 void generate_plugin_config_xml(std::string &xml_buffer);
 void generate_account_xml(std::string &xml_buffer);
 void generate_plapps_xml(std::string &new_xml);
@@ -122,6 +124,9 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     break;
   case toolbox::Page::Plugins:
     generate_plugins_xml(new_xml_string);
+    break;
+  case toolbox::Page::Sprx:
+    generate_sprx_xml(new_xml_string);
     break;
   case toolbox::Page::PluginConfig: {
     const onion::plugins::Descriptor *d =

@@ -65,6 +65,9 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
   case toolbox::OnPressDomain::AutoPayloads:
     run_prefix(onpress_payloads_prefix);
     break;
+  case toolbox::OnPressDomain::Sprx:
+    run_prefix(onpress_sprx_prefix);
+    break;
   case toolbox::OnPressDomain::Plugins:
   case toolbox::OnPressDomain::PluginConfig:
     run_prefix(onpress_plugins_prefix);

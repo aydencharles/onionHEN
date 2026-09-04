@@ -1,8 +1,10 @@
 #include "test_harness.h"
+#include "test_support.h"
 
 #include <onion/sprx_catalog.hpp>
 
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -98,6 +100,57 @@ int test_dependency_cycle_rejected() {
   return 0;
 }
 
+int test_enabled_persists_and_excludes_startup() {
+  char path[256] = {};
+  const char manifest[] =
+      "[plugin.overlay]\n"
+      "path=/data/OnionHEN/sprx/overlay.sprx\n"
+      "exact_title_ids=CUSA12345\n"
+      "auto_start=true\n";
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_text_file(
+                            ".ini", manifest, path, sizeof(path)));
+
+  onion::sprx::SprxCatalogStore store;
+  std::vector<onion::sprx::SprxCatalogIssue> issues;
+  TEST_ASSERT_TRUE(store.load(path, &issues));
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(store.snapshot()
+                                             .startup_order("CUSA12345", &issues)
+                                             .size()));
+  TEST_ASSERT_TRUE(store.set_enabled("overlay", false));
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(store.snapshot()
+                                             .startup_order("CUSA12345", &issues)
+                                             .size()));
+
+  onion::sprx::SprxCatalogStore reloaded;
+  TEST_ASSERT_TRUE(reloaded.load(path, &issues));
+  const auto inventory = reloaded.inventory();
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(inventory.size()));
+  TEST_ASSERT_TRUE(!inventory[0].enabled);
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(reloaded.snapshot()
+                                             .startup_order("CUSA12345", &issues)
+                                             .size()));
+  unlink(path);
+  return 0;
+}
+
+int test_remove_persists_catalog_entry_only() {
+  char path[256] = {};
+  const char manifest[] =
+      "[plugin.overlay]\n"
+      "path=/data/OnionHEN/sprx/overlay.sprx\n"
+      "exact_title_ids=CUSA12345\n";
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_text_file(
+                            ".ini", manifest, path, sizeof(path)));
+  onion::sprx::SprxCatalogStore store;
+  TEST_ASSERT_TRUE(store.load(path));
+  TEST_ASSERT_TRUE(store.remove("overlay"));
+  onion::sprx::SprxCatalogStore reloaded;
+  TEST_ASSERT_TRUE(reloaded.load(path));
+  TEST_ASSERT_TRUE(reloaded.inventory().empty());
+  unlink(path);
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_sprx_catalog_suite(void) {
@@ -106,5 +159,7 @@ extern "C" int test_sprx_catalog_suite(void) {
   failures += onion_test_run("sprx_catalog_invalid_keys", test_duplicate_and_unknown_keys_rejected);
   failures += onion_test_run("sprx_catalog_missing_dependency", test_dependency_errors_rejected_at_ordering);
   failures += onion_test_run("sprx_catalog_dependency_cycle", test_dependency_cycle_rejected);
+  failures += onion_test_run("sprx_catalog_enabled_persists", test_enabled_persists_and_excludes_startup);
+  failures += onion_test_run("sprx_catalog_remove_persists", test_remove_persists_catalog_entry_only);
   return failures;
 }

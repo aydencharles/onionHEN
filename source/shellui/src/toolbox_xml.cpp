@@ -15,6 +15,7 @@
 #include "toolbox_values.hpp"
 #include "dynamic_ui_runtime.hpp"
 #include "external_plugin_ui.hpp"
+#include "external_sprx_ui.hpp"
 #include "onion_cjson.hpp"
 
 #include <dirent.h>
@@ -327,6 +328,12 @@ void generate_plugins_xml(std::string& xml_buffer) {
   xml_buffer = page.build();
 }
 
+void generate_sprx_xml(std::string& xml_buffer) {
+  ps5ui::Page page("id_sprx", toolbox_i18n::tr("sprx.title"));
+  onion::shellui::external_sprx::append_inventory(page);
+  xml_buffer = page.build();
+}
+
 void generate_kstuff_config_xml(std::string &xml_buffer) {
   using namespace onion::plugins;
   const Descriptor *d = find_by_key("kstuff");
@@ -540,7 +547,9 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
       .link("id_auto_payloads", toolbox_i18n::tr("payload.auto.link"),
             "auto_payloads.xml", toolbox_i18n::tr("payload.auto.sub"), kIconPlugins)
       .link("id_plugins", toolbox_i18n::tr("plugins.link"), "plugins.xml",
-            toolbox_i18n::tr("plugins.link.sub"), kIconPlugins);
+            toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
+      .link("id_sprx", toolbox_i18n::tr("sprx.link"), "sprx.xml",
+            toolbox_i18n::tr("sprx.link.sub"), kIconPlugins);
 }
 
 void append_toolbox_game_group(ps5ui::Group& g) {

@@ -14,6 +14,7 @@ enum class Page : unsigned char {
   None = 0,           /**< unknown → original stream */
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
+  Sprx,
   Plugins,            /**< built-in and externally discovered plugins */
   PluginConfig,       /**< per-plugin configuration page (plugin_config.xml) */
   Cheats,
@@ -44,6 +45,7 @@ struct RouteInput {
 struct RouteFlags {
   bool is_payloads = false;
   bool is_plugins = false;
+  bool is_sprx = false;
   bool is_plugin_config = false;
   bool is_su_menu = false;
   bool is_debug_settings = false;
@@ -75,6 +77,8 @@ inline constexpr std::string_view kAutoPayloadsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.auto_payloads.xml";
 inline constexpr std::string_view kPluginsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.plugins.xml";
+inline constexpr std::string_view kSprxXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.sprx.xml";
 inline constexpr std::string_view kAccountXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.account.xml";
 inline constexpr std::string_view kPlappsXml =

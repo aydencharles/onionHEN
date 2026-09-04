@@ -100,6 +100,10 @@ static int test_plugin_commands_stable(void) {
   TEST_ASSERT_EQ_U64(0x9000104u, static_cast<unsigned>(BREW_PLUGIN_DELETE));
   TEST_ASSERT_EQ_U64(0x9000105u,
                      static_cast<unsigned>(BREW_PLUGIN_SET_AUTO_START));
+  TEST_ASSERT_EQ_U64(0x9000110u, static_cast<unsigned>(BREW_SPRX_LIST));
+  TEST_ASSERT_EQ_U64(0x9000111u,
+                     static_cast<unsigned>(BREW_SPRX_SET_ENABLED));
+  TEST_ASSERT_EQ_U64(0x9000112u, static_cast<unsigned>(BREW_SPRX_DELETE));
   return 0;
 }
 

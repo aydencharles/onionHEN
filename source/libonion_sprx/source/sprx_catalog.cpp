@@ -8,9 +8,12 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <fcntl.h>
 #include <map>
 #include <set>
 #include <string>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <utility>
 
 namespace onion::sprx {
@@ -150,6 +153,29 @@ bool has_key(const std::set<std::string> &keys, std::string_view key) {
   return keys.find(std::string(key)) != keys.end();
 }
 
+std::string join_csv(const std::vector<std::string> &values) {
+  std::string result;
+  for (const std::string &value : values) {
+    if (!result.empty())
+      result.push_back(',');
+    result += value;
+  }
+  return result;
+}
+
+bool write_all(int fd, std::string_view text) {
+  size_t offset = 0;
+  while (offset < text.size()) {
+    const ssize_t written = write(fd, text.data() + offset, text.size() - offset);
+    if (written < 0 && errno == EINTR)
+      continue;
+    if (written <= 0)
+      return false;
+    offset += static_cast<size_t>(written);
+  }
+  return true;
+}
+
 } // namespace
 
 bool SprxCatalog::parse(std::string_view text,
@@ -263,6 +289,12 @@ bool SprxCatalog::parse(std::string_view text,
             add_issue(issues, line_number, current_id, "invalid title_id_prefixes");
             ok = false;
           }
+        } else if (key == "enabled") {
+          if (!parse_bool(value, &current.enabled)) {
+            add_issue(issues, line_number, current_id,
+                      "enabled must be true or false");
+            ok = false;
+          }
         } else if (key == "auto_start") {
           if (!parse_bool(value, &current.auto_start)) {
             add_issue(issues, line_number, current_id, "auto_start must be true or false");
@@ -343,6 +375,49 @@ const SprxManifestEntry *SprxCatalog::find(std::string_view id) const noexcept {
   return found == entries_.end() ? nullptr : &*found;
 }
 
+bool SprxCatalog::set_enabled(std::string_view id, bool enabled) noexcept {
+  const auto found = std::find_if(entries_.begin(), entries_.end(),
+                                  [&](const SprxManifestEntry &entry) {
+                                    return entry.id == id;
+                                  });
+  if (found == entries_.end())
+    return false;
+  found->enabled = enabled;
+  return true;
+}
+
+bool SprxCatalog::remove(std::string_view id) noexcept {
+  const auto found = std::find_if(entries_.begin(), entries_.end(),
+                                  [&](const SprxManifestEntry &entry) {
+                                    return entry.id == id;
+                                  });
+  if (found == entries_.end())
+    return false;
+  entries_.erase(found);
+  return true;
+}
+
+std::string SprxCatalog::serialize() const {
+  std::string result;
+  for (const SprxManifestEntry &entry : entries_) {
+    if (!result.empty())
+      result.push_back('\n');
+    result += "[plugin." + entry.id + "]\n";
+    result += "path=" + entry.path + "\n";
+    if (!entry.exact_title_ids.empty())
+      result += "exact_title_ids=" + join_csv(entry.exact_title_ids) + "\n";
+    if (!entry.title_id_prefixes.empty())
+      result += "title_id_prefixes=" + join_csv(entry.title_id_prefixes) + "\n";
+    result += std::string("enabled=") + (entry.enabled ? "true\n" : "false\n");
+    result += std::string("auto_start=") +
+              (entry.auto_start ? "true\n" : "false\n");
+    result += "priority=" + std::to_string(entry.priority) + "\n";
+    if (!entry.dependencies.empty())
+      result += "dependencies=" + join_csv(entry.dependencies) + "\n";
+  }
+  return result;
+}
+
 bool SprxCatalog::matches(const SprxManifestEntry &entry,
                           std::string_view title_id) const noexcept {
   if (!valid_title_id(title_id))
@@ -364,7 +439,7 @@ SprxCatalog::startup_order(std::string_view title_id,
     issues->clear();
   std::map<std::string, const SprxManifestEntry *> matched;
   for (const SprxManifestEntry &entry : entries_) {
-    if (matches(entry, title_id))
+    if (entry.enabled && matches(entry, title_id))
       matched.emplace(entry.id, &entry);
   }
 
@@ -439,6 +514,135 @@ SprxCatalog::startup_order(std::string_view title_id,
       --indegree[dependent];
   }
   return order;
+}
+
+bool SprxCatalogStore::load(std::string_view path,
+                            std::vector<SprxCatalogIssue> *issues) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  SprxCatalog loaded;
+  if (!loaded.load_file(path, issues)) {
+    catalog_ = {};
+    path_ = std::string(path);
+    loaded_ = false;
+    return false;
+  }
+  catalog_ = std::move(loaded);
+  path_ = std::string(path);
+  loaded_ = true;
+  return true;
+}
+
+bool SprxCatalogStore::reload(std::vector<SprxCatalogIssue> *issues) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (path_.empty()) {
+    if (issues)
+      issues->clear();
+    loaded_ = false;
+    return false;
+  }
+  SprxCatalog loaded;
+  if (!loaded.load_file(path_, issues)) {
+    catalog_ = {};
+    loaded_ = false;
+    return false;
+  }
+  catalog_ = std::move(loaded);
+  loaded_ = true;
+  return true;
+}
+
+std::vector<SprxInventoryEntry> SprxCatalogStore::inventory() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<SprxInventoryEntry> result;
+  result.reserve(catalog_.entries().size());
+  for (const SprxManifestEntry &entry : catalog_.entries()) {
+    result.push_back({entry.id, entry.path, entry.enabled, entry.auto_start,
+                      entry.priority, false, false});
+  }
+  return result;
+}
+
+SprxCatalog SprxCatalogStore::snapshot() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return catalog_;
+}
+
+std::string SprxCatalogStore::path() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return path_;
+}
+
+bool SprxCatalogStore::loaded() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return loaded_;
+}
+
+SprxOperationResult SprxCatalogStore::persist_locked() {
+  if (path_.empty())
+    return {false, "catalog path is not configured"};
+  const std::string temporary = path_ + ".writing";
+  const int fd = open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+  if (fd < 0)
+    return {false, std::string("cannot create catalog staging file: ") +
+                       std::strerror(errno)};
+  const std::string text = catalog_.serialize();
+  const bool write_ok = write_all(fd, text);
+  const int write_error = write_ok ? 0 : errno;
+  const bool sync_ok = write_ok && fsync(fd) == 0;
+  const int sync_error = sync_ok ? 0 : errno;
+  const int close_result = close(fd);
+  const int close_error = close_result == 0 ? 0 : errno;
+  if (!write_ok || !sync_ok || close_result != 0) {
+    const int error = !write_ok ? write_error
+                      : !sync_ok ? sync_error
+                                 : close_error;
+    (void)unlink(temporary.c_str());
+    return {false, std::string("cannot persist catalog: ") +
+                       std::strerror(error)};
+  }
+  if (rename(temporary.c_str(), path_.c_str()) != 0) {
+    const int rename_error = errno;
+    (void)unlink(temporary.c_str());
+    return {false, std::string("cannot persist catalog: ") +
+                       std::strerror(rename_error)};
+  }
+  return {true, {}};
+}
+
+SprxOperationResult SprxCatalogStore::set_enabled(std::string_view id,
+                                                   bool enabled) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!loaded_)
+    return {false, "catalog is not loaded"};
+  const SprxManifestEntry *entry = catalog_.find(id);
+  if (!entry)
+    return {false, "SPRX plugin is not declared"};
+  if (entry->enabled == enabled)
+    return {true, {}};
+  if (!catalog_.set_enabled(id, enabled))
+    return {false, "SPRX plugin is not declared"};
+  const SprxOperationResult persisted = persist_locked();
+  if (persisted)
+    return persisted;
+  (void)catalog_.set_enabled(id, !enabled);
+  return persisted;
+}
+
+SprxOperationResult SprxCatalogStore::remove(std::string_view id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!loaded_)
+    return {false, "catalog is not loaded"};
+  const SprxManifestEntry *entry = catalog_.find(id);
+  if (!entry)
+    return {false, "SPRX plugin is not declared"};
+  SprxCatalog previous = catalog_;
+  if (!catalog_.remove(id))
+    return {false, "SPRX plugin is not declared"};
+  const SprxOperationResult persisted = persist_locked();
+  if (persisted)
+    return persisted;
+  catalog_ = std::move(previous);
+  return persisted;
 }
 
 } // namespace onion::sprx

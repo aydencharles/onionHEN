@@ -160,6 +160,20 @@ bool try_external_plugin_value(const std::string &id, std::string &out) {
   return false;
 }
 
+constexpr std::string_view kSprxEnabledPrefix = "id_external_sprx_enabled_";
+
+bool try_external_sprx_value(const std::string &id, std::string &out) {
+  const std::string_view control(id);
+  if (!control.starts_with(kSprxEnabledPrefix)) return false;
+  const std::string_view sprx_id = control.substr(kSprxEnabledPrefix.size());
+  for (const auto &entry : g_ui.external_sprx) {
+    if (entry.id != sprx_id) continue;
+    out = bool_str(entry.enabled);
+    return true;
+  }
+  return false;
+}
+
 bool try_dynamic_control_value(const std::string &id, std::string &out) {
   return onion::shellui::dynamic_ui::resolve_control_value(id, out);
 }
@@ -178,6 +192,8 @@ std::string resolve_toolbox_control_value(const std::string &id) {
   if (try_cheat_value(id, value))
     return value;
   if (try_external_plugin_value(id, value))
+    return value;
+  if (try_external_sprx_value(id, value))
     return value;
   if (try_dynamic_control_value(id, value))
     return value;

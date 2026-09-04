@@ -126,6 +126,25 @@ bool is_current_target(Runtime &current, pid_t pid, uint32_t app_id,
 void start() { run("startup", true); }
 void reconcile() { run("reconcile", false); }
 
+std::vector<onion::sprx::SprxInventoryEntry> inventory() {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  return current.manager.inventory();
+}
+
+onion::sprx::SprxOperationResult set_enabled(std::string_view id,
+                                             bool enabled) {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  return current.manager.set_enabled(id, enabled);
+}
+
+onion::sprx::SprxOperationResult remove(std::string_view id) {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  return current.manager.remove(id);
+}
+
 void on_big_app_started(pid_t pid, uint32_t app_id,
                         std::string_view title_id) {
   Runtime &current = runtime();

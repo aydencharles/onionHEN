@@ -591,3 +591,53 @@ bool IPC_Client::SetPluginAutoStart(const std::string &plugin_id, bool enabled) 
   return IPCSendCommand(BREW_PLUGIN_SET_AUTO_START, response,
                         json_object_str(request));
 }
+
+bool IPC_Client::ListSprx(std::vector<SprxInventoryItem> &sprx) {
+  if (!require_crit("ListSprx")) return false;
+  sprx.clear();
+  int offset = 0;
+  for (;;) {
+    cJSON *request = cJSON_CreateObject();
+    cJSON_AddNumberToObject(request, "offset", offset);
+    std::string response;
+    if (!IPCSendCommand(BREW_SPRX_LIST, response, json_object_str(request)))
+      return false;
+    onion_cjson::Root root(response);
+    cJSON *items = root ? onion_cjson::item(root.get(), "sprx") : nullptr;
+    if (!cJSON_IsArray(items)) return false;
+    cJSON *item = nullptr;
+    cJSON_ArrayForEach(item, items) {
+      const char *id = onion_cjson::string_item(item, "id");
+      const char *path = onion_cjson::string_item(item, "path");
+      if (!id || !path) return false;
+      sprx.push_back({id, path, onion_cjson::bool_item(item, "enabled"),
+                      onion_cjson::bool_item(item, "auto_start"),
+                      onion_cjson::int_item(item, "priority", 0),
+                      onion_cjson::bool_item(item, "matches_current_target"),
+                      onion_cjson::bool_item(item, "loaded_for_current_target")});
+    }
+    const int next = onion_cjson::int_item(root.get(), "next", -1);
+    if (next < 0) return true;
+    if (next <= offset) return false;
+    offset = next;
+  }
+}
+
+bool IPC_Client::SprxOperation(DaemonCommands command, const std::string &id,
+                               bool enabled) {
+  if (!require_crit("SprxOperation")) return false;
+  cJSON *request = cJSON_CreateObject();
+  cJSON_AddStringToObject(request, "id", id.c_str());
+  if (command == BREW_SPRX_SET_ENABLED)
+    cJSON_AddBoolToObject(request, "enabled", enabled);
+  std::string response;
+  return IPCSendCommand(command, response, json_object_str(request));
+}
+
+bool IPC_Client::SetSprxEnabled(const std::string &id, bool enabled) {
+  return SprxOperation(BREW_SPRX_SET_ENABLED, id, enabled);
+}
+
+bool IPC_Client::DeleteSprx(const std::string &id) {
+  return SprxOperation(BREW_SPRX_DELETE, id);
+}

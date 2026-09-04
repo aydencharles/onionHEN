@@ -2,6 +2,8 @@
 
 #include <onion/log.h>
 
+#include <cstdlib>
+#include <limits.h>
 #include <mutex>
 #include <set>
 
@@ -12,6 +14,19 @@ void append_issues(std::vector<SprxCatalogIssue> *dst,
                    const std::vector<SprxCatalogIssue> &src) {
   if (dst)
     dst->insert(dst->end(), src.begin(), src.end());
+}
+
+std::string_view basename_of(std::string_view path) noexcept {
+  const size_t slash = path.find_last_of('/');
+  return slash == std::string_view::npos ? path : path.substr(slash + 1);
+}
+
+std::string canonical_module_name(std::string_view path) {
+  const std::string input(path);
+  char resolved[PATH_MAX] = {};
+  if (realpath(input.c_str(), resolved))
+    return std::string(basename_of(resolved));
+  return std::string(basename_of(path));
 }
 
 } // namespace
@@ -27,15 +42,7 @@ bool SprxPluginManager::load_catalog(
   std::lock_guard<std::mutex> lock(mutex_);
   if (issues)
     issues->clear();
-  SprxCatalog loaded;
-  if (!loaded.load_file(path, issues)) {
-    catalog_loaded_ = false;
-    return false;
-  }
-  catalog_ = std::move(loaded);
-  catalog_path_ = std::string(path);
-  catalog_loaded_ = true;
-  return true;
+  return catalog_store_.load(path, issues);
 }
 
 SprxStartupReport SprxPluginManager::start() {
@@ -45,23 +52,19 @@ SprxStartupReport SprxPluginManager::start() {
 
 SprxStartupReport SprxPluginManager::reconcile() {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!catalog_path_.empty()) {
-    SprxCatalog loaded;
+  if (!catalog_store_.path().empty()) {
     std::vector<SprxCatalogIssue> issues;
-    if (!loaded.load_file(catalog_path_, &issues)) {
-      catalog_loaded_ = false;
+    if (!catalog_store_.reload(&issues)) {
       return {false, std::move(issues), {}};
     }
-    catalog_ = std::move(loaded);
-    catalog_loaded_ = true;
   }
   return start_locked();
 }
 
 SprxStartupReport SprxPluginManager::start_locked() {
   SprxStartupReport report;
-  report.catalog_loaded = catalog_loaded_;
-  if (!catalog_loaded_)
+  report.catalog_loaded = catalog_store_.loaded();
+  if (!report.catalog_loaded)
     return report;
 
   SprxTarget target;
@@ -70,8 +73,9 @@ SprxStartupReport SprxPluginManager::start_locked() {
     return report;
   }
 
+  const SprxCatalog catalog = catalog_store_.snapshot();
   std::vector<SprxCatalogIssue> order_issues;
-  const auto order = catalog_.startup_order(target.title_id, &order_issues);
+  const auto order = catalog.startup_order(target.title_id, &order_issues);
   append_issues(&report.issues, order_issues);
   if (order.empty())
     return report;
@@ -105,6 +109,52 @@ SprxStartupReport SprxPluginManager::start_locked() {
     report.results.push_back(std::move(item));
   }
   return report;
+}
+
+std::vector<SprxInventoryEntry> SprxPluginManager::inventory() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<SprxInventoryEntry> entries = catalog_store_.inventory();
+  const SprxCatalog catalog = catalog_store_.snapshot();
+  SprxTarget target;
+  if (!target_provider_.current(&target))
+    return entries;
+  for (SprxInventoryEntry &item : entries) {
+    const SprxManifestEntry *entry = catalog.find(item.id);
+    if (!entry || !catalog.matches(*entry, target.title_id))
+      continue;
+    item.matches_current_target = true;
+    ModuleInfo module;
+    const std::string module_name = canonical_module_name(item.path);
+    item.loaded_for_current_target = !module_name.empty() &&
+                                     runtime_.find_loaded(target.pid, module_name,
+                                                          &module);
+  }
+  return entries;
+}
+
+SprxOperationResult SprxPluginManager::set_enabled(std::string_view id,
+                                                    bool enabled) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return catalog_store_.set_enabled(id, enabled);
+}
+
+SprxOperationResult SprxPluginManager::remove(std::string_view id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const SprxCatalog catalog = catalog_store_.snapshot();
+  const SprxManifestEntry *entry = catalog.find(id);
+  if (!entry)
+    return {false, "SPRX plugin is not declared"};
+  SprxTarget target;
+  if (target_provider_.current(&target) &&
+      catalog.matches(*entry, target.title_id)) {
+    ModuleInfo module;
+    const std::string module_name = canonical_module_name(entry->path);
+    if (!module_name.empty() && runtime_.find_loaded(target.pid, module_name,
+                                                     &module)) {
+      return {false, "SPRX plugin is loaded in the current game"};
+    }
+  }
+  return catalog_store_.remove(id);
 }
 
 void SprxPluginManager::stop() noexcept {

@@ -33,6 +33,7 @@ COMMON_FLAGS := -Wall -Wextra -g -O0 $(DEPFLAGS) -DONION_HOST_TEST=1 -DCBC=1 \
 	-I$(REPO_ROOT)/source/libonion_detour/include \
 	-I$(REPO_ROOT)/source/libonion_ready \
 	-I$(REPO_ROOT)/source/libonion_fps/include \
+	-I$(REPO_ROOT)/source/libonion_lifecycle/include \
 	-I$(REPO_ROOT)/source/libonion_sprx/include \
 	-I$(REPO_ROOT)/source/libonion_plugin_ui/include \
 	-I$(REPO_ROOT)/source/libonion_plugin_bridge/include \
@@ -98,6 +99,7 @@ PROD_CXX_SRCS := \
 	$(REPO_ROOT)/source/shellui/src/dynamic_ui_xml.cpp \
 	$(REPO_ROOT)/source/shellui/src/dynamic_ui_runtime.cpp \
 	$(REPO_ROOT)/source/libonion_fps/source/fps_formula.cpp \
+	$(REPO_ROOT)/source/libonion_lifecycle/source/app_lifecycle.cpp \
 	$(REPO_ROOT)/source/libonion_sprx/source/sprx_loader.cpp \
 	$(REPO_ROOT)/source/libonion_sprx/source/sprx_catalog.cpp \
 	$(REPO_ROOT)/source/libonion_sprx/source/sprx_plugin_manager.cpp
@@ -141,6 +143,7 @@ TEST_CXX_SRCS := \
   test_overlay_text_metrics.cpp \
   test_overlay_layout.cpp \
 	test_fps_formula.cpp \
+	test_app_lifecycle.cpp \
 	test_sprx_loader.cpp \
 	test_sprx_catalog.cpp \
 	test_sprx_plugin_manager.cpp \
@@ -179,6 +182,7 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_lifecycle/app_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_loader.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_catalog.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_plugin_manager.o
@@ -317,6 +321,10 @@ $(BUILD_DIR)/prod/shellui/toolbox_i18n.o: $(REPO_ROOT)/source/shellui/src/toolbo
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/libonion_fps/fps_formula.o: $(REPO_ROOT)/source/libonion_fps/source/fps_formula.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_lifecycle/app_lifecycle.o: $(REPO_ROOT)/source/libonion_lifecycle/source/app_lifecycle.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

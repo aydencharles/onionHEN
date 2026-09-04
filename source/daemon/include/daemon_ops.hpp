@@ -5,6 +5,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <string>
 #include <sys/types.h>
 #include <msg.hpp>
@@ -90,9 +91,24 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid);
 bool Open_Utility_Elf(const char *path, uint8_t **buffer);
 
 /* ---- background threads ---- */
-/** Update the app-jailbreak gate and wake the event listener to rebuild. */
+/** Update the app-jailbreak gate and wake its runtime to rebuild. */
 void app_jailbreak_set_enabled(bool enabled);
+/**
+ * Run Big App lifecycle work on the SceSysCore kqueue owner thread.
+ * These calls synchronously wait for the listener to acknowledge the work.
+ */
+bool app_jailbreak_on_big_app_started(pid_t pid, uint32_t app_id,
+                                      const char *title_id);
+bool app_jailbreak_on_big_app_exited(pid_t pid, uint32_t app_id,
+                                     const char *title_id);
+/** Start the AppJailbreak runtime and wait until its control watch is ready. */
+bool app_jailbreak_runtime_start(pthread_t *thread);
+/** Dedicated SceSysCore listener; publishes Big App lifecycle events only. */
+void *app_lifecycle_listener_thread(void *args) noexcept;
+/** AppJailbreak runtime; owns PID and sandbox vnode monitoring. */
 void *fifo_and_dumper_thread(void *args) noexcept; // daemon_jailbreak.cpp
+/** Wake the lifecycle listener so it can stop before daemon teardown. */
+void app_lifecycle_listener_stop();
 void *runtime_supervisor_thread(void *args) noexcept;
 /** PID owned by the current util readiness marker, or -1. */
 pid_t runtime_owned_util_pid();

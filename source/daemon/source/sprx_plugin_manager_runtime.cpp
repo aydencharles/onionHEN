@@ -102,10 +102,46 @@ void run(const char *operation, bool reload) {
   log_report(operation, report);
 }
 
+bool is_current_target(Runtime &current, pid_t pid, uint32_t app_id,
+                       std::string_view title_id) {
+  onion::sprx::SprxTarget target;
+  if (!current.target.current(&target)) {
+    LOG_DEBUG("[sprx-manager] lifecycle target unavailable pid=%d",
+              static_cast<int>(pid));
+    return false;
+  }
+  if (target.pid != pid || target.title_id != title_id) {
+    LOG_DEBUG("[sprx-manager] stale Big App start pid=%d tid=%.*s current_pid=%d current_tid=%s",
+              static_cast<int>(pid), static_cast<int>(title_id.size()),
+              title_id.data(), static_cast<int>(target.pid),
+              target.title_id.c_str());
+    return false;
+  }
+  (void)app_id;
+  return true;
+}
+
 } // namespace
 
 void start() { run("startup", true); }
 void reconcile() { run("reconcile", false); }
+
+void on_big_app_started(pid_t pid, uint32_t app_id,
+                        std::string_view title_id) {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  if (!is_current_target(current, pid, app_id, title_id))
+    return;
+  log_report("big-app-start", current.manager.reconcile());
+}
+
+void on_big_app_exited(pid_t pid, uint32_t app_id,
+                       std::string_view title_id) {
+  LOG_INFO("[sprx-manager] target exited pid=%d appid=%u tid=%.*s; no daemon-owned SPRX runtime or UI session to release",
+           static_cast<int>(pid), app_id, static_cast<int>(title_id.size()),
+           title_id.data());
+}
+
 void stop() {
   Runtime &current = runtime();
   std::lock_guard<std::mutex> lock(current.mutex);

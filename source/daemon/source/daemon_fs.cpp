@@ -3,6 +3,7 @@
 #include "daemon_ops.hpp"
 #include "plugin_ipc_server.hpp"
 #include "plugin_manager_runtime.hpp"
+#include "app_lifecycle_runtime.hpp"
 #include "sprx_plugin_manager_runtime.hpp"
 #include <onion/platform.h>
 #include <onion/proc_query.h>
@@ -328,6 +329,8 @@ static void shutdown_restart_shellui(void) {
   g_stack_shutting_down.store(true, std::memory_order_release);
   is_handler_enabled = false;
   onion::daemon::plugins::stop();
+  onion::daemon::app_lifecycle::stop();
+  app_lifecycle_listener_stop();
   onion::daemon::sprx_plugins::stop();
   onion::daemon::plugin_ipc::stop();
   app_jailbreak_set_enabled(false);

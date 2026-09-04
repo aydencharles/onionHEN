@@ -47,6 +47,7 @@ along with this program; see the file COPYING. If not, see
 #include "ipc.hpp"
 #include "plugin_ipc_server.hpp"
 #include "plugin_manager_runtime.hpp"
+#include "app_lifecycle_runtime.hpp"
 #include "sprx_plugin_manager_runtime.hpp"
 #include "startup_navigation.hpp"
 #include "welcome_toast.hpp"
@@ -147,8 +148,20 @@ void install_crash_handlers() {
     sigaction(i, &action, nullptr);
 }
 
-void start_worker_threads(pthread_t* fifo_thr, pthread_t* msg_thr) {
-  pthread_create(fifo_thr, nullptr, fifo_and_dumper_thread, nullptr);
+void start_worker_threads(pthread_t* app_jailbreak_thr, pthread_t* msg_thr) {
+  if (app_jailbreak_runtime_start(app_jailbreak_thr)) {
+    pthread_t lifecycle_thr = nullptr;
+    if (pthread_create(&lifecycle_thr, nullptr, app_lifecycle_listener_thread,
+                       nullptr) == 0) {
+      pthread_detach(lifecycle_thr);
+    } else {
+      LOG_ERROR("[lifecycle] SceSysCore listener thread creation failed");
+      onion::daemon::app_lifecycle::stop();
+    }
+  } else {
+    LOG_ERROR("[lifecycle] Big App listener disabled: AppJailbreak runtime is "
+              "not ready");
+  }
   pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
   if (!onion::daemon::plugin_ipc::start())
     LOG_ERROR("plugin IPC server failed to start");
@@ -247,7 +260,7 @@ int main() {
       sceKernelSendNotificationRequest));
 
   char buz[255];
-  pthread_t fifo_thr = nullptr;
+  pthread_t app_jailbreak_thr = nullptr;
   pthread_t msg_thr = nullptr;
 
   sceNetCtlInit();
@@ -288,7 +301,13 @@ int main() {
       []() -> int { return sceSystemServiceGetAppIdOfRunningBigApp(); });
 
   (void)onion_net_get_ip_address(&buz[0], sizeof(buz));
-  start_worker_threads(&fifo_thr, &msg_thr);
+  if (!onion::daemon::app_lifecycle::start())
+    LOG_ERROR("[lifecycle] startup failed; Big App SPRX events disabled");
+  // Load the catalog before the SceSysCore listener can publish an event.
+  // Big App lifecycle events then use reconcile() against this initialized
+  // catalog, rather than racing a second initial start().
+  onion::daemon::sprx_plugins::start();
+  start_worker_threads(&app_jailbreak_thr, &msg_thr);
   for (int attempt = 0;
        attempt < 20 && !onion::daemon::plugin_ipc::is_listening(); ++attempt)
     usleep(50 * 1000);
@@ -296,7 +315,6 @@ int main() {
     onion::daemon::plugins::start();
   else
     LOG_ERROR("[plugins] startup skipped because plugin IPC is not listening");
-  onion::daemon::sprx_plugins::start();
   onion_ready_signal_pid(ONION_READY_DAEMON, getpid());
 
   LOG_DEBUG("is toolbox only: %s | ver: %x", toolbox_only ? "Yes" : "No",

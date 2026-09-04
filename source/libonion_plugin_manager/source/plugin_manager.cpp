@@ -203,7 +203,7 @@ Discovery Repository::discover() const {
 Manager::Manager(Repository repository, ProcessRuntime &runtime)
     : repository_(std::move(repository)), runtime_(runtime) {}
 
-ReconcileReport Manager::reconcile() {
+ReconcileReport Manager::reconcile(bool apply_auto_start) {
   std::lock_guard<std::mutex> lock(mutex_);
   Discovery discovery = repository_.discover();
   ReconcileReport report;
@@ -255,7 +255,8 @@ ReconcileReport Manager::reconcile() {
   for (auto &[plugin_id, plugin] : discovered) {
     if (find_instance(instances_, plugin_id) != instances_.end()) continue;
     const bool replacing_running = restart.contains(plugin_id);
-    const bool auto_start = auto_start_enabled(plugin->path) &&
+    const bool auto_start = apply_auto_start &&
+                            auto_start_enabled(plugin->path) &&
                             !suppressed_.contains(plugin_id);
     if (!replacing_running && !auto_start && !relaunch.contains(plugin_id))
       continue;

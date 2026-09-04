@@ -122,7 +122,7 @@ void log_report(const char *operation, const plugin::ReconcileReport &report) {
 } // namespace
 
 void start() {
-  log_report("startup", manager().reconcile());
+  log_report("startup", manager().reconcile(true));
   if (!watcher().start())
     LOG_ERROR("[plugins] directory watcher failed to start");
 }

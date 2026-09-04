@@ -63,7 +63,7 @@ OnionHEN 面向已越狱的 PS5，提供一套能日常使用、也方便维护�
 - **ShellUI 工具箱** — 注入 PS5 ShellUI 的设置页
 - **系统准备** — 提权、重新挂载文件系统、阻断系统更新分区
 - **fSELF / fPKG** — 内嵌 kstuff，用来跑自制 SELF / PKG；默认加载，可在工具箱关掉
-- **插件运行时** — 发现、校验、启动、停止、重载和删除带 descriptor 的插件 ELF
+- **插件运行时** — 发现、校验、启动、停止和删除带 descriptor 的插件 ELF
 - **PS5 FTP 服务器** — 由可选的外部 `onionHEN-ftpsrv-plugin` 提供
 - **ShadowMount+** — 由可选的外部 `onionHEN-shadowmountplus-plugin` 提供
 - **远程游玩配对** — 在网络菜单中启用 PS5 原生远程游玩服务、生成配对 PIN 并注册客户端
@@ -117,7 +117,7 @@ FTP 由独立的
 ShadowMount+ 由可选的外部
 [`onionHEN-shadowmountplus-plugin`](https://github.com/OnionBuddies/onionHEN-shadowmountplus-plugin)
 提供。将带 descriptor 的 ELF 安装到 `/data/OnionHEN/plugins/` 后，daemon 统一负责
-发现、启动、停止、重载、替换和删除；插件动态页面提供立即扫描操作。它依赖
+发现、启动、停止、替换和删除；插件动态页面提供立即扫描操作。它依赖
 `kstuff`，自身选项保存在 `/data/shadowmount/config.ini`。
 
 ### DPI（网络包安装器）

@@ -13,7 +13,6 @@ enum class Action {
   None,
   Started,
   Stopped,
-  Reloaded,
   Deleted,
   AutoStartChanged,
 };

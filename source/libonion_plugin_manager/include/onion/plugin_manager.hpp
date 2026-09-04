@@ -136,9 +136,14 @@ class Manager {
 public:
   Manager(Repository repository, ProcessRuntime &runtime);
 
-  ReconcileReport reconcile();
+  // apply_auto_start launches plugins that have a .auto_start marker.
+  // Only daemon startup should pass true. Watcher / mid-session calls
+  // must pass false so toggling auto-start does not start the plugin
+  // until the next OnionHEN boot.
+  ReconcileReport reconcile(bool apply_auto_start = false);
   OperationResult start(std::string_view plugin_id);
   OperationResult stop(std::string_view plugin_id);
+  // Persistence only: does not start or stop the running process.
   OperationResult set_auto_start(std::string_view plugin_id, bool enabled);
   OperationResult reload(std::string_view plugin_id);
   OperationResult remove(std::string_view plugin_id);

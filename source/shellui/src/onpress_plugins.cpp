@@ -28,9 +28,6 @@ OnPressResult external_plugin_control(OnPressContext &ctx) {
     case Action::Stopped:
       key = "plugins.external.stopped_fmt";
       break;
-    case Action::Reloaded:
-      key = "plugins.external.reloaded_fmt";
-      break;
     case Action::Deleted:
       key = "plugins.external.deleted_fmt";
       break;

@@ -158,6 +158,8 @@ int test_manager_lifecycle(void) {
   onion::plugin::Manager manager(onion::plugin::Repository(root), runtime);
   onion::plugin::ReconcileReport report = manager.reconcile();
   TEST_ASSERT_EQ_INT(2, static_cast<int>(report.discovered));
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(report.started));
+  report = manager.reconcile(true);
   TEST_ASSERT_EQ_INT(1, static_cast<int>(report.started));
   auto inventory = manager.inventory();
   TEST_ASSERT_EQ_INT(2, static_cast<int>(inventory.size()));
@@ -166,6 +168,10 @@ int test_manager_lifecycle(void) {
   TEST_ASSERT_TRUE(!find_entry(inventory, "MANU00001")->running());
   TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", true));
   TEST_ASSERT_TRUE(find_entry(manager.inventory(), "MANU00001")->auto_start());
+  const size_t launches_after_marker = runtime.launched.size();
+  (void)manager.reconcile();
+  TEST_ASSERT_EQ_U64(launches_after_marker, runtime.launched.size());
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->running());
   TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", false));
   TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->auto_start());
 
@@ -184,6 +190,9 @@ int test_manager_lifecycle(void) {
       make_plugin("AUTO00001", 0, 1)));
   TEST_ASSERT_TRUE(touch_file(auto_marker.c_str()));
   report = manager.reconcile();
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(report.started));
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "AUTO00001")->running());
+  report = manager.reconcile(true);
   TEST_ASSERT_EQ_INT(1, static_cast<int>(report.started));
   const size_t launches_before_replace = runtime.launched.size();
   const int stops_before_replace = runtime.stop_count;
@@ -215,6 +224,49 @@ int test_manager_lifecycle(void) {
   TEST_ASSERT_EQ_INT(stops_before_remove + 1, runtime.stop_count);
   TEST_ASSERT_EQ_INT(0, static_cast<int>(report.discovered));
   TEST_ASSERT_TRUE(manager.inventory().empty());
+  return 0;
+}
+
+int test_auto_start_is_boot_only(void) {
+  const std::string root = onion::plugin::kInstallRoot;
+  (void)mkdir(ONION_DATA_ROOT, 0777);
+  (void)mkdir(root.c_str(), 0777);
+  const std::string path = root + "/manual.elf";
+  const std::string marker = path + ".auto_start";
+  unlink(path.c_str());
+  unlink(marker.c_str());
+  TEST_ASSERT_TRUE(write_plugin(path, make_plugin("MANU00001", 0, 1)));
+
+  FakeRuntime runtime;
+  onion::plugin::Manager manager(onion::plugin::Repository(root), runtime);
+  onion::plugin::ReconcileReport report = manager.reconcile();
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(report.started));
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->running());
+
+  TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", true));
+  TEST_ASSERT_TRUE(find_entry(manager.inventory(), "MANU00001")->auto_start());
+  const size_t launches_after_enable = runtime.launched.size();
+  report = manager.reconcile();
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(report.started));
+  TEST_ASSERT_EQ_U64(launches_after_enable, runtime.launched.size());
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->running());
+
+  report = manager.reconcile(true);
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(report.started));
+  TEST_ASSERT_TRUE(find_entry(manager.inventory(), "MANU00001")->running());
+
+  TEST_ASSERT_TRUE(manager.stop("MANU00001"));
+  report = manager.reconcile(true);
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->running());
+
+  TEST_ASSERT_TRUE(manager.start("MANU00001"));
+  TEST_ASSERT_TRUE(manager.set_auto_start("MANU00001", false));
+  TEST_ASSERT_TRUE(find_entry(manager.inventory(), "MANU00001")->running());
+  TEST_ASSERT_TRUE(!find_entry(manager.inventory(), "MANU00001")->auto_start());
+
+  unlink(path.c_str());
+  unlink(marker.c_str());
+  (void)manager.reconcile();
   return 0;
 }
 
@@ -289,6 +341,8 @@ extern "C" int test_plugin_manager_suite(void) {
                              test_fingerprint_changes_with_content);
   failures += onion_test_run("plugin_manager.lifecycle",
                              test_manager_lifecycle);
+  failures += onion_test_run("plugin_manager.auto_start_boot_only",
+                             test_auto_start_is_boot_only);
   failures += onion_test_run("plugin_manager.flags",
                              test_manager_flags);
   return failures;

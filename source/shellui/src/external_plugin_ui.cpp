@@ -13,7 +13,6 @@ namespace onion::shellui::external_plugins {
 namespace {
 
 constexpr std::string_view kRunPrefix = "id_external_plugin_run_";
-constexpr std::string_view kReloadPrefix = "id_external_plugin_reload_";
 constexpr std::string_view kDeletePrefix = "id_external_plugin_delete_";
 constexpr std::string_view kAutoStartPrefix =
     "id_external_plugin_autostart_";
@@ -61,8 +60,6 @@ std::vector<std::string> append_inventory(
                             toolbox_i18n::tr("plugins.external.run"),
                             plugin.running,
                             toolbox_i18n::tr("plugins.external.run.sub"))
-                    .button(std::string(kReloadPrefix) + plugin.plugin_id,
-                            toolbox_i18n::tr("plugins.external.reload"))
                     .button(
                         std::string(kDeletePrefix) + plugin.plugin_id,
                         toolbox_i18n::tr("plugins.external.delete"),
@@ -101,12 +98,6 @@ DispatchResult dispatch(std::string_view control_id, std::string_view value) {
     result.success = start ? client.StartPlugin(result.plugin_id)
                            : client.StopPlugin(result.plugin_id);
     result.action = start ? Action::Started : Action::Stopped;
-    return result;
-  }
-  if (split_control(control_id, kReloadPrefix, result.plugin_id)) {
-    result.owned = true;
-    result.success = client.ReloadPlugin(result.plugin_id);
-    result.action = Action::Reloaded;
     return result;
   }
   if (split_control(control_id, kDeletePrefix, result.plugin_id)) {

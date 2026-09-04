@@ -64,7 +64,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **ShellUI Toolbox** — a settings page injected into the PS5 ShellUI
 - **System preparation** — raise privileges, remount filesystems, and block the update partition
 - **fSELF / fPKG** — bundled kstuff for homebrew SELF / PKG; loads by default, can be turned off in the Toolbox
-- **Plugin runtime** — discovers, validates, starts, stops, reloads, and removes descriptor-bearing plugin ELFs
+- **Plugin runtime** — discovers, validates, starts, stops, and removes descriptor-bearing plugin ELFs
 - **PS5 FTP server** — available as the optional external `onionHEN-ftpsrv-plugin`
 - **ShadowMount+** — available as the optional external `onionHEN-shadowmountplus-plugin`
 - **Remote Play pairing** — enable the native PS5 Remote Play service, generate a pairing PIN, and register a client from the Network section
@@ -121,7 +121,7 @@ restart controls. The plugin retains upstream `ftpsrv` commands such as
 ShadowMount+ is provided by the optional external
 [`onionHEN-shadowmountplus-plugin`](https://github.com/OnionBuddies/onionHEN-shadowmountplus-plugin).
 Install its descriptor-bearing ELF under `/data/OnionHEN/plugins/`; the daemon
-then owns discovery, start, stop, reload, replacement, and removal. Its dynamic
+then owns discovery, start, stop, replacement, and removal. Its dynamic
 page provides an immediate scan action. The plugin requires `kstuff` and keeps
 its own options under `/data/shadowmount/config.ini`.
 

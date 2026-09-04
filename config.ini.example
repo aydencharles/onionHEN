@@ -38,9 +38,6 @@ show_title_ids=false
 show_onionhen_options=true
 
 [cheats]
-# memory_backend selects the cheat memory access implementation.
-# Available values: default, libhijacker
-memory_backend=default
 # mirror selects the git host for online cheat catalogs.
 # Available values: auto, github, cnb
 # auto uses cnb.cool when the UI/system language is zh-Hans, otherwise GitHub.

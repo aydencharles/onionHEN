@@ -118,7 +118,6 @@ struct Settings {
   int startup_open_after_load = kStartupOpenNone;
 
   // [cheats], [app_jailbreak]
-  bool libhijacker_cheats = false;
   int cheats_mirror = kCheatsMirrorAuto;
   bool app_jailbreak_enabled = true;
   bool debug_app_jb_msg = false;

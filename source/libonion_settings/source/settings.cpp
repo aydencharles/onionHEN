@@ -242,20 +242,6 @@ const char *log_level_name(int v) {
   }
 }
 
-bool parse_libhijacker_backend(const char *s, bool def) {
-  if (streq_ci(s, "default")) {
-    return false;
-  }
-  if (streq_ci(s, "libhijacker")) {
-    return true;
-  }
-  return def;
-}
-
-const char *cheat_backend_name(bool libhijacker) {
-  return libhijacker ? "libhijacker" : "default";
-}
-
 int parse_cheats_mirror(const char *s, int def) {
   if (streq_ci(s, "auto")) {
     return kCheatsMirrorAuto;
@@ -555,8 +541,6 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->onionhen_game_opts =
       parse_bool(ini_get(parser, "game_menu.show_onionhen_options"),
                  out->onionhen_game_opts);
-  out->libhijacker_cheats = parse_libhijacker_backend(
-      ini_get(parser, "cheats.memory_backend"), out->libhijacker_cheats);
   out->cheats_mirror = parse_cheats_mirror(ini_get(parser, "cheats.mirror"),
                                            out->cheats_mirror);
   out->app_jailbreak_enabled =
@@ -699,10 +683,6 @@ std::string settings_serialize(const Settings &in) {
   b += "show_onionhen_options=" + bool_text(in.onionhen_game_opts) + "\n";
   b += "\n";
   b += "[cheats]\n";
-  b += "# memory_backend selects the cheat memory access implementation.\n";
-  b += "# Available values: default, libhijacker\n";
-  b += "memory_backend=" + std::string(cheat_backend_name(in.libhijacker_cheats)) +
-       "\n";
   b += "# mirror selects the git host for online cheat catalogs.\n";
   b += "# Available values: auto, github, cnb\n";
   b += "# auto uses cnb.cool when the UI/system language is zh-Hans, otherwise GitHub.\n";

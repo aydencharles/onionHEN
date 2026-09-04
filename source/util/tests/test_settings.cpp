@@ -56,6 +56,7 @@ static int test_defaults_and_serialize_keys(void) {
                 "TOOL00001") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("title_id_prefixes=LAPY") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("mirror=auto") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("memory_backend") == std::string::npos);
   TEST_ASSERT_TRUE(text.find("[kstuff]\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("autoload=true") != std::string::npos);
   return 0;
@@ -106,7 +107,6 @@ static int test_full_schema_roundtrip(void) {
 
   onion::Settings in{};
   in.startup_open_after_load = onion::kStartupOpenHomeMenu;
-  in.libhijacker_cheats = true;
   in.cheats_mirror = onion::kCheatsMirrorCnb;
   in.app_jailbreak_enabled = false;
   in.debug_app_jb_msg = true;
@@ -142,7 +142,6 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
 
   TEST_ASSERT_EQ_INT(in.startup_open_after_load, out.startup_open_after_load);
-  TEST_ASSERT_TRUE(out.libhijacker_cheats == in.libhijacker_cheats);
   TEST_ASSERT_TRUE(out.app_jailbreak_enabled == in.app_jailbreak_enabled);
   TEST_ASSERT_TRUE(out.debug_app_jb_msg == in.debug_app_jb_msg);
   TEST_ASSERT_TRUE(out.display_tids == in.display_tids);

@@ -1,6 +1,8 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — OnPress payloads / auto-start */
 #include "onpress.hpp"
 #include "shellui_payload_state.hpp"
+#include <cerrno>
+#include <cstdlib>
 #include <fcntl.h>
 #include <pthread.h>
 #include <string>
@@ -12,6 +14,8 @@ namespace {
 
 constexpr const char *kRunPrefix = "id_payload_run_";
 constexpr const char *kAutoStartPrefix = "id_payload_autostart_";
+constexpr const char *kPriorityPrefix = "id_payload_priority_";
+constexpr const char *kDelayPrefix = "id_payload_delay_";
 
 PayloadEntry *payload_for_control(const std::string &control_id,
                                   const char *prefix) {
@@ -88,7 +92,56 @@ static OnPressResult prefix_id_auto_payload(OnPressContext &ctx) {
   return OnPressResult::Consumed;
 }
 
+static OnPressResult set_payload_schedule(OnPressContext &ctx, bool priority) {
+  ctx.dirty = false;
+  PayloadEntry *entry = payload_for_control(
+      ctx.id, priority ? kPriorityPrefix : kDelayPrefix);
+  if (!entry)
+    return OnPressResult::Consumed;
+
+  OnionPayloadConfig config;
+  onion_payload_config_load(entry->shellui_path.c_str(), &config);
+  const int maximum = priority ? ONION_PAYLOAD_PRIORITY_MAX : ONION_PAYLOAD_DELAY_MAX;
+  char *end = nullptr;
+  errno = 0;
+  const long value = std::strtol(ctx.value.c_str(), &end, 10);
+  if (ctx.value.empty() || ctx.value.find_first_not_of("0123456789") !=
+                               std::string::npos ||
+      errno == ERANGE || !end || *end || value < 0 || value > maximum) {
+    notify("notify.payload.config_invalid", maximum);
+  } else {
+    (priority ? config.priority : config.delay_seconds) = static_cast<int>(value);
+    if (!onion_payload_config_save(entry->shellui_path.c_str(), &config))
+      notify("notify.payload.config_save_failed", entry->name.c_str());
+  }
+
+  // Rebind the persisted value, including after rejected input or failed writes.
+  onion_payload_config_load(entry->shellui_path.c_str(), &entry->config);
+  const std::string saved = std::to_string(
+      priority ? entry->config.priority : entry->config.delay_seconds);
+  MonoDomain *domain = mono_domain_get ? mono_domain_get() : Root_Domain;
+  if (!domain)
+    domain = Root_Domain;
+  if (ctx.element && domain && set_value_method && mono_string_new && mono_runtime_invoke) {
+    MonoString *text = mono_string_new(domain, saved.c_str());
+    if (text) {
+      void *args[] = {text};
+      MonoObject *exception = nullptr;
+      mono_runtime_invoke(set_value_method, ctx.element, args, &exception);
+      if (exception)
+        LOG_ERROR("Failed to restore payload config control value");
+    }
+  }
+  return OnPressResult::Consumed;
+}
+
 static const OnPressPrefixEntry kPrefix[] = {
+    {kPriorityPrefix, +[](OnPressContext &ctx) {
+       return set_payload_schedule(ctx, true);
+     }},
+    {kDelayPrefix, +[](OnPressContext &ctx) {
+       return set_payload_schedule(ctx, false);
+     }},
     {kAutoStartPrefix, prefix_id_auto_payload},
     {kRunPrefix, prefix_id_payload_run},
 };

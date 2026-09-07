@@ -5,6 +5,8 @@ extern "C" int test_cheat_parsers_suite(void);
 extern "C" int test_cheat_repository_suite(void);
 extern "C" int test_cheat_flatten_suite(void);
 extern "C" int test_payload_suite(void);
+extern "C" int test_payload_config_suite(void);
+extern "C" int test_payload_autostart_suite(void);
 extern "C" int test_conflict_suite(void);
 extern "C" int test_base64_suite(void);
 extern "C" int test_aes_cbc_suite(void);
@@ -55,6 +57,8 @@ int main() {
   failures += test_cheat_repository_suite();
   failures += test_cheat_flatten_suite();
   failures += test_payload_suite();
+  failures += test_payload_config_suite();
+  failures += test_payload_autostart_suite();
   failures += test_conflict_suite();
   failures += test_base64_suite();
   failures += test_aes_cbc_suite();

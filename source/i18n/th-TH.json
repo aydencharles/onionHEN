@@ -5,6 +5,11 @@
     "fallback": false
   },
   "toolbox": {
+    "payload.priority": "ลำดับความสำคัญในการโหลด",
+    "payload.priority.sub": "0-999 ค่าที่สูงกว่าจะโหลดก่อน",
+    "payload.delay": "เวลาหน่วงก่อนเริ่มอัตโนมัติ (วินาที)",
+    "payload.delay.sub": "0-300 วินาที ระยะเวลาที่รอก่อนเริ่ม Payload นี้โดยอัตโนมัติ",
+    "payload.status.schedule_fmt": "%s · ลำดับความสำคัญ %d · หน่วง %d วินาที",
     "root.title": "★OnionHEN Toolbox",
     "group.pkg": "ติดตั้งและจัดการคอนเทนต์",
     "group.pkg.sub": "ติดตั้ง PKG และจัดการคอนเทนต์เสริม",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "ไม่โหลดอัตโนมัติ"
   },
   "notifications": {
+    "notify.payload.config_invalid": "กรุณาป้อนจำนวนเต็มตั้งแต่ 0 ถึง %d",
+    "notify.payload.config_save_failed": "ไม่สามารถบันทึกการตั้งค่า Payload: %s",
     "notify.boot.starting": "OnionHEN กำลังเริ่มทำงาน...",
     "notify.boot.welcome": "ยินดีต้อนรับสู่ OnionHEN",
     "notify.boot.goto_toolbox": "ไปที่ OnionHEN Toolbox",

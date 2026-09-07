@@ -66,11 +66,11 @@ std::string payload_list_status(const PayloadEntry& entry) {
   return toolbox_i18n::tr("payload.status.stopped");
 }
 
-void append_payload_entry(ps5ui::Page& page, const std::string& directory,
+void append_payload_entry(const std::string& directory,
                           const char* filename) {
   if (!toolbox::is_payload_elf_name(filename))
     return;
-  if (directory == "/data/OnionHEN/payloads" &&
+  if (toolbox::display_path_for_ui(directory) == "/data/OnionHEN/payloads" &&
       toolbox::is_legacy_payload_staging_name(filename))
     return;
 
@@ -91,12 +91,14 @@ void append_payload_entry(ps5ui::Page& page, const std::string& directory,
 
   LOG_DEBUG("Found payload: %s key=%s", path.c_str(), identity);
 
-  const std::string shown_path = toolbox::display_path_for_ui(path);
+  char canonical[ONION_PAYLOAD_PATH_SIZE];
+  if (!onion_payload_canonical_path(path.c_str(), canonical, sizeof(canonical)))
+    return;
 
   PayloadEntry entry;
   entry.shellui_path = path;
   entry.tid = identity;
-  entry.path = shown_path;
+  entry.path = canonical;
   entry.name = filename;
   entry.version = "";
   entry.id = identity;
@@ -108,9 +110,8 @@ void append_payload_entry(ps5ui::Page& page, const std::string& directory,
     return;
   }
 
-  page.link("id_payload_item_" + entry.id, entry.name,
-            toolbox::payload_config_xml(entry.id), payload_list_status(entry),
-            kIconPlugins);
+  if (!onion_payload_config_load(path.c_str(), &entry.config))
+    LOG_WARN("Invalid payload config, using defaults: %s", path.c_str());
   g_ui.payloads_list.push_back(std::move(entry));
 }
 
@@ -270,11 +271,17 @@ void generate_account_xml(std::string& xml_buffer) {
 static bool payloads_model(ps5ui::Node& model) {
   static const std::vector<std::string> kPayloadDirs = {
       "/user/data/OnionHEN/payloads",
+      "/user/data/onionhen/payloads",
       "/data/OnionHEN/payloads",
+      "/data/onionhen/payloads",
       "/usb0/OnionHEN/payloads",
+      "/usb0/onionhen/payloads",
       "/usb1/OnionHEN/payloads",
+      "/usb1/onionhen/payloads",
       "/usb2/OnionHEN/payloads",
+      "/usb2/onionhen/payloads",
       "/usb3/OnionHEN/payloads",
+      "/usb3/onionhen/payloads",
   };
 
   g_ui.payloads_list.clear();
@@ -287,10 +294,23 @@ static bool payloads_model(ps5ui::Node& model) {
       continue;
     }
     while (struct dirent* entry = readdir(dir))
-      append_payload_entry(page, directory, entry->d_name);
+      append_payload_entry(directory, entry->d_name);
     closedir(dir);
   }
 
+  std::sort(g_ui.payloads_list.begin(), g_ui.payloads_list.end(),
+            [](const PayloadEntry& a, const PayloadEntry& b) {
+              return onion_payload_compare(a.config.priority, a.path.c_str(),
+                                           b.config.priority, b.path.c_str()) < 0;
+            });
+  for (const auto& entry : g_ui.payloads_list) {
+    const std::string status = payload_list_status(entry);
+    page.link("id_payload_item_" + entry.id, entry.name,
+              toolbox::payload_config_xml(entry.id),
+              toolbox_i18n::format("payload.status.schedule_fmt", status.c_str(),
+                                   entry.config.priority, entry.config.delay_seconds),
+              kIconPlugins);
+  }
   model = page.root();
   return true;
 }
@@ -314,6 +334,7 @@ void generate_payload_config_xml(std::string& xml_buffer,
     const bool running = shellui_payload_is_running(found->tid.c_str());
     const std::string auto_path = found->shellui_path + ".auto_start";
     const bool auto_start = if_exists(auto_path.c_str());
+    onion_payload_config_load(found->shellui_path.c_str(), &found->config);
     ps5ui::Page page("id_payload_config", found->name);
     page.label("id_payload_path", found->path)
         .toggle("id_payload_run_" + found->id,
@@ -321,7 +342,17 @@ void generate_payload_config_xml(std::string& xml_buffer,
                 toolbox_i18n::tr("payload.current_session.sub"))
         .toggle("id_payload_autostart_" + found->id,
                 toolbox_i18n::tr("payload.next_autostart"), auto_start,
-                toolbox_i18n::tr("payload.next_autostart.sub"));
+                toolbox_i18n::tr("payload.next_autostart.sub"))
+        .text_field("id_payload_priority_" + found->id,
+                    toolbox_i18n::tr("payload.priority"),
+                    toolbox_i18n::tr("payload.priority.sub"), "number", "1", "3",
+                    std::nullopt, std::nullopt, std::nullopt,
+                    std::to_string(found->config.priority))
+        .text_field("id_payload_delay_" + found->id,
+                    toolbox_i18n::tr("payload.delay"),
+                    toolbox_i18n::tr("payload.delay.sub"), "number", "1", "3",
+                    std::nullopt, std::nullopt, std::nullopt,
+                    std::to_string(found->config.delay_seconds));
     xml_buffer = page.build();
   }
 }

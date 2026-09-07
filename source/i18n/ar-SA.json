@@ -5,6 +5,11 @@
     "fallback": false
   },
   "toolbox": {
+    "payload.priority": "أولوية التحميل",
+    "payload.priority.sub": "0-999؛ تُحمّل القيم الأعلى أولاً",
+    "payload.delay": "التأخير قبل التشغيل التلقائي (بالثواني)",
+    "payload.delay.sub": "0-300 ثانية؛ مدة الانتظار قبل تشغيل هذا Payload تلقائياً",
+    "payload.status.schedule_fmt": "%s · الأولوية %d · التأخير %d ثانية",
     "root.title": "★صندوق أدوات OnionHEN",
     "group.pkg": "تثبيت المحتوى وإدارته",
     "group.pkg.sub": "تثبيت ملفات PKG وإدارة المحتوى الإضافي",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "لا يُحمَّل تلقائيًا"
   },
   "notifications": {
+    "notify.payload.config_invalid": "أدخل عدداً صحيحاً من 0 إلى %d.",
+    "notify.payload.config_save_failed": "تعذر حفظ إعدادات Payload: %s",
     "notify.boot.starting": "جاري تشغيل OnionHEN...",
     "notify.boot.welcome": "مرحبًا بك في OnionHEN",
     "notify.boot.goto_toolbox": "الانتقال إلى صندوق أدوات OnionHEN",

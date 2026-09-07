@@ -5,6 +5,11 @@
     "fallback": false
   },
   "toolbox": {
+    "payload.priority": "加载优先级",
+    "payload.priority.sub": "0-999，数值越大越先加载",
+    "payload.delay": "自动启动前延时（秒）",
+    "payload.delay.sub": "0-300 秒，轮到此 Payload 自动启动时等待的时间",
+    "payload.status.schedule_fmt": "%s · 优先级 %d · 延时 %d 秒",
     "root.title": "★OnionHEN 工具箱",
     "group.pkg": "内容安装与管理",
     "group.pkg.sub": "安装 PKG 与管理附加内容",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "启动时不自动加载"
   },
   "notifications": {
+    "notify.payload.config_invalid": "请输入 0 到 %d 之间的整数。",
+    "notify.payload.config_save_failed": "无法保存 Payload 配置：%s",
     "notify.boot.starting": "OnionHEN 正在启动...",
     "notify.boot.welcome": "欢迎使用 OnionHEN",
     "notify.boot.goto_toolbox": "前往 OnionHEN 工具箱",

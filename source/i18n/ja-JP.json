@@ -5,6 +5,11 @@
     "fallback": false
   },
   "toolbox": {
+    "payload.priority": "読み込み優先度",
+    "payload.priority.sub": "0～999。値が大きいほど先に読み込みます",
+    "payload.delay": "自動起動前の待機時間（秒）",
+    "payload.delay.sub": "0～300 秒。この Payload の自動起動順が来てから待機する時間",
+    "payload.status.schedule_fmt": "%s · 優先度 %d · 待機 %d 秒",
     "root.title": "★OnionHEN ツールボックス",
     "group.pkg": "コンテンツのインストールと管理",
     "group.pkg.sub": "PKG のインストールと追加コンテンツの管理",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "起動時に自動読み込みしません"
   },
   "notifications": {
+    "notify.payload.config_invalid": "0 から %d までの整数を入力してください。",
+    "notify.payload.config_save_failed": "Payload の設定を保存できませんでした：%s",
     "notify.boot.starting": "OnionHEN を起動しています...",
     "notify.boot.welcome": "OnionHEN へようこそ",
     "notify.boot.goto_toolbox": "OnionHEN ツールボックスへ",

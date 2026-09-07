@@ -9,6 +9,7 @@
 #include <iostream>
 #include "defs.h"
 #include <onion/settings.hpp>
+#include <onion/payload_config.h>
 
 #define MAX_LINE 256
 #define MAX_PAIRS 100
@@ -79,13 +80,14 @@ struct LaunchAppParam
 };
 
 /** List entry for a payload .elf in the toolbox. */
-typedef struct {
+typedef struct PayloadEntry {
     std::string path;
     std::string shellui_path;
     std::string tid;  /* path-derived key for PID / launch */
     std::string id;   /* stable resource/control suffix */
     std::string name;
     std::string version;
+    OnionPayloadConfig config{};
 } PayloadEntry;
 
 // all_cpu_usage: overlay.cpu_usage_mode=per_core (config.ini)

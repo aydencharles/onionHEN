@@ -5,6 +5,11 @@
     "fallback": true
   },
   "toolbox": {
+    "payload.priority": "Load priority",
+    "payload.priority.sub": "0-999; higher values load first",
+    "payload.delay": "Auto-start delay (seconds)",
+    "payload.delay.sub": "0-300 seconds; wait before this Payload starts automatically",
+    "payload.status.schedule_fmt": "%s · Priority %d · Delay %d s",
     "root.title": "★OnionHEN Toolbox",
     "group.pkg": "Content Install & Management",
     "group.pkg.sub": "Install PKGs and manage add-on content",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "Not loaded automatically"
   },
   "notifications": {
+    "notify.payload.config_invalid": "Enter a whole number from 0 to %d.",
+    "notify.payload.config_save_failed": "Failed to save Payload settings: %s",
     "notify.boot.starting": "OnionHEN is starting...",
     "notify.boot.welcome": "Welcome to OnionHEN",
     "notify.boot.goto_toolbox": "Go to the OnionHEN Toolbox",

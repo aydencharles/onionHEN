@@ -72,6 +72,7 @@ PROD_C_SRCS := \
 	$(REPO_ROOT)/source/libonion_platform/source/notify_i18n.c \
 	$(REPO_ROOT)/source/libonion_ready/source/ready.c \
 	$(REPO_ROOT)/source/libonion_payload/source/payload.c \
+	$(REPO_ROOT)/source/libonion_payload/source/payload_config.c \
 	$(REPO_ROOT)/source/libonion_conflict/source/conflict.c
 
 PROD_CXX_SRCS := \
@@ -112,6 +113,8 @@ TEST_C_SRCS := \
 	test_cheat_utils.c \
 	test_cheat_flatten.c \
 	test_payload.c \
+	test_payload_config.c \
+	test_payload_autostart.c \
 	test_conflict.c \
 	test_base64.c \
 	test_aes_cbc.c \
@@ -168,6 +171,7 @@ PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_ready/ready.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload_config.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_conflict/conflict.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_detour/hde64.o
 
@@ -380,7 +384,7 @@ $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o: $(REPO_ROOT)/source/libonion_
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/prod/libonion_payload/payload.o: $(REPO_ROOT)/source/libonion_payload/source/payload.c | $(BUILD_DIR)
+$(BUILD_DIR)/prod/libonion_payload/%.o: $(REPO_ROOT)/source/libonion_payload/source/%.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
@@ -395,6 +399,8 @@ $(BUILD_DIR)/prod/libonion_detour/hde64.o: $(REPO_ROOT)/source/libonion_detour/s
 $(BUILD_DIR)/tests/%.o: %.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/tests/test_payload_autostart.o: CFLAGS += -I$(REPO_ROOT)/source/bootstrapper/include
 
 $(BUILD_DIR)/tests/%.o: %.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)

@@ -5,6 +5,11 @@
     "fallback": false
   },
   "toolbox": {
+    "payload.priority": "로드 우선순위",
+    "payload.priority.sub": "0-999, 값이 클수록 먼저 로드됩니다",
+    "payload.delay": "자동 시작 전 대기 시간(초)",
+    "payload.delay.sub": "0-300초, 이 Payload의 자동 시작 차례가 된 후 기다리는 시간",
+    "payload.status.schedule_fmt": "%s · 우선순위 %d · 대기 %d초",
     "root.title": "★OnionHEN 툴박스",
     "group.pkg": "콘텐츠 설치 및 관리",
     "group.pkg.sub": "PKG 설치와 추가 콘텐츠 관리",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "시작 시 자동으로 로드하지 않음"
   },
   "notifications": {
+    "notify.payload.config_invalid": "0에서 %d 사이의 정수를 입력하세요.",
+    "notify.payload.config_save_failed": "Payload 설정을 저장하지 못했습니다: %s",
     "notify.boot.starting": "OnionHEN을 시작하는 중...",
     "notify.boot.welcome": "OnionHEN에 오신 것을 환영합니다",
     "notify.boot.goto_toolbox": "OnionHEN 툴박스로 이동",

@@ -5,6 +5,11 @@
     "fallback": false
   },
   "toolbox": {
+    "payload.priority": "Prioridad de carga",
+    "payload.priority.sub": "0-999; los valores más altos se cargan primero",
+    "payload.delay": "Espera antes del inicio automático (segundos)",
+    "payload.delay.sub": "0-300 segundos; espera antes de iniciar automáticamente este Payload",
+    "payload.status.schedule_fmt": "%s · Prioridad %d · Espera %d s",
     "root.title": "★Caja de herramientas OnionHEN",
     "group.pkg": "Instalación y gestión de contenido",
     "group.pkg.sub": "Instalar PKG y gestionar contenido adicional",
@@ -290,6 +295,8 @@
     "plugin.kstuff.status.manual": "No se carga automáticamente"
   },
   "notifications": {
+    "notify.payload.config_invalid": "Introduce un número entero entre 0 y %d.",
+    "notify.payload.config_save_failed": "No se pudo guardar la configuración del Payload: %s",
     "notify.boot.starting": "OnionHEN se está iniciando...",
     "notify.boot.welcome": "Bienvenido a OnionHEN",
     "notify.boot.goto_toolbox": "Ir a la caja de herramientas OnionHEN",

@@ -120,6 +120,7 @@ int get_ip_address(char *ip_address, size_t size);
 int sceNetCtlInit(void);
 int sceUserServiceInitialize(void *ptr);
 bool load_payload(const char *path);
+bool load_payload_with_key(const char *path, const char *key);
 #ifdef __cplusplus
 }
 #endif

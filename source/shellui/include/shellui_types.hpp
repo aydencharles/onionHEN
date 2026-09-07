@@ -82,8 +82,8 @@ struct LaunchAppParam
 typedef struct {
     std::string path;
     std::string shellui_path;
-    std::string tid;  /* stem key for PID / launch */
-    std::string id;
+    std::string tid;  /* path-derived key for PID / launch */
+    std::string id;   /* stable resource/control suffix */
     std::string name;
     std::string version;
 } PayloadEntry;

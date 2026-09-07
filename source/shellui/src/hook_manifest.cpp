@@ -19,7 +19,9 @@ extern MonoClass *MemoryStream_IO;
 extern MonoObject *MemoryStream_Instance;
 extern std::string payloads_xml, debug_settings_xml, cheats_xml;
 extern std::string UI3_dec, legacy_dec;
-void generate_payload_xml(std::string &xml_buffer, bool list_page);
+void generate_payload_xml(std::string &xml_buffer);
+void generate_payload_config_xml(std::string &xml_buffer,
+                                 const std::string &payload_id);
 void generate_plugins_xml(std::string &xml_buffer);
 void generate_sprx_xml(std::string &xml_buffer);
 void generate_plugin_config_xml(std::string &xml_buffer);
@@ -119,9 +121,14 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     generate_toolbox_xml(new_xml_string);
     break;
   case toolbox::Page::Payloads:
-    g_ui.payloads_list.clear();
-    generate_payload_xml(new_xml_string, true);
+    generate_payload_xml(new_xml_string);
     break;
+  case toolbox::Page::PayloadConfig: {
+    std::string payload_id;
+    toolbox::parse_payload_config_resource(resourceName, &payload_id);
+    generate_payload_config_xml(new_xml_string, payload_id);
+    break;
+  }
   case toolbox::Page::Plugins:
     generate_plugins_xml(new_xml_string);
     break;
@@ -157,8 +164,7 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
       g_ui.clear_cheat_shortcuts();
     break;
   case toolbox::Page::AutoPayloads:
-    g_ui.auto_payloads_list.clear();
-    generate_payload_xml(new_xml_string, false);
+    generate_payload_xml(new_xml_string);
     break;
   case toolbox::Page::Account:
     generate_account_xml(new_xml_string);

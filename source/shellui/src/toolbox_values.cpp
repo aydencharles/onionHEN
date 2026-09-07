@@ -102,23 +102,26 @@ bool try_exact_value(const std::string &id, std::string &out) {
   return false;
 }
 
-bool try_payload_list_value(const std::string &id, std::string &out) {
-  for (const auto &entry : g_ui.payloads_list) {
-    if (entry.id != id)
-      continue;
-    out = bool_str(shellui_payload_resolve_recorded_pid(entry.tid.c_str(),
-                                                        nullptr, 0) > 1);
-    return true;
+bool try_payload_control_value(const std::string &id, std::string &out) {
+  constexpr std::string_view kRunPrefix = "id_payload_run_";
+  constexpr std::string_view kAutoStartPrefix = "id_payload_autostart_";
+  std::string_view payload_id;
+  bool is_run = false;
+  if (id.starts_with(kRunPrefix)) {
+    payload_id = std::string_view(id).substr(kRunPrefix.size());
+    is_run = true;
+  } else if (id.starts_with(kAutoStartPrefix)) {
+    payload_id = std::string_view(id).substr(kAutoStartPrefix.size());
+  } else {
+    return false;
   }
-  return false;
-}
-
-bool try_auto_payload_value(const std::string &id, std::string &out) {
-  for (const auto &entry : g_ui.auto_payloads_list) {
-    if (entry.id != id)
+  for (const auto &entry : g_ui.payloads_list) {
+    if (entry.id != payload_id)
       continue;
-    const std::string auto_path = entry.shellui_path + ".auto_start";
-    out = bool_str(if_exists(auto_path.c_str()));
+    out = bool_str(is_run
+                       ? shellui_payload_resolve_recorded_pid(entry.tid.c_str(),
+                                                              nullptr, 0) > 1
+                       : if_exists((entry.shellui_path + ".auto_start").c_str()));
     return true;
   }
   return false;
@@ -181,9 +184,7 @@ bool try_dynamic_control_value(const std::string &id, std::string &out) {
 std::string resolve_toolbox_control_value(const std::string &id) {
   std::string value;
 
-  if (try_payload_list_value(id, value))
-    return value;
-  if (try_auto_payload_value(id, value))
+  if (try_payload_control_value(id, value))
     return value;
   if (try_exact_value(id, value))
     return value;

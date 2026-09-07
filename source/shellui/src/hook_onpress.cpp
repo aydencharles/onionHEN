@@ -62,6 +62,7 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
     run_exact(onpress_misc_root_exact);
     break;
   case toolbox::OnPressDomain::Payloads:
+  case toolbox::OnPressDomain::PayloadConfig:
   case toolbox::OnPressDomain::AutoPayloads:
     run_prefix(onpress_payloads_prefix);
     break;

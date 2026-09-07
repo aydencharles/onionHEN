@@ -32,7 +32,6 @@ struct ToolboxUiState {
   std::vector<unsigned char> cheat_enabled_map;
 
   std::vector<PayloadEntry> payloads_list;
-  std::vector<PayloadEntry> auto_payloads_list;
 
   std::vector<PluginInventoryItem> external_plugins;
   std::vector<SprxInventoryItem> external_sprx;

@@ -134,6 +134,31 @@ static int test_sprx_config_page(void) {
   return 0;
 }
 
+static int test_payload_config_page(void) {
+  RouteResult list = resolve_resource(make_in("payloads.xml"));
+  TEST_ASSERT_TRUE(list.page == Page::Payloads);
+  TEST_ASSERT_TRUE(!list.flags.is_payload_config);
+
+  RouteResult r = resolve_resource(
+      make_in(cfg_res("payload_p0123456789abcdef.xml")));
+  TEST_ASSERT_TRUE(r.page == Page::PayloadConfig);
+  TEST_ASSERT_TRUE(r.flags.is_payload_config);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) ==
+                   OnPressDomain::PayloadConfig);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+
+  std::string id;
+  TEST_ASSERT_TRUE(parse_payload_config_resource(
+      cfg_res("payload_p0123456789abcdef.xml"), &id));
+  TEST_ASSERT_STREQ("p0123456789abcdef", id.c_str());
+  TEST_ASSERT_TRUE(resolve_resource(make_in(cfg_res("payload_p012.xml"))).page ==
+                   Page::None);
+  TEST_ASSERT_TRUE(resolve_resource(
+                       make_in(cfg_res("payload_P0123456789abcdef.xml")))
+                       .page == Page::None);
+  return 0;
+}
+
 static int test_plugins_registry(void) {
   using namespace onion::plugins;
 
@@ -182,6 +207,21 @@ static int test_sprx_config_restores_parent(void) {
 
   state.leave_page(Page::SprxConfig);
   TEST_ASSERT_TRUE(state.active_page == Page::Sprx);
+  TEST_ASSERT_TRUE(state.parent_page == Page::None);
+  TEST_ASSERT_TRUE(state.child_page == Page::None);
+  return 0;
+}
+
+static int test_payload_config_restores_parent(void) {
+  ToolboxUiState state;
+  state.set_active_page(Page::Payloads);
+  state.set_active_page(Page::PayloadConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::PayloadConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::Payloads);
+  TEST_ASSERT_TRUE(state.child_page == Page::PayloadConfig);
+
+  state.leave_page(Page::PayloadConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::Payloads);
   TEST_ASSERT_TRUE(state.parent_page == Page::None);
   TEST_ASSERT_TRUE(state.child_page == Page::None);
   return 0;
@@ -366,11 +406,14 @@ extern "C" int test_toolbox_route_suite(void) {
   fails += onion_test_run("route.sprx", test_sprx_page);
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);
   fails += onion_test_run("route.sprx_config", test_sprx_config_page);
+  fails += onion_test_run("route.payload_config", test_payload_config_page);
   fails += onion_test_run("plugins.registry", test_plugins_registry);
   fails += onion_test_run("plugins.config_restores_parent",
                           test_plugin_config_restores_parent);
   fails += onion_test_run("sprx.config_restores_parent",
                           test_sprx_config_restores_parent);
+  fails += onion_test_run("payload.config_restores_parent",
+                          test_payload_config_restores_parent);
   fails += onion_test_run("route.account", test_account_page);
   fails += onion_test_run("route.cheat_progress", test_cheat_progress_page);
   fails += onion_test_run("route.remote_play", test_remote_play_page);

@@ -14,6 +14,7 @@ void onion_test_elfldr_reset(void);
 void onion_test_elfldr_configure(bool available, pid_t launch_pid);
 int onion_test_elfldr_launch_calls(void);
 uint16_t onion_test_elfldr_last_port(void);
+const char *onion_test_elfldr_last_path(void);
 void onion_test_live_pid(pid_t pid);
 
 static int test_is_elf(void) {
@@ -47,6 +48,27 @@ static int test_elf_key_from_name(void) {
   TEST_ASSERT_TRUE(!onion_payload_elf_key_from_name(".elf", key, sizeof(key)));
   TEST_ASSERT_TRUE(!onion_payload_elf_key_from_name(NULL, key, sizeof(key)));
   TEST_ASSERT_TRUE(!onion_payload_elf_key_from_name("", key, sizeof(key)));
+  return 0;
+}
+
+static int test_path_identity(void) {
+  char first[ONION_PAYLOAD_IDENTITY_SIZE];
+  char repeated[ONION_PAYLOAD_IDENTITY_SIZE];
+  char second[ONION_PAYLOAD_IDENTITY_SIZE];
+
+  TEST_ASSERT_TRUE(onion_payload_identity_from_path(
+      "/data/OnionHEN/payloads/tool.elf", first, sizeof(first)));
+  TEST_ASSERT_TRUE(onion_payload_identity_from_path(
+      "/data/OnionHEN/payloads/tool.elf", repeated, sizeof(repeated)));
+  TEST_ASSERT_TRUE(onion_payload_identity_from_path(
+      "/mnt/usb0/OnionHEN/payloads/tool.elf", second, sizeof(second)));
+  TEST_ASSERT_STREQ(first, repeated);
+  TEST_ASSERT_TRUE(strcmp(first, second) != 0);
+  TEST_ASSERT_EQ_INT(17, (int)strlen(first));
+  TEST_ASSERT_TRUE(first[0] == 'p');
+  TEST_ASSERT_TRUE(!onion_payload_identity_from_path("", first, sizeof(first)));
+  TEST_ASSERT_TRUE(!onion_payload_identity_from_path(
+      "/data/OnionHEN/payloads/tool.elf", first, sizeof(first) - 1));
   return 0;
 }
 
@@ -100,27 +122,28 @@ static int test_read_file(void) {
 }
 
 static int test_strict_private_loader_policy(void) {
-  const unsigned char elf[8] = {0x7F, 'E', 'L', 'F', 2, 1, 1, 0};
+  const char *path = "/data/OnionHEN/payloads/strict-test.elf";
 
   onion_test_elfldr_reset();
   TEST_ASSERT_EQ_INT(-1, (int)onion_payload_launch_elfldr(
-                             "strict-test", elf, sizeof(elf)));
+                             "strict-test", path));
   TEST_ASSERT_EQ_INT(0, onion_test_elfldr_launch_calls());
 
   onion_test_elfldr_configure(true, 4242);
   TEST_ASSERT_EQ_INT(4242, (int)onion_payload_launch_elfldr(
-                               "strict-test", elf, sizeof(elf)));
+                               "strict-test", path));
   TEST_ASSERT_EQ_INT(1, onion_test_elfldr_launch_calls());
   TEST_ASSERT_EQ_INT(ONION_ELFLDR_PORT, onion_test_elfldr_last_port());
+  TEST_ASSERT_STREQ(path, onion_test_elfldr_last_path());
 
   onion_test_elfldr_configure(true, 0);
   TEST_ASSERT_EQ_INT(-1, (int)onion_payload_launch_elfldr(
-                             "strict-test", elf, sizeof(elf)));
+                             "strict-test", path));
   TEST_ASSERT_EQ_INT(2, onion_test_elfldr_launch_calls());
 
   onion_test_elfldr_configure(true, -1);
   TEST_ASSERT_EQ_INT(-1, (int)onion_payload_launch_elfldr(
-                             "strict-test", elf, sizeof(elf)));
+                             "strict-test", path));
   TEST_ASSERT_EQ_INT(3, onion_test_elfldr_launch_calls());
   return 0;
 }
@@ -136,6 +159,7 @@ static int test_load_requires_real_pid(void) {
   onion_test_elfldr_reset();
   onion_test_elfldr_configure(true, 5151);
   TEST_ASSERT_TRUE(onion_payload_load(path, NULL));
+  TEST_ASSERT_STREQ(path, onion_test_elfldr_last_path());
 
   char path_copy[256];
   snprintf(path_copy, sizeof(path_copy), "%s", path);
@@ -188,6 +212,25 @@ static int test_load_preserves_running_instance(void) {
   return 0;
 }
 
+static int test_load_with_explicit_key(void) {
+  char path[256];
+  char pid_path[256];
+  const char key[] = "p0123456789abcdef";
+  const unsigned char elf[8] = {0x7F, 'E', 'L', 'F', 2, 1, 1, 0};
+
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_file(
+                            ".elf", elf, sizeof(elf), path, sizeof(path)));
+  onion_test_elfldr_reset();
+  onion_test_elfldr_configure(true, 8181);
+  TEST_ASSERT_TRUE(onion_payload_load_with_key(path, NULL, key));
+  onion_payload_pid_path(pid_path, sizeof(pid_path), key);
+  TEST_ASSERT_EQ_INT(8181, (int)onion_payload_read_pid_file(pid_path));
+
+  onion_test_remove_file(pid_path);
+  onion_test_remove_file(path);
+  return 0;
+}
+
 static int test_builtin_identity_payloads_allowed(void) {
   char path[256];
   const unsigned char elf[8] = {0x7F, 'E', 'L', 'F', 2, 1, 1, 0};
@@ -198,7 +241,7 @@ static int test_builtin_identity_payloads_allowed(void) {
   onion_test_elfldr_reset();
   onion_test_elfldr_configure(true, 5151);
   TEST_ASSERT_EQ_INT(5151, (int)onion_payload_launch_elfldr(
-                             "ftpsrv", elf, sizeof(elf)));
+                             "ftpsrv", path));
   TEST_ASSERT_TRUE(onion_payload_load(path, "ftpsrv.elf"));
   TEST_ASSERT_TRUE(onion_payload_load(path, "ftpsrv-ps5.elf"));
   TEST_ASSERT_TRUE(onion_payload_load(path, "kstuff.elf"));
@@ -220,6 +263,7 @@ int test_payload_suite(void) {
   failures += onion_test_run("payload.is_elf", test_is_elf);
   failures += onion_test_run("payload.pid_path", test_pid_path);
   failures += onion_test_run("payload.elf_key_from_name", test_elf_key_from_name);
+  failures += onion_test_run("payload.path_identity", test_path_identity);
   failures += onion_test_run("payload.pid_file_roundtrip",
                              test_pid_file_roundtrip);
   failures += onion_test_run("payload.read_file", test_read_file);
@@ -231,6 +275,8 @@ int test_payload_suite(void) {
                              test_payload_running_without_live_pid);
   failures += onion_test_run("payload.load_preserves_running_instance",
                              test_load_preserves_running_instance);
+  failures += onion_test_run("payload.load_with_explicit_key",
+                             test_load_with_explicit_key);
   failures += onion_test_run("payload.builtin_identity_payloads_allowed",
                              test_builtin_identity_payloads_allowed);
   return failures;

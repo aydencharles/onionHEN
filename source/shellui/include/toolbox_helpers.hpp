@@ -42,6 +42,22 @@ inline bool is_payload_elf_name(const char *name) {
 }
 
 /**
+ * Previous builds left runtime staging files in the visible /data payload
+ * directory. Keep their reserved identity format out of the list after upgrade.
+ */
+inline bool is_legacy_payload_staging_name(const char *name) {
+  if (!name || std::strlen(name) != 21 || name[0] != 'p' ||
+      std::strcmp(name + 17, ".elf") != 0)
+    return false;
+  for (std::size_t i = 1; i < 17; ++i) {
+    const char c = name[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+      return false;
+  }
+  return true;
+}
+
+/**
  * Launch/PID key for payload: "foo.elf" → "foo".
  * Matches util onion_payload_elf_key_from_name.
  */

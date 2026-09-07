@@ -136,7 +136,9 @@ std::string base64_decode(const std::string &encoded_string);
 std::vector<unsigned char> encrypt_decrypt(const unsigned char *data, size_t size, const std::string &key);
 void ReloadRNPSApp(const char* title_id);
 
-void generate_payload_xml(std::string& xml_buffer, bool list_page);
+void generate_payload_xml(std::string& xml_buffer);
+void generate_payload_config_xml(std::string& xml_buffer,
+                                 const std::string& payload_id);
 void generate_account_xml(std::string& xml_buffer);
 void generate_toolbox_xml(std::string& new_xml);
 void Patch_Main_thread_Check(MonoImage * image_core);

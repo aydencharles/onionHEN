@@ -33,7 +33,10 @@
 #include <string>
 
 #include "shellui_state.hpp"
+#include "shellui_payload_state.hpp"
 #include "toolbox_helpers.hpp"
+
+#include <onion/payload_identity.h>
 
 void escapeXML(std::string& input);
 bool Get_Running_App_TID(std::string& title_id, int& BigAppid);
@@ -44,20 +47,38 @@ void escapeXML(std::string& input) {
 
 namespace {
 
+constexpr const char* kIconPlugins =
+    "/user/data/OnionHEN/assets/icon_xml_plugins.png";
+
 /* Defined with the other dynamic control helpers below. */
 std::string toolbox_val(const char* id, const char* fallback);
 
 /** Payload .elf only (OnionHEN no longer supports .plugin packages). */
-template <typename G>
-void append_payload_entry(G& page, const std::string& directory, const char* filename,
-                          bool list_page, int& next_id) {
+std::string payload_list_status(const PayloadEntry& entry) {
+  const bool running = shellui_payload_is_running(entry.tid.c_str());
+  const bool auto_start = if_exists((entry.shellui_path + ".auto_start").c_str());
+  if (running && auto_start)
+    return toolbox_i18n::tr("payload.status.running_autostart");
+  if (running)
+    return toolbox_i18n::tr("payload.status.running");
+  if (auto_start)
+    return toolbox_i18n::tr("payload.status.stopped_autostart");
+  return toolbox_i18n::tr("payload.status.stopped");
+}
+
+void append_payload_entry(ps5ui::Page& page, const std::string& directory,
+                          const char* filename) {
   if (!toolbox::is_payload_elf_name(filename))
+    return;
+  if (directory == "/data/OnionHEN/payloads" &&
+      toolbox::is_legacy_payload_staging_name(filename))
     return;
 
   const std::string path = directory + "/" + filename;
-  char elf_key[64] = {};
-  if (!toolbox::elf_key_from_name(filename, elf_key, sizeof(elf_key))) {
-    LOG_ERROR("Skipping invalid payload name: %s", filename);
+  char identity[ONION_PAYLOAD_IDENTITY_SIZE] = {};
+  if (!onion_payload_identity_from_path(path.c_str(), identity,
+                                        sizeof(identity))) {
+    LOG_ERROR("Skipping payload with invalid path: %s", path.c_str());
     return;
   }
   /* Confirm file is readable (ELF magic checked at launch). */
@@ -68,31 +89,29 @@ void append_payload_entry(G& page, const std::string& directory, const char* fil
   }
   close(fd);
 
-  LOG_DEBUG("Found payload: %s key=%s", path.c_str(), elf_key);
+  LOG_DEBUG("Found payload: %s key=%s", path.c_str(), identity);
 
   const std::string shown_path = toolbox::display_path_for_ui(path);
-  const std::string id_prefix = list_page ? "id_payload_" : "id_auto_payload_";
-  const std::string id = id_prefix + std::to_string(next_id++);
-
-  const std::string second =
-      list_page ? toolbox_i18n::format("payload.start_stop_fmt", filename,
-                                      shown_path.c_str(), elf_key)
-                : toolbox_i18n::format("payload.autostart_fmt", filename,
-                                      shown_path.c_str());
-
-  page.toggle(id, filename, /*on=*/false, second);
 
   PayloadEntry entry;
   entry.shellui_path = path;
-  entry.tid = elf_key;
+  entry.tid = identity;
   entry.path = shown_path;
   entry.name = filename;
   entry.version = "";
-  entry.id = id;
-  if (list_page)
-    g_ui.payloads_list.push_back(entry);
-  else
-    g_ui.auto_payloads_list.push_back(entry);
+  entry.id = identity;
+  const auto existing = std::find_if(
+      g_ui.payloads_list.begin(), g_ui.payloads_list.end(),
+      [&](const PayloadEntry& item) { return item.id == entry.id; });
+  if (existing != g_ui.payloads_list.end()) {
+    LOG_ERROR("Skipping Payload with colliding identity: %s", path.c_str());
+    return;
+  }
+
+  page.link("id_payload_item_" + entry.id, entry.name,
+            toolbox::payload_config_xml(entry.id), payload_list_status(entry),
+            kIconPlugins);
+  g_ui.payloads_list.push_back(std::move(entry));
 }
 
 std::string read_file_to_string(const char* path) {
@@ -248,7 +267,7 @@ void generate_account_xml(std::string& xml_buffer) {
   xml_buffer = page.build();
 }
 
-void generate_payload_xml(std::string& xml_buffer, bool list_page) {
+static bool payloads_model(ps5ui::Node& model) {
   static const std::vector<std::string> kPayloadDirs = {
       "/user/data/OnionHEN/payloads",
       "/data/OnionHEN/payloads",
@@ -258,13 +277,9 @@ void generate_payload_xml(std::string& xml_buffer, bool list_page) {
       "/usb3/OnionHEN/payloads",
   };
 
-  const char* root_id = list_page ? "id_payload" : "id_auto_payloads";
-  const char* root_title =
-      list_page ? toolbox_i18n::tr("payload.title")
-                : toolbox_i18n::tr("payload.auto_title");
-  ps5ui::Page page(root_id, root_title);
+  g_ui.payloads_list.clear();
+  ps5ui::Page page("id_payload", toolbox_i18n::tr("payload.title"));
 
-  int toggle_switch_id = 1;
   for (const auto& directory : kPayloadDirs) {
     DIR* dir = opendir(directory.c_str());
     if (!dir) {
@@ -272,12 +287,43 @@ void generate_payload_xml(std::string& xml_buffer, bool list_page) {
       continue;
     }
     while (struct dirent* entry = readdir(dir))
-      append_payload_entry(page, directory, entry->d_name, list_page,
-                           toggle_switch_id);
+      append_payload_entry(page, directory, entry->d_name);
     closedir(dir);
   }
 
-  xml_buffer = page.build();
+  model = page.root();
+  return true;
+}
+
+void generate_payload_xml(std::string& xml_buffer) {
+  ps5ui::Node model;
+  payloads_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, payloads_model);
+}
+
+void generate_payload_config_xml(std::string& xml_buffer,
+                                 const std::string& payload_id) {
+  const auto found = std::find_if(
+      g_ui.payloads_list.begin(), g_ui.payloads_list.end(),
+      [&](const PayloadEntry& entry) { return entry.id == payload_id; });
+  if (found == g_ui.payloads_list.end()) {
+    ps5ui::Page page("id_payload_config", toolbox_i18n::tr("payload.title"));
+    page.label("id_payload_missing", toolbox_i18n::tr("payload.missing"));
+    xml_buffer = page.build();
+  } else {
+    const bool running = shellui_payload_is_running(found->tid.c_str());
+    const std::string auto_path = found->shellui_path + ".auto_start";
+    const bool auto_start = if_exists(auto_path.c_str());
+    ps5ui::Page page("id_payload_config", found->name);
+    page.label("id_payload_path", found->path)
+        .toggle("id_payload_run_" + found->id,
+                toolbox_i18n::tr("payload.current_session"), running,
+                toolbox_i18n::tr("payload.current_session.sub"))
+        .toggle("id_payload_autostart_" + found->id,
+                toolbox_i18n::tr("payload.next_autostart"), auto_start,
+                toolbox_i18n::tr("payload.next_autostart.sub"));
+    xml_buffer = page.build();
+  }
 }
 
 static bool plugins_model(ps5ui::Node &model) {
@@ -425,8 +471,6 @@ namespace {
 
 constexpr const char* kIconPkg =
     "/user/data/OnionHEN/assets/icon_xml_package.png";
-constexpr const char* kIconPlugins =
-    "/user/data/OnionHEN/assets/icon_xml_plugins.png";
 constexpr const char* kIconGame = "/user/data/OnionHEN/assets/icon_xml_game.png";
 constexpr const char* kIconCheats =
     "/user/data/OnionHEN/assets/icon_xml_cheats.png";
@@ -492,8 +536,6 @@ void append_toolbox_pkg_group(ps5ui::Group& g) {
 void append_toolbox_payloads_group(ps5ui::Group& g) {
   g.link("id_payloads", toolbox_i18n::tr("payloads.link"), "payloads.xml",
          toolbox_i18n::tr("payloads.link.sub"), kIconPlugins)
-      .link("id_auto_payloads", toolbox_i18n::tr("payload.auto.link"),
-            "auto_payloads.xml", toolbox_i18n::tr("payload.auto.sub"), kIconPlugins)
       .link("id_plugins", toolbox_i18n::tr("plugins.link"), "plugins.xml",
             toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
       .link("id_sprx", toolbox_i18n::tr("sprx.link"), "sprx.xml",

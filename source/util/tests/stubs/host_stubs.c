@@ -22,6 +22,7 @@ static bool g_test_onion_available = false;
 static pid_t g_test_onion_launch_pid = -1;
 static int g_test_onion_launch_calls = 0;
 static uint16_t g_test_onion_last_port = 0;
+static char g_test_onion_last_path[512];
 static pid_t g_test_live_pid = -1;
 
 void onion_test_elfldr_reset(void) {
@@ -29,6 +30,7 @@ void onion_test_elfldr_reset(void) {
   g_test_onion_launch_pid = -1;
   g_test_onion_launch_calls = 0;
   g_test_onion_last_port = 0;
+  g_test_onion_last_path[0] = '\0';
   g_test_live_pid = -1;
 }
 
@@ -39,6 +41,7 @@ void onion_test_elfldr_configure(bool available, pid_t launch_pid) {
 
 int onion_test_elfldr_launch_calls(void) { return g_test_onion_launch_calls; }
 uint16_t onion_test_elfldr_last_port(void) { return g_test_onion_last_port; }
+const char *onion_test_elfldr_last_path(void) { return g_test_onion_last_path; }
 void onion_test_live_pid(pid_t pid) { g_test_live_pid = pid; }
 
 bool elfldr_remote_available_on(uint16_t port) {
@@ -77,10 +80,11 @@ pid_t elfldr_remote_onion_write_and_launch_get_pid(const char *abs_path,
 
 pid_t elfldr_remote_onion_launch_file_get_pid(const char *abs_path,
                                               const char *args) {
-  (void)abs_path;
   (void)args;
   ++g_test_onion_launch_calls;
   g_test_onion_last_port = ONION_ELFLDR_PORT;
+  snprintf(g_test_onion_last_path, sizeof(g_test_onion_last_path), "%s",
+           abs_path ? abs_path : "");
   return g_test_onion_launch_pid;
 }
 

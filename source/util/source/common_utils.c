@@ -103,6 +103,10 @@ bool load_payload(const char *path) {
   return onion_payload_load(path, /*filename=*/NULL);
 }
 
+bool load_payload_with_key(const char *path, const char *key) {
+  return onion_payload_load_with_key(path, /*filename=*/NULL, key);
+}
+
 int launchApp(const char *titleId)
 {
 	int id = 0;

@@ -42,6 +42,17 @@ int launchApp(const char *titleId);
 }
 namespace {
 
+bool is_payload_path_identity(const std::string &id) {
+  if (id.size() != ONION_PAYLOAD_IDENTITY_SIZE - 1 || id[0] != 'p')
+    return false;
+  for (size_t i = 1; i < id.size(); ++i) {
+    const char c = id[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+      return false;
+  }
+  return true;
+}
+
 std::string make_state_json(const char *state, uint32_t task_id = 0) {
   cJSON *root = cJSON_CreateObject();
   if (!root || !cJSON_AddStringToObject(root, "state", state) ||
@@ -147,7 +158,10 @@ void handleIPC(clientArgs *client, std::string &inputStr,
         std::string(onion_cjson::string_item(my_json.get(), "title_id", ""));
     LOG_INFO("Launching payload %s (key: %s)", payload_path.c_str(),
                  title_id.c_str());
-    if (!load_payload(payload_path.c_str())) {
+    const bool has_path_identity = is_payload_path_identity(title_id);
+    if (!(has_path_identity
+              ? load_payload_with_key(payload_path.c_str(), title_id.c_str())
+              : load_payload(payload_path.c_str()))) {
       onion_notify(true, "notify.payload.load_failed",
                    payload_path.c_str(), title_id.c_str());
       reply(sender_app, true);

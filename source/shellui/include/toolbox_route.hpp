@@ -15,6 +15,7 @@ enum class Page : unsigned char {
   None = 0,           /**< unknown → original stream */
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
+  PayloadConfig,      /**< per-Payload configuration page */
   Sprx,
   SprxConfig,         /**< per-module SPRX catalog page (sprx_<id>.xml) */
   Plugins,            /**< built-in and externally discovered plugins */
@@ -45,6 +46,7 @@ struct RouteInput {
 /** Flag snapshot after matching resource. */
 struct RouteFlags {
   bool is_payloads = false;
+  bool is_payload_config = false;
   bool is_plugins = false;
   bool is_sprx = false;
   bool is_sprx_config = false;
@@ -70,7 +72,8 @@ RouteResult resolve_resource(const RouteInput &in);
 /** Child routes whose page-stack pop should restore the owning parent route. */
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
-         page == Page::PluginConfig || page == Page::SprxConfig ||
+         page == Page::PayloadConfig || page == Page::PluginConfig ||
+         page == Page::SprxConfig ||
          page == Page::DynamicPlugin;
 }
 
@@ -97,6 +100,7 @@ inline constexpr std::string_view kSettingsPluginsPrefix =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.";
 inline constexpr std::string_view kExternalPluginXmlPrefix = "plugin_";
 inline constexpr std::string_view kSprxConfigXmlPrefix = "sprx_";
+inline constexpr std::string_view kPayloadConfigXmlPrefix = "payload_";
 
 inline bool settings_plugins_relative(std::string_view resource,
                                       std::string_view *out) {
@@ -132,6 +136,18 @@ inline bool valid_sprx_config_id(std::string_view id) {
     const bool letter = (uc >= 'A' && uc <= 'Z') || (uc >= 'a' && uc <= 'z');
     const bool digit = uc >= '0' && uc <= '9';
     if (!letter && !digit && uc != '_' && uc != '-' && uc != '.')
+      return false;
+  }
+  return true;
+}
+
+inline bool valid_payload_config_id(std::string_view id) {
+  if (id.size() != 17 || id[0] != 'p')
+    return false;
+  for (char c : id.substr(1)) {
+    const bool digit = c >= '0' && c <= '9';
+    const bool lower_hex = c >= 'a' && c <= 'f';
+    if (!digit && !lower_hex)
       return false;
   }
   return true;
@@ -179,12 +195,30 @@ inline bool parse_sprx_config_resource(std::string_view resource,
   return true;
 }
 
+inline bool parse_payload_config_resource(std::string_view resource,
+                                          std::string *out_id) {
+  std::string_view relative;
+  if (!settings_plugins_relative(resource, &relative))
+    return false;
+  std::string id;
+  if (!parse_prefixed_xml(relative, kPayloadConfigXmlPrefix, &id) ||
+      !valid_payload_config_id(id))
+    return false;
+  if (out_id)
+    *out_id = std::move(id);
+  return true;
+}
+
 inline std::string external_plugin_config_xml(std::string_view plugin_id) {
   return std::string(kExternalPluginXmlPrefix) + std::string(plugin_id) + ".xml";
 }
 
 inline std::string sprx_config_xml(std::string_view id) {
   return std::string(kSprxConfigXmlPrefix) + std::string(id) + ".xml";
+}
+
+inline std::string payload_config_xml(std::string_view id) {
+  return std::string(kPayloadConfigXmlPrefix) + std::string(id) + ".xml";
 }
 
 } // namespace toolbox

@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <onion/payload_identity.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,15 +37,14 @@ void onion_payload_write_pid_file(const char *pid_path, pid_t pid);
 bool onion_payload_running(const char *title_id);
 
 /**
- * Stage ELF under /data/OnionHEN/payloads/<key>.elf and launch exclusively via
- * OnionHEN's private 9020 elfldr. User payloads never fall back to the external
- * 9021 bootstrap/recovery loader and never infer a PID from process snapshots.
+ * Launch an existing absolute ELF path exclusively through OnionHEN's private
+ * 9020 elfldr. User payloads never fall back to the external 9021
+ * bootstrap/recovery loader and never infer a PID from process snapshots.
  *
  * Returns the loader-reported PID (>1) on success or -1 on every failure,
  * including an unavailable loader, protocol timeout, or missing/invalid PID.
  */
-pid_t onion_payload_launch_elfldr(const char *title_id, const uint8_t *elf,
-                                  size_t elf_sz);
+pid_t onion_payload_launch_elfldr(const char *title_id, const char *path);
 
 /** malloc'd file contents; caller free(). NULL on error. */
 uint8_t *onion_payload_read_file(const char *path, size_t *out_size);
@@ -55,6 +56,13 @@ uint8_t *onion_payload_read_file(const char *path, size_t *out_size);
  * requires the private loader to report a real PID (>1) and persist it.
  */
 bool onion_payload_load(const char *path, const char *filename);
+
+/**
+ * Load a Payload using an explicit runtime key. When @key is NULL or invalid,
+ * this preserves onion_payload_load's legacy basename-derived identity.
+ */
+bool onion_payload_load_with_key(const char *path, const char *filename,
+                                 const char *key);
 
 #ifdef __cplusplus
 }

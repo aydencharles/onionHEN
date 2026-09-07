@@ -44,10 +44,10 @@ static void payload_list_destroy(PayloadList *list) {
   list->count = 0;
 }
 
-static bool payload_list_contains(const PayloadList *list,
-                                  const char *filename) {
+static bool payload_list_contains_path(const PayloadList *list,
+                                       const char *path) {
   for (size_t i = 0; i < list->count; ++i) {
-    if (strcmp(list->entries[i].filename, filename) == 0)
+    if (strcmp(list->entries[i].path, path) == 0)
       return true;
   }
   return false;
@@ -107,8 +107,8 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
       LOG_WARN("skipping auto start for payload: %s", path);
       continue;
     }
-    if (payload_list_contains(list, entry->d_name)) {
-      LOG_WARN("skipping duplicate payload: %s", path);
+    if (payload_list_contains_path(list, path)) {
+      LOG_WARN("skipping duplicate payload path: %s", path);
       continue;
     }
     if (!payload_list_append(list, path, entry->d_name)) {
@@ -143,7 +143,10 @@ void bootstrap_payload_autostart(void) {
       continue;
 
     LOG_DEBUG("Loading payload: %s", entry->path);
-    if (!onion_payload_load(entry->path, entry->filename)) {
+    char identity[ONION_PAYLOAD_IDENTITY_SIZE];
+    const char *key = onion_payload_identity_from_path(
+        entry->path, identity, sizeof(identity)) ? identity : NULL;
+    if (!onion_payload_load_with_key(entry->path, entry->filename, key)) {
       bootstrap_notify("notify.payload.load_failed_path", entry->path);
       LOG_ERROR("FAILED!");
       continue;

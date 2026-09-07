@@ -48,6 +48,7 @@ struct Attrs {
   std::optional<std::string> raw_title;
   std::optional<bool> restorable;
   Style style = Style::None;
+  bool operator==(const Attrs &) const = default;
 };
 
 struct Node {
@@ -67,7 +68,13 @@ struct Node {
 
   Attrs attrs;
   std::vector<Node> children;
+  bool operator==(const Node &) const = default;
 };
+
+const char *node_tag(Node::Kind kind);
+std::vector<std::pair<std::string, std::string>> node_attributes(const Node &node);
+std::string build_document(const Node &root,
+                           std::string_view plugin = "debug_settings_plugin");
 
 class ListBuilder {
 public:
@@ -183,6 +190,7 @@ public:
 
   /** Serialize to a complete system_settings document. */
   [[nodiscard]] std::string build() const;
+  const Node &root() const { return root_; }
 
 private:
   std::string plugin_;

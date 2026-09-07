@@ -151,6 +151,8 @@ TEST_CXX_SRCS := \
 	test_sprx_catalog.cpp \
 	test_sprx_plugin_manager.cpp \
 	test_plugin_ui.cpp \
+	test_plugin_sprx_pages.cpp \
+	test_settings_page_update.cpp \
 	test_plugin_manager.cpp \
 	test_trampoline_arena.cpp \
 	test_hook_lifecycle.cpp \
@@ -183,8 +185,10 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/trampoline_arena.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/x64_relocator.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/hook_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/settings_page_update.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_lifecycle/app_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_loader.o
@@ -321,6 +325,14 @@ $(NOTIFY_I18N_CATALOG): $(I18N_DIR)/generate_catalog.py $(I18N_JSON) | $(BUILD_D
 		--output $@
 
 $(BUILD_DIR)/prod/shellui/toolbox_i18n.o: $(REPO_ROOT)/source/shellui/src/toolbox_i18n.cpp $(I18N_CATALOG) | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o: $(REPO_ROOT)/source/shellui/src/plugin_sprx_pages.cpp $(I18N_CATALOG) | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/settings_page_update.o: $(REPO_ROOT)/source/shellui/src/settings_page_update.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

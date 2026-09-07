@@ -50,6 +50,14 @@ static int test_page_domain_matrix(void) {
                    OnPressDomain::PassThrough);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::RedirectOgDebug) ==
                    OnPressDomain::PassThrough);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Plugins) ==
+                   OnPressDomain::Plugins);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::PluginConfig) ==
+                   OnPressDomain::PluginConfig);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Sprx) ==
+                   OnPressDomain::Sprx);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::SprxConfig) ==
+                   OnPressDomain::Sprx);
   return 0;
 }
 

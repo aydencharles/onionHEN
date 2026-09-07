@@ -257,6 +257,7 @@
     "sprx.delete.confirm": "¿Eliminar esta entrada del catálogo SPRX? El archivo del módulo se conserva y los módulos cargados no se pueden eliminar.",
     "sprx.operation_failed_fmt": "Error en la operación SPRX: %s",
     "sprx.deleted_fmt": "Entrada del catálogo SPRX eliminada: %s",
+    "sprx.missing": "Esta entrada del catálogo SPRX ya no está disponible",
     "plugins.title": "★ Plugins de OnionHEN",
     "plugins.external.group": "Plugins ELF instalados",
     "plugins.external.group.sub": "Detectados en /data/OnionHEN/plugins",
@@ -271,8 +272,15 @@
     "plugins.external.started_fmt": "Plugin iniciado: %s",
     "plugins.external.stopped_fmt": "Plugin detenido: %s",
     "plugins.external.deleted_fmt": "Plugin eliminado: %s",
+    "plugins.external.status.running": "En ejecución",
+    "plugins.external.status.running_autostart": "En ejecución · Inicio automático",
+    "plugins.external.status.stopped": "Detenido",
+    "plugins.external.status.stopped_autostart": "Detenido · Inicio automático",
+    "plugins.external.missing": "Este plugin ya no está instalado",
     "plugin.kstuff.title": "Kstuff",
-    "plugin.kstuff.sub": "Parche de núcleo para compatibilidad fSELF / fPKG, cargado al iniciar OnionHEN"
+    "plugin.kstuff.sub": "Parche de núcleo para compatibilidad fSELF / fPKG, cargado al iniciar OnionHEN",
+    "plugin.kstuff.status.autoload": "Se carga con OnionHEN",
+    "plugin.kstuff.status.manual": "No se carga automáticamente"
   },
   "notifications": {
     "notify.boot.starting": "OnionHEN se está iniciando...",

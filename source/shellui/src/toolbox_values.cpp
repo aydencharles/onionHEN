@@ -10,11 +10,14 @@
 #include "shellui_state.hpp"
 #include "toolbox_i18n.hpp"
 #include "dynamic_ui_runtime.hpp"
+#include "plugin_sprx_pages.hpp"
 
 #include <onion/platform.h>
 #include <onion/ipc_client.hpp>
 
+#include <algorithm>
 #include <cstring>
+#include <ranges>
 #include <string>
 
 namespace {
@@ -134,44 +137,39 @@ bool try_cheat_value(const std::string &id, std::string &out) {
   return true;
 }
 
-constexpr std::string_view kRunPrefix = "id_external_plugin_run_";
-constexpr std::string_view kAutoStartPrefix = "id_external_plugin_autostart_";
-
 bool try_external_plugin_value(const std::string &id, std::string &out) {
-  const std::string_view sv(id);
-  std::string_view prefix;
+  using onion::shellui::plugin_pages::kPluginAutoStartPrefix;
+  using onion::shellui::plugin_pages::kPluginRunPrefix;
+  using onion::shellui::plugin_pages::split_control_id;
+
+  std::string plugin_id;
   bool is_run = false;
-  if (sv.starts_with(kRunPrefix)) {
-    prefix = kRunPrefix;
+  if (split_control_id(id, kPluginRunPrefix, plugin_id, 9, 9)) {
     is_run = true;
-  } else if (sv.starts_with(kAutoStartPrefix)) {
-    prefix = kAutoStartPrefix;
-  } else {
+  } else if (!split_control_id(id, kPluginAutoStartPrefix, plugin_id, 9, 9)) {
     return false;
   }
-  const std::string_view suffix = sv.substr(prefix.size());
-  if (suffix.size() != 9) return false;
-  const std::string plugin_id(suffix);
-  for (const auto &plugin : g_ui.external_plugins) {
-    if (plugin.plugin_id != plugin_id) continue;
-    out = bool_str(is_run ? plugin.running : plugin.auto_start);
-    return true;
-  }
-  return false;
+  const auto it = std::ranges::find(g_ui.external_plugins, plugin_id,
+                                    &PluginInventoryItem::plugin_id);
+  if (it == g_ui.external_plugins.end())
+    return false;
+  out = bool_str(is_run ? it->running : it->auto_start);
+  return true;
 }
 
-constexpr std::string_view kSprxEnabledPrefix = "id_external_sprx_enabled_";
-
 bool try_external_sprx_value(const std::string &id, std::string &out) {
-  const std::string_view control(id);
-  if (!control.starts_with(kSprxEnabledPrefix)) return false;
-  const std::string_view sprx_id = control.substr(kSprxEnabledPrefix.size());
-  for (const auto &entry : g_ui.external_sprx) {
-    if (entry.id != sprx_id) continue;
-    out = bool_str(entry.enabled);
-    return true;
-  }
-  return false;
+  using onion::shellui::plugin_pages::kSprxEnabledPrefix;
+  using onion::shellui::plugin_pages::split_control_id;
+
+  std::string sprx_id;
+  if (!split_control_id(id, kSprxEnabledPrefix, sprx_id, 1, 31))
+    return false;
+  const auto it =
+      std::ranges::find(g_ui.external_sprx, sprx_id, &SprxInventoryItem::id);
+  if (it == g_ui.external_sprx.end())
+    return false;
+  out = bool_str(it->enabled);
+  return true;
 }
 
 bool try_dynamic_control_value(const std::string &id, std::string &out) {

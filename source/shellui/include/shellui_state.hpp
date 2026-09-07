@@ -42,10 +42,21 @@ struct ToolboxUiState {
   /* The plugin whose config page is active; a registry key ("kstuff"/…). */
   std::string active_plugin;
 
+  struct ParentContext {
+    toolbox::Page page;
+    std::string plugin;
+  };
+  std::vector<ParentContext> parent_pages;
+
   void set_active_page(toolbox::Page page) {
     if (toolbox::restores_parent_on_pop(page) && active_page != page) {
+      parent_pages.push_back({active_page, active_plugin});
       parent_page = active_page;
       child_page = page;
+    } else if (page != active_page && !toolbox::restores_parent_on_pop(page)) {
+      parent_pages.clear();
+      parent_page = toolbox::Page::None;
+      child_page = toolbox::Page::None;
     }
     active_page = page;
   }
@@ -55,11 +66,12 @@ struct ToolboxUiState {
   }
 
   void leave_page(toolbox::Page page) {
-    if (child_page == page) {
-      if (active_page == page)
-        active_page = parent_page;
-      parent_page = toolbox::Page::None;
-      child_page = toolbox::Page::None;
+    if (child_page == page && active_page == page && !parent_pages.empty()) {
+      active_page = parent_pages.back().page;
+      active_plugin = std::move(parent_pages.back().plugin);
+      parent_pages.pop_back();
+      parent_page = parent_pages.empty() ? toolbox::Page::None : parent_pages.back().page;
+      child_page = parent_pages.empty() ? toolbox::Page::None : active_page;
       return;
     }
     if (active_page == page)

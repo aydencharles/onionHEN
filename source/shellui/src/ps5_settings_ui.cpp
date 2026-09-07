@@ -61,39 +61,10 @@ void write_attr(std::ostringstream& out, const char* key, std::string_view value
       << (path_escape ? escape(value) : escape_xml(value)) << '"';
 }
 
-void write_optional(std::ostringstream& out, const char* key,
-                    const std::optional<std::string>& value, bool path_escape) {
-  if (value)
-    write_attr(out, key, *value, path_escape);
-}
-
 void write_open_tag(std::ostringstream& out, const Node& node, bool self_close) {
   out << '<' << kind_tag(node.kind);
-  /* Display text: single '/'. Icon filesystem paths: / → // for ShellUI. */
-  write_attr(out, "id", node.attrs.id, /*path_escape=*/false);
-  if (node.kind != Node::Kind::UserCustom && !node.attrs.title.empty())
-    write_attr(out, "title", node.attrs.title, /*path_escape=*/false);
-  write_optional(out, "second_title", node.attrs.second_title, false);
-  write_optional(out, "description", node.attrs.description, false);
-  write_optional(out, "icon", node.attrs.icon, /*path_escape=*/true);
-  /* Relative plugin resource paths and reg keys keep single '/'. */
-  write_optional(out, "file", node.attrs.file, false);
-  write_optional(out, "key", node.attrs.key, false);
-  write_optional(out, "keyboard_type", node.attrs.keyboard_type, false);
-  write_optional(out, "min_length", node.attrs.min_length, false);
-  write_optional(out, "max_length", node.attrs.max_length, false);
-  write_optional(out, "value", node.attrs.value, false);
-  write_optional(out, "confirm", node.attrs.confirm, false);
-  write_optional(out, "confirm_phrase", node.attrs.confirm_phrase, false);
-  write_optional(out, "initial_focus_to", node.attrs.initial_focus_to, false);
-  write_optional(out, "list_size", node.attrs.list_size, false);
-  write_optional(out, "list_highlight", node.attrs.list_highlight, false);
-  write_optional(out, "raw_title", node.attrs.raw_title, false);
-  if (node.attrs.restorable)
-    write_attr(out, "restorable", *node.attrs.restorable ? "true" : "false",
-               false);
-  if (const char* s = style_attr(node.attrs.style))
-    write_attr(out, "style", s, false);
+  for (const auto &[key, value] : node_attributes(node))
+    write_attr(out, key.c_str(), value, false);
   out << (self_close ? "/>\n" : ">\n");
 }
 
@@ -109,6 +80,45 @@ void serialize_node(std::ostringstream& out, const Node& node) {
 }
 
 } // namespace
+
+const char *node_tag(Node::Kind kind) { return kind_tag(kind); }
+
+std::vector<std::pair<std::string, std::string>> node_attributes(const Node &node) {
+  std::vector<std::pair<std::string, std::string>> result;
+  const auto &a = node.attrs;
+  result.emplace_back("id", a.id);
+  if (node.kind != Node::Kind::UserCustom && !a.title.empty())
+    result.emplace_back("title", a.title);
+  const auto optional = [&](const char *key, const auto &value) {
+    if (value) result.emplace_back(key, *value);
+  };
+  optional("second_title", a.second_title);
+  optional("description", a.description);
+  if (a.icon) {
+    std::string path;
+    for (char c : *a.icon) {
+      path += c;
+      if (c == '/') path += '/';
+    }
+    result.emplace_back("icon", std::move(path));
+  }
+  optional("file", a.file);
+  optional("key", a.key);
+  optional("keyboard_type", a.keyboard_type);
+  optional("min_length", a.min_length);
+  optional("max_length", a.max_length);
+  optional("value", a.value);
+  optional("confirm", a.confirm);
+  optional("confirm_phrase", a.confirm_phrase);
+  optional("initial_focus_to", a.initial_focus_to);
+  optional("list_size", a.list_size);
+  optional("list_highlight", a.list_highlight);
+  optional("raw_title", a.raw_title);
+  if (a.restorable)
+    result.emplace_back("restorable", *a.restorable ? "true" : "false");
+  if (const char *style = style_attr(a.style)) result.emplace_back("style", style);
+  return result;
+}
 
 std::string escape_xml(std::string_view text) {
   std::string out;
@@ -210,11 +220,15 @@ Page& Page::root_restorable(bool restorable) {
 }
 
 std::string Page::build() const {
+  return build_document(root_, plugin_);
+}
+
+std::string build_document(const Node &root, std::string_view plugin) {
   std::ostringstream out;
   out << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n"
-      << "<system_settings version=\"1.0\" plugin=\"" << escape_xml(plugin_)
+      << "<system_settings version=\"1.0\" plugin=\"" << escape_xml(plugin)
       << "\">\n";
-  serialize_node(out, root_);
+  serialize_node(out, root);
   out << "</system_settings>\n";
   return out.str();
 }

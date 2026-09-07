@@ -257,6 +257,7 @@
     "sprx.delete.confirm": "Удалить эту запись из каталога SPRX? Файл модуля будет сохранён, а загруженные модули удалить нельзя.",
     "sprx.operation_failed_fmt": "Сбой операции SPRX: %s",
     "sprx.deleted_fmt": "Запись каталога SPRX удалена: %s",
+    "sprx.missing": "Эта запись каталога SPRX больше недоступна",
     "plugins.title": "★ Плагины OnionHEN",
     "plugins.external.group": "Установленные ELF-плагины",
     "plugins.external.group.sub": "Обнаружены в /data/OnionHEN/plugins",
@@ -271,8 +272,15 @@
     "plugins.external.started_fmt": "Плагин запущен: %s",
     "plugins.external.stopped_fmt": "Плагин остановлен: %s",
     "plugins.external.deleted_fmt": "Плагин удалён: %s",
+    "plugins.external.status.running": "Запущен",
+    "plugins.external.status.running_autostart": "Запущен · автозапуск",
+    "plugins.external.status.stopped": "Остановлен",
+    "plugins.external.status.stopped_autostart": "Остановлен · автозапуск",
+    "plugins.external.missing": "Этот плагин больше не установлен",
     "plugin.kstuff.title": "Kstuff",
-    "plugin.kstuff.sub": "Патч ядра для поддержки fSELF / fPKG, загружается при запуске OnionHEN"
+    "plugin.kstuff.sub": "Патч ядра для поддержки fSELF / fPKG, загружается при запуске OnionHEN",
+    "plugin.kstuff.status.autoload": "Загружается вместе с OnionHEN",
+    "plugin.kstuff.status.manual": "Не загружается автоматически"
   },
   "notifications": {
     "notify.boot.starting": "OnionHEN запускается...",

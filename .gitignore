@@ -56,3 +56,4 @@ source/webui/.eslintcache
 source/webui/npm-debug.log*
 source/webui/yarn-debug.log*
 source/webui/yarn-error.log*
+docs/legacy-settings-refresh.md

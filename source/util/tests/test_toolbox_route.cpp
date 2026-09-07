@@ -100,8 +100,41 @@ static int test_plugin_config_page(void) {
                    OnPressDomain::PluginConfig);
   TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
 
+  RouteResult ext = resolve_resource(make_in(cfg_res("plugin_FTPS00001.xml")));
+  TEST_ASSERT_TRUE(ext.page == Page::PluginConfig);
+  TEST_ASSERT_TRUE(ext.flags.is_plugin_config);
+  std::string plugin_id;
+  TEST_ASSERT_TRUE(parse_external_plugin_config_resource(
+      cfg_res("plugin_FTPS00001.xml"), &plugin_id));
+  TEST_ASSERT_STREQ("FTPS00001", plugin_id.c_str());
+
   RouteResult unknown = resolve_resource(make_in(cfg_res("nope.xml")));
   TEST_ASSERT_TRUE(unknown.page == Page::None);
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("plugin_.xml"))).page == Page::None);
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("plugin_TOOLONG001.xml"))).page ==
+      Page::None);
+  return 0;
+}
+
+static int test_sprx_config_page(void) {
+  RouteResult list = resolve_resource(make_in(kSprxXml));
+  TEST_ASSERT_TRUE(list.page == Page::Sprx);
+  TEST_ASSERT_TRUE(!list.flags.is_sprx_config);
+
+  RouteResult r = resolve_resource(make_in(cfg_res("sprx_overlay.xml")));
+  TEST_ASSERT_TRUE(r.page == Page::SprxConfig);
+  TEST_ASSERT_TRUE(r.flags.is_sprx_config);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::Sprx);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+
+  std::string id;
+  TEST_ASSERT_TRUE(
+      parse_sprx_config_resource(cfg_res("sprx_fps.overlay.xml"), &id));
+  TEST_ASSERT_STREQ("fps.overlay", id.c_str());
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("sprx_.xml"))).page == Page::None);
   return 0;
 }
 
@@ -135,6 +168,24 @@ static int test_plugin_config_restores_parent(void) {
 
   state.leave_page(Page::PluginConfig);
   TEST_ASSERT_TRUE(state.active_page == Page::Plugins);
+  TEST_ASSERT_TRUE(state.parent_page == Page::None);
+  TEST_ASSERT_TRUE(state.child_page == Page::None);
+  return 0;
+}
+
+static int test_sprx_config_restores_parent(void) {
+  ToolboxUiState state;
+  state.set_active_page(Page::Sprx);
+  state.set_active_page(Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::Sprx);
+  TEST_ASSERT_TRUE(state.child_page == Page::SprxConfig);
+
+  state.set_active_page(Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::Sprx);
+
+  state.leave_page(Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::Sprx);
   TEST_ASSERT_TRUE(state.parent_page == Page::None);
   TEST_ASSERT_TRUE(state.child_page == Page::None);
   return 0;
@@ -318,9 +369,12 @@ extern "C" int test_toolbox_route_suite(void) {
   fails += onion_test_run("route.plugins", test_plugins_page);
   fails += onion_test_run("route.sprx", test_sprx_page);
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);
+  fails += onion_test_run("route.sprx_config", test_sprx_config_page);
   fails += onion_test_run("plugins.registry", test_plugins_registry);
   fails += onion_test_run("plugins.config_restores_parent",
                           test_plugin_config_restores_parent);
+  fails += onion_test_run("sprx.config_restores_parent",
+                          test_sprx_config_restores_parent);
   fails += onion_test_run("route.account", test_account_page);
   fails += onion_test_run("route.cheat_progress", test_cheat_progress_page);
   fails += onion_test_run("route.remote_play", test_remote_play_page);

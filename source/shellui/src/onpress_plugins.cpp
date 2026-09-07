@@ -45,10 +45,10 @@ OnPressResult external_plugin_control(OnPressContext &ctx) {
 } // namespace
 
 /*
- * The Plugins page lists each built-in plugin as a <link> that the stock
- * settings UI navigates natively (file="<plugin>.xml"). Each plugin's config
- * page then binds its controls to the shared handlers below, so start/stop and
- * scan behavior stay in one place.
+ * The Plugins page lists each plugin as a <link> that the stock settings UI
+ * navigates natively (file="<plugin>.xml" / "plugin_<id>.xml"). Each plugin's
+ * config page then binds its controls to the shared handlers below, so
+ * start/stop and scan behavior stay in one place.
  */
 static const OnPressExactEntry kPluginsExact[] = {
     {"id_plugin_kstuff_autoload", onpress_kstuff_autoload},

@@ -11,6 +11,7 @@
 #include "ipc.hpp"
 #include "plugins_registry.hpp"
 #include "ps5_settings_ui.hpp"
+#include "settings_page_refresh.hpp"
 #include "toolbox_i18n.hpp"
 #include "toolbox_values.hpp"
 #include "dynamic_ui_runtime.hpp"
@@ -19,6 +20,7 @@
 #include "onion_cjson.hpp"
 
 #include <dirent.h>
+#include <algorithm>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -309,40 +311,65 @@ void generate_payload_xml(std::string& xml_buffer, bool list_page) {
   xml_buffer = page.build();
 }
 
-void generate_plugins_xml(std::string& xml_buffer) {
+static bool plugins_model(ps5ui::Node &model) {
   using namespace onion::plugins;
 
   ps5ui::Page page("id_plugins", toolbox_i18n::tr("plugins.title"));
 
-  /* Each built-in plugin is a <link> entry; X navigates natively to that
-   * plugin's own config page (file="<plugin>.xml"). */
-  for (const auto &d : kRegistry)
+  /* The same model supplies initial XML and updates to existing elements. */
+  for (const auto &d : kRegistry) {
+    const char *status = d.sub_key;
+    if (std::string_view(d.key) == "kstuff")
+      status = g_settings.kstuff_autoload ? "plugin.kstuff.status.autoload"
+                                          : "plugin.kstuff.status.manual";
     page.link(d.toggle_id, toolbox_i18n::tr(d.title_key), d.config_xml,
-              toolbox_i18n::tr(d.sub_key));
+              toolbox_i18n::tr(status));
+  }
 
   const auto settings = onion::shellui::dynamic_ui::plugin_settings_links();
-  const auto matched = onion::shellui::external_plugins::append_inventory(
+  const auto inventory = onion::shellui::external_plugins::append_inventory(
       page, settings);
-  onion::shellui::dynamic_ui::append_plugin_links(page, settings, matched);
+  onion::shellui::dynamic_ui::append_plugin_links(page, settings, inventory.matched_settings);
 
-  xml_buffer = page.build();
+  model = page.root();
+  return inventory.available;
 }
 
-void generate_sprx_xml(std::string& xml_buffer) {
+static bool sprx_model(ps5ui::Node &model) {
   ps5ui::Page page("id_sprx", toolbox_i18n::tr("sprx.title"));
-  onion::shellui::external_sprx::append_inventory(page);
-  xml_buffer = page.build();
+  const bool available = onion::shellui::external_sprx::append_inventory(page);
+  model = page.root();
+  return available;
 }
 
-void generate_kstuff_config_xml(std::string &xml_buffer) {
+void generate_plugins_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  plugins_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, plugins_model);
+}
+
+void generate_sprx_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  sprx_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, sprx_model);
+}
+
+static bool kstuff_model(ps5ui::Node &model) {
   using namespace onion::plugins;
   const Descriptor *d = find_by_key("kstuff");
   ps5ui::Page page("id_plugin_config", toolbox_i18n::tr(d->title_key));
   page.toggle("id_plugin_kstuff_autoload", toolbox_i18n::tr("kstuff.autoload"),
-              /*on=*/false, toolbox_i18n::tr("kstuff.autoload.sub"))
+              g_settings.kstuff_autoload, toolbox_i18n::tr("kstuff.autoload.sub"))
       .button("id_plugin_delete_kstuff", toolbox_i18n::tr("kstuff.delete"),
               std::nullopt, toolbox_i18n::tr("kstuff.delete.desc"));
-  xml_buffer = page.build();
+  model = page.root();
+  return true;
+}
+
+void generate_kstuff_config_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  kstuff_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, kstuff_model);
 }
 
 void generate_plugin_config_xml(std::string &xml_buffer) {

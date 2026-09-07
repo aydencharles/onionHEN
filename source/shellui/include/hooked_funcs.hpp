@@ -321,6 +321,8 @@ result Invoke(MonoImage* Assembly_Image, MonoClass* klass, MonoObject* Instance,
 /* ================================= ORIG HOOKED MONO FUNCS ============================================= */
 extern int (*oOnPress)(MonoObject* Instance, MonoObject* element, MonoObject* e);
 extern int (*oOnPreCreate)(MonoObject* Instance, MonoObject* element);
+extern void (*oSettingPageOnActivated)(MonoObject *, int);
+extern void (*oSettingListCleanup)(MonoObject *);
 extern void (*oUserCustomElementReset)(MonoObject* Instance, MonoObject* item);
 extern void (*oSettingPageStackOnPopping)(MonoObject* Instance,
                                           MonoObject* outgoing,
@@ -363,6 +365,8 @@ MonoObject* New_Object(MonoClass* Klass);
 MonoString *GetString_Hook(MonoObject *Instance, MonoString *str);
 int OnPress_Hook(MonoObject* Instance, MonoObject* element, MonoObject* e);
 int OnPreCreate_Hook(MonoObject* Instance, MonoObject* element);
+void SettingPageOnActivated_Hook(MonoObject *, int);
+void SettingListCleanup_Hook(MonoObject *);
 void UserCustomElementReset_Hook(MonoObject* Instance, MonoObject* item);
 void SettingPageStackOnPopping_Hook(MonoObject* Instance,
                                     MonoObject* outgoing,

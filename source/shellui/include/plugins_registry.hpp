@@ -7,15 +7,17 @@
 
 #pragma once
 
+#include "toolbox_route.hpp"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
 
 namespace onion::plugins {
 
-/** Fixed Legacy resource prefix (Sony Settings.Plugins module name is fixed). */
+/** Same Settings.Plugins prefix as toolbox child routes. */
 inline constexpr std::string_view kConfigResourcePrefix =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.";
+    toolbox::kSettingsPluginsPrefix;
 
 struct Descriptor {
   const char *key;        /* stable plugin key, e.g. "kstuff" */

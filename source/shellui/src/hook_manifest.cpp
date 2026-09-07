@@ -10,6 +10,7 @@
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
 #include "dynamic_ui_runtime.hpp"
+#include "external_plugin_ui.hpp"
 #include "external_sprx_ui.hpp"
 #include <onion/platform.h>
 #include <string>
@@ -128,7 +129,21 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   case toolbox::Page::Sprx:
     generate_sprx_xml(new_xml_string);
     break;
+  case toolbox::Page::SprxConfig: {
+    std::string sprx_id;
+    toolbox::parse_sprx_config_resource(resourceName, &sprx_id);
+    onion::shellui::external_sprx::generate_config_xml(new_xml_string, sprx_id);
+    break;
+  }
   case toolbox::Page::PluginConfig: {
+    std::string plugin_id;
+    if (toolbox::parse_external_plugin_config_resource(resourceName,
+                                                       &plugin_id)) {
+      g_ui.active_plugin = plugin_id;
+      onion::shellui::external_plugins::generate_config_xml(new_xml_string,
+                                                            plugin_id);
+      break;
+    }
     const onion::plugins::Descriptor *d =
         onion::plugins::find_by_config_xml_resource(resourceName);
     g_ui.active_plugin =

@@ -257,6 +257,7 @@
     "sprx.delete.confirm": "从 SPRX 目录清单移除此项？模块文件会保留，已加载的模块不能移除。",
     "sprx.operation_failed_fmt": "SPRX 操作失败：%s",
     "sprx.deleted_fmt": "已移除 SPRX 目录清单项：%s",
+    "sprx.missing": "此 SPRX 目录项已不存在",
     "plugins.title": "★ OnionHEN 插件",
     "plugins.external.group": "已安装的 ELF 插件",
     "plugins.external.group.sub": "从 /data/OnionHEN/plugins 发现的插件",
@@ -271,8 +272,15 @@
     "plugins.external.started_fmt": "插件已启动：%s",
     "plugins.external.stopped_fmt": "插件已停止：%s",
     "plugins.external.deleted_fmt": "插件已删除：%s",
+    "plugins.external.status.running": "运行中",
+    "plugins.external.status.running_autostart": "运行中 · 自动启动",
+    "plugins.external.status.stopped": "已停止",
+    "plugins.external.status.stopped_autostart": "已停止 · 自动启动",
+    "plugins.external.missing": "此插件已不在清单中",
     "plugin.kstuff.title": "Kstuff",
-    "plugin.kstuff.sub": "支持 fSELF / fPKG 的内核补丁，OnionHEN 启动时加载"
+    "plugin.kstuff.sub": "支持 fSELF / fPKG 的内核补丁，OnionHEN 启动时加载",
+    "plugin.kstuff.status.autoload": "随 OnionHEN 启动加载",
+    "plugin.kstuff.status.manual": "启动时不自动加载"
   },
   "notifications": {
     "notify.boot.starting": "OnionHEN 正在启动...",

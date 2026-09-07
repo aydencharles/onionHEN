@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <string>
 #include <string_view>
 
 namespace toolbox {
@@ -15,8 +16,9 @@ enum class Page : unsigned char {
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
   Sprx,
+  SprxConfig,         /**< per-module SPRX catalog page (sprx_<id>.xml) */
   Plugins,            /**< built-in and externally discovered plugins */
-  PluginConfig,       /**< per-plugin configuration page (plugin_config.xml) */
+  PluginConfig,       /**< per-plugin configuration page (kstuff.xml / plugin_<id>.xml) */
   Cheats,
   AutoPayloads,
   Account,
@@ -46,6 +48,7 @@ struct RouteFlags {
   bool is_payloads = false;
   bool is_plugins = false;
   bool is_sprx = false;
+  bool is_sprx_config = false;
   bool is_plugin_config = false;
   bool is_su_menu = false;
   bool is_debug_settings = false;
@@ -69,7 +72,8 @@ RouteResult resolve_resource(const RouteInput &in);
 /** Child routes whose page-stack pop should restore the owning parent route. */
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
-         page == Page::PluginConfig || page == Page::DynamicPlugin;
+         page == Page::PluginConfig || page == Page::SprxConfig ||
+         page == Page::DynamicPlugin;
 }
 
 /** Fixed Legacy resource paths (Sony Settings.Plugins module name is fixed). */
@@ -91,5 +95,100 @@ inline constexpr std::string_view kSuperuserXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.superuser.xml";
 inline constexpr std::string_view kOgDebugXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.og_debug.xml";
+
+/** Sony Settings.Plugins module prefix shared by toolbox child resources. */
+inline constexpr std::string_view kSettingsPluginsPrefix =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.";
+inline constexpr std::string_view kExternalPluginXmlPrefix = "plugin_";
+inline constexpr std::string_view kSprxConfigXmlPrefix = "sprx_";
+
+inline bool settings_plugins_relative(std::string_view resource,
+                                      std::string_view *out) {
+  if (!resource.starts_with(kSettingsPluginsPrefix))
+    return false;
+  const std::string_view relative =
+      resource.substr(kSettingsPluginsPrefix.size());
+  if (relative.empty())
+    return false;
+  if (out)
+    *out = relative;
+  return true;
+}
+
+inline bool valid_external_plugin_id(std::string_view id) {
+  if (id.size() != 9)
+    return false;
+  for (char c : id) {
+    const auto uc = static_cast<unsigned char>(c);
+    const bool letter = (uc >= 'A' && uc <= 'Z') || (uc >= 'a' && uc <= 'z');
+    const bool digit = uc >= '0' && uc <= '9';
+    if (!letter && !digit)
+      return false;
+  }
+  return true;
+}
+
+inline bool valid_sprx_config_id(std::string_view id) {
+  if (id.empty() || id.size() >= 32)
+    return false;
+  for (char c : id) {
+    const auto uc = static_cast<unsigned char>(c);
+    const bool letter = (uc >= 'A' && uc <= 'Z') || (uc >= 'a' && uc <= 'z');
+    const bool digit = uc >= '0' && uc <= '9';
+    if (!letter && !digit && uc != '_' && uc != '-' && uc != '.')
+      return false;
+  }
+  return true;
+}
+
+inline bool parse_prefixed_xml(std::string_view relative, std::string_view prefix,
+                               std::string *out_id) {
+  constexpr std::string_view kXml = ".xml";
+  if (!relative.starts_with(prefix) || !relative.ends_with(kXml))
+    return false;
+  const std::string_view id = relative.substr(
+      prefix.size(), relative.size() - prefix.size() - kXml.size());
+  if (id.empty())
+    return false;
+  if (out_id)
+    *out_id = std::string(id);
+  return true;
+}
+
+inline bool parse_external_plugin_config_resource(std::string_view resource,
+                                                  std::string *out_id) {
+  std::string_view relative;
+  if (!settings_plugins_relative(resource, &relative))
+    return false;
+  std::string id;
+  if (!parse_prefixed_xml(relative, kExternalPluginXmlPrefix, &id) ||
+      !valid_external_plugin_id(id))
+    return false;
+  if (out_id)
+    *out_id = std::move(id);
+  return true;
+}
+
+inline bool parse_sprx_config_resource(std::string_view resource,
+                                       std::string *out_id) {
+  std::string_view relative;
+  if (!settings_plugins_relative(resource, &relative))
+    return false;
+  std::string id;
+  if (!parse_prefixed_xml(relative, kSprxConfigXmlPrefix, &id) ||
+      !valid_sprx_config_id(id))
+    return false;
+  if (out_id)
+    *out_id = std::move(id);
+  return true;
+}
+
+inline std::string external_plugin_config_xml(std::string_view plugin_id) {
+  return std::string(kExternalPluginXmlPrefix) + std::string(plugin_id) + ".xml";
+}
+
+inline std::string sprx_config_xml(std::string_view id) {
+  return std::string(kSprxConfigXmlPrefix) + std::string(id) + ".xml";
+}
 
 } // namespace toolbox

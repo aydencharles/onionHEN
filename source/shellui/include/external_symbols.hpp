@@ -519,6 +519,7 @@ extern MonoThread* (*mono_thread_attach)(MonoDomain* domain);
 extern MonoMethod* (*mono_class_get_method_from_name)(MonoClass* klass, const char* name, int param_count);//
 extern void (*mono_runtime_object_init)(MonoObject* obj);
 extern MonoClassField* (*mono_class_get_field_from_name)(MonoClass* klass, const char* name);
+extern void (*mono_field_get_value)(MonoObject *object, MonoClassField *field, void *value);
 extern void (*mono_field_static_set_value)(MonoVTable* vt, MonoClassField* field, void* value);
 extern MonoVTable* (*mono_class_vtable)(MonoDomain* domain, MonoClass* klass);
 extern MonoImage* (*mono_image_open_from_data)(char* data, uint32_t data_len, int need_copy, MonoImageOpenStatus* status);

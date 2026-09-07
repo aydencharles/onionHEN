@@ -257,6 +257,7 @@
     "sprx.delete.confirm": "この項目を SPRX カタログから削除しますか？モジュールファイルは保持され、読み込み済みモジュールは削除できません。",
     "sprx.operation_failed_fmt": "SPRX 操作に失敗しました: %s",
     "sprx.deleted_fmt": "SPRX カタログ項目を削除しました: %s",
+    "sprx.missing": "この SPRX カタログ項目はもうありません",
     "plugins.title": "★ OnionHEN プラグイン",
     "plugins.external.group": "インストール済み ELF プラグイン",
     "plugins.external.group.sub": "/data/OnionHEN/plugins から検出",
@@ -271,8 +272,15 @@
     "plugins.external.started_fmt": "プラグインを起動しました：%s",
     "plugins.external.stopped_fmt": "プラグインを停止しました：%s",
     "plugins.external.deleted_fmt": "プラグインを削除しました：%s",
+    "plugins.external.status.running": "実行中",
+    "plugins.external.status.running_autostart": "実行中 · 自動起動",
+    "plugins.external.status.stopped": "停止中",
+    "plugins.external.status.stopped_autostart": "停止中 · 自動起動",
+    "plugins.external.missing": "このプラグインはインストールされていません",
     "plugin.kstuff.title": "Kstuff",
-    "plugin.kstuff.sub": "fSELF / fPKG をサポートするカーネルパッチ。OnionHEN 起動時に読み込みます"
+    "plugin.kstuff.sub": "fSELF / fPKG をサポートするカーネルパッチ。OnionHEN 起動時に読み込みます",
+    "plugin.kstuff.status.autoload": "OnionHEN 起動時に読み込み",
+    "plugin.kstuff.status.manual": "起動時に自動読み込みしません"
   },
   "notifications": {
     "notify.boot.starting": "OnionHEN を起動しています...",

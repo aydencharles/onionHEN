@@ -257,6 +257,7 @@
     "sprx.delete.confirm": "هل تريد إزالة هذا الإدخال من كتالوج SPRX؟ سيبقى ملف الوحدة، ولا يمكن إزالة الوحدات المحمّلة.",
     "sprx.operation_failed_fmt": "فشلت عملية SPRX: %s",
     "sprx.deleted_fmt": "أزيل إدخال كتالوج SPRX: %s",
+    "sprx.missing": "إدخال كتالوج SPRX هذا لم يعد متاحًا",
     "plugins.title": "★ إضافات OnionHEN",
     "plugins.external.group": "إضافات ELF المثبتة",
     "plugins.external.group.sub": "تم اكتشافها في /data/OnionHEN/plugins",
@@ -271,8 +272,15 @@
     "plugins.external.started_fmt": "تم تشغيل الإضافة: %s",
     "plugins.external.stopped_fmt": "تم إيقاف الإضافة: %s",
     "plugins.external.deleted_fmt": "تم حذف الإضافة: %s",
+    "plugins.external.status.running": "قيد التشغيل",
+    "plugins.external.status.running_autostart": "قيد التشغيل · تشغيل تلقائي",
+    "plugins.external.status.stopped": "متوقف",
+    "plugins.external.status.stopped_autostart": "متوقف · تشغيل تلقائي",
+    "plugins.external.missing": "هذه الإضافة لم تعد مثبتة",
     "plugin.kstuff.title": "Kstuff",
-    "plugin.kstuff.sub": "تصحيح النواة لدعم fSELF / fPKG، يُحمَّل عند بدء OnionHEN"
+    "plugin.kstuff.sub": "تصحيح النواة لدعم fSELF / fPKG، يُحمَّل عند بدء OnionHEN",
+    "plugin.kstuff.status.autoload": "يُحمَّل مع OnionHEN",
+    "plugin.kstuff.status.manual": "لا يُحمَّل تلقائيًا"
   },
   "notifications": {
     "notify.boot.starting": "جاري تشغيل OnionHEN...",

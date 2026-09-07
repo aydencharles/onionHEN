@@ -1,116 +1,129 @@
 #include "external_plugin_ui.hpp"
 
+#include "plugin_sprx_pages.hpp"
 #include "shellui_state.hpp"
 #include "toolbox_i18n.hpp"
 #include "dynamic_ui_runtime.hpp"
+#include "settings_page_refresh.hpp"
 
 #include <onion/ipc_client.hpp>
 
-#include <optional>
+#include <algorithm>
+#include <ranges>
 #include <vector>
 
 namespace onion::shellui::external_plugins {
 namespace {
 
-constexpr std::string_view kRunPrefix = "id_external_plugin_run_";
-constexpr std::string_view kDeletePrefix = "id_external_plugin_delete_";
-constexpr std::string_view kAutoStartPrefix =
-    "id_external_plugin_autostart_";
+using plugin_pages::kPluginAutoStartPrefix;
+using plugin_pages::kPluginDeletePrefix;
+using plugin_pages::kPluginRunPrefix;
+using plugin_pages::split_control_id;
 
-bool split_control(std::string_view control_id, std::string_view prefix,
-                   std::string &plugin_id) {
-  if (!control_id.starts_with(prefix)) return false;
-  const std::string_view suffix = control_id.substr(prefix.size());
-  if (suffix.size() != 9) return false;
-  plugin_id.assign(suffix);
-  return true;
+bool refresh_inventory() {
+  std::vector<PluginInventoryItem> plugins;
+  const bool loaded = IPC_Client::getInstance(false).ListPlugins(plugins);
+  if (loaded)
+    g_ui.external_plugins = std::move(plugins);
+  return loaded;
+}
+
+PluginInventoryItem *find_plugin(std::string_view plugin_id) {
+  const auto it = std::ranges::find(g_ui.external_plugins, plugin_id,
+                                    &PluginInventoryItem::plugin_id);
+  return it == g_ui.external_plugins.end() ? nullptr : &*it;
 }
 
 } // namespace
 
-std::vector<std::string> append_inventory(
+InventoryResult append_inventory(
     ps5ui::Page &page,
     const std::vector<dynamic_ui::PluginSettingsLink> &settings) {
-  std::vector<std::string> matched;
-  std::vector<PluginInventoryItem> plugins;
-  const bool loaded = IPC_Client::getInstance(false).ListPlugins(plugins);
-  if (loaded) {
-    g_ui.external_plugins = plugins;
-  } else {
-    g_ui.external_plugins.clear();
+  InventoryResult result;
+  if (!refresh_inventory()) {
+    page.label("id_external_plugins_unavailable",
+               toolbox_i18n::tr("plugins.external.unavailable"));
+    return result;
   }
-  if (loaded && plugins.empty()) return matched;
+  result.available = true;
+  if (g_ui.external_plugins.empty())
+    return result;
 
-  page.group(
-      "id_external_plugins", toolbox_i18n::tr("plugins.external.group"),
-      [&](ps5ui::Group &group) {
-        if (!loaded) {
-          group.label("id_external_plugins_unavailable",
-                      toolbox_i18n::tr("plugins.external.unavailable"));
-          return;
-        }
-        for (const PluginInventoryItem &plugin : plugins) {
-          std::string details = plugin.plugin_id + " | v" + plugin.version;
-          if (plugin.auto_start) details += " | AUTO_START";
-          group.group(
-              "id_external_plugin_" + plugin.plugin_id, plugin.name,
-              [&](ps5ui::Group &controls) {
-                controls
-                    .toggle(std::string(kRunPrefix) + plugin.plugin_id,
-                            toolbox_i18n::tr("plugins.external.run"),
-                            plugin.running,
-                            toolbox_i18n::tr("plugins.external.run.sub"))
-                    .button(
-                        std::string(kDeletePrefix) + plugin.plugin_id,
-                        toolbox_i18n::tr("plugins.external.delete"),
-                        std::nullopt, std::nullopt, std::nullopt,
-                        ps5ui::Style::None,
-                        toolbox_i18n::tr("plugins.external.delete.confirm"),
-                        toolbox_i18n::tr("account.activate.confirm_phrase"))
-                    .toggle(std::string(kAutoStartPrefix) + plugin.plugin_id,
-                            toolbox_i18n::tr("plugins.external.autostart"),
-                            plugin.auto_start,
-                            toolbox_i18n::tr("plugins.external.autostart.sub"));
-                for (const dynamic_ui::PluginSettingsLink &link : settings) {
-                  if (link.plugin_id != plugin.plugin_id) continue;
-                  controls.link("id_external_plugin_settings_" + plugin.plugin_id,
-                                link.title, link.resource,
-                                link.description.empty()
-                                    ? std::optional<std::string>{}
-                                    : std::optional<std::string>{link.description});
-                  matched.push_back(link.control_id);
-                  break;
-                }
-              },
-              details);
-        }
-      },
-      toolbox_i18n::tr("plugins.external.group.sub"));
-  return matched;
+  plugin_pages::append_plugin_list_links(page, g_ui.external_plugins);
+  for (const dynamic_ui::PluginSettingsLink &link : settings) {
+    if (find_plugin(link.plugin_id))
+      result.matched_settings.push_back(link.control_id);
+  }
+  return result;
+}
+
+static bool config_model(ps5ui::Node &model, std::string_view plugin_id) {
+  const bool loaded = refresh_inventory();
+  const PluginInventoryItem *found = loaded ? find_plugin(plugin_id) : nullptr;
+
+  ps5ui::Page page("id_plugin_config",
+                   found ? found->name : std::string(plugin_id));
+  if (!loaded) {
+    page.label("id_external_plugins_unavailable",
+               toolbox_i18n::tr("plugins.external.unavailable"));
+  } else if (!found) {
+    page.label("id_external_plugin_missing",
+               toolbox_i18n::tr("plugins.external.missing"));
+  } else {
+    const dynamic_ui::PluginSettingsLink *settings = nullptr;
+    const auto links = dynamic_ui::plugin_settings_links();
+    const auto it = std::ranges::find(links, plugin_id,
+                                      &dynamic_ui::PluginSettingsLink::plugin_id);
+    if (it != links.end())
+      settings = &*it;
+    plugin_pages::fill_plugin_config(page, *found, settings);
+  }
+  model = page.root();
+  return loaded;
+}
+
+void generate_config_xml(std::string &xml_buffer, std::string_view plugin_id) {
+  ps5ui::Node model;
+  config_model(model, plugin_id);
+  xml_buffer = settings::publish(model, [id = std::string(plugin_id)](ps5ui::Node &next) {
+    return config_model(next, id);
+  });
 }
 
 DispatchResult dispatch(std::string_view control_id, std::string_view value) {
   DispatchResult result;
   IPC_Client &client = IPC_Client::getInstance(false);
-  if (split_control(control_id, kRunPrefix, result.plugin_id)) {
+  if (split_control_id(control_id, kPluginRunPrefix, result.plugin_id, 9, 9)) {
     result.owned = true;
     const bool start = value == "1" || value == "true";
     result.success = start ? client.StartPlugin(result.plugin_id)
                            : client.StopPlugin(result.plugin_id);
     result.action = start ? Action::Started : Action::Stopped;
+    if (result.success)
+      if (PluginInventoryItem *plugin = find_plugin(result.plugin_id))
+        plugin->running = start;
     return result;
   }
-  if (split_control(control_id, kDeletePrefix, result.plugin_id)) {
+  if (split_control_id(control_id, kPluginDeletePrefix, result.plugin_id, 9,
+                       9)) {
     result.owned = true;
     result.success = client.DeletePlugin(result.plugin_id);
     result.action = Action::Deleted;
+    if (result.success)
+      std::erase_if(g_ui.external_plugins, [&](const PluginInventoryItem &plugin) {
+        return plugin.plugin_id == result.plugin_id;
+      });
     return result;
   }
-  if (split_control(control_id, kAutoStartPrefix, result.plugin_id)) {
+  if (split_control_id(control_id, kPluginAutoStartPrefix, result.plugin_id, 9,
+                       9)) {
     result.owned = true;
     const bool enabled = value == "1" || value == "true";
     result.success = client.SetPluginAutoStart(result.plugin_id, enabled);
     result.action = Action::AutoStartChanged;
+    if (result.success)
+      if (PluginInventoryItem *plugin = find_plugin(result.plugin_id))
+        plugin->auto_start = enabled;
   }
   return result;
 }

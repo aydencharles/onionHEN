@@ -11,6 +11,7 @@
 #include "progress_dialog.hpp"
 #include "remote_play.hpp"
 #include "toolbox_values.hpp"
+#include "settings_page_refresh.hpp"
 
 #include "shellui_state.hpp"
 #include <onion/platform.h>
@@ -77,6 +78,7 @@ int OnPreCreate_Hook(MonoObject *Instance, MonoObject *element) {
     return call_original(Instance, element);
   }
 
+  onion::shellui::settings::bind(Instance);
   const std::string id = GetPropertyValue(element, "Id");
 
   if (!toolbox::toolbox_owns_settings_page(g_ui.active_page)) {

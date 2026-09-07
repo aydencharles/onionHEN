@@ -43,6 +43,8 @@ extern "C" int test_sprx_loader_suite(void);
 extern "C" int test_sprx_catalog_suite(void);
 extern "C" int test_sprx_plugin_manager_suite(void);
 extern "C" int test_plugin_ui_suite(void);
+extern "C" int test_plugin_sprx_pages_suite(void);
+extern "C" int test_settings_page_update_suite(void);
 extern "C" int test_plugin_manager_suite(void);
 
 int main() {
@@ -91,6 +93,8 @@ int main() {
   failures += test_sprx_catalog_suite();
   failures += test_sprx_plugin_manager_suite();
   failures += test_plugin_ui_suite();
+  failures += test_plugin_sprx_pages_suite();
+  failures += test_settings_page_update_suite();
   failures += test_plugin_manager_suite();
 
   if (failures == 0) {

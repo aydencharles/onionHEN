@@ -37,6 +37,7 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
   case Page::Payloads:
     return OnPressDomain::Payloads;
   case Page::Sprx:
+  case Page::SprxConfig:
     return OnPressDomain::Sprx;
   case Page::Plugins:
     return OnPressDomain::Plugins;

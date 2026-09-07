@@ -24,10 +24,16 @@ struct DispatchResult {
   std::string plugin_id;
 };
 
-/** Append installed plugin cards and return link IDs whose settings were embedded. */
-std::vector<std::string> append_inventory(
+struct InventoryResult {
+  bool available = false;
+  std::vector<std::string> matched_settings;
+};
+
+/** Append inventory links and report data availability separately from display content. */
+InventoryResult append_inventory(
     ps5ui::Page &page,
     const std::vector<dynamic_ui::PluginSettingsLink> &settings);
+void generate_config_xml(std::string &xml_buffer, std::string_view plugin_id);
 DispatchResult dispatch(std::string_view control_id, std::string_view value);
 
 } // namespace onion::shellui::external_plugins

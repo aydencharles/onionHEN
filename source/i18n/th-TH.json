@@ -257,6 +257,7 @@
     "sprx.delete.confirm": "ลบรายการนี้ออกจากแค็ตตาล็อก SPRX หรือไม่? ไฟล์โมดูลจะยังคงอยู่ และไม่สามารถลบโมดูลที่โหลดแล้วได้",
     "sprx.operation_failed_fmt": "การดำเนินการ SPRX ล้มเหลว: %s",
     "sprx.deleted_fmt": "ลบรายการแค็ตตาล็อก SPRX แล้ว: %s",
+    "sprx.missing": "รายการแคตตาล็อก SPRX นี้ไม่มีแล้ว",
     "plugins.title": "★ ปลั๊กอิน OnionHEN",
     "plugins.external.group": "ปลั๊กอิน ELF ที่ติดตั้ง",
     "plugins.external.group.sub": "ตรวจพบใน /data/OnionHEN/plugins",
@@ -271,8 +272,15 @@
     "plugins.external.started_fmt": "เริ่มปลั๊กอินแล้ว: %s",
     "plugins.external.stopped_fmt": "หยุดปลั๊กอินแล้ว: %s",
     "plugins.external.deleted_fmt": "ลบปลั๊กอินแล้ว: %s",
+    "plugins.external.status.running": "กำลังทำงาน",
+    "plugins.external.status.running_autostart": "กำลังทำงาน · เริ่มอัตโนมัติ",
+    "plugins.external.status.stopped": "หยุดแล้ว",
+    "plugins.external.status.stopped_autostart": "หยุดแล้ว · เริ่มอัตโนมัติ",
+    "plugins.external.missing": "ปลั๊กอินนี้ไม่ได้ติดตั้งแล้ว",
     "plugin.kstuff.title": "Kstuff",
-    "plugin.kstuff.sub": "แพตช์เคอร์เนลสำหรับรองรับ fSELF / fPKG โหลดเมื่อ OnionHEN เริ่มทำงาน"
+    "plugin.kstuff.sub": "แพตช์เคอร์เนลสำหรับรองรับ fSELF / fPKG โหลดเมื่อ OnionHEN เริ่มทำงาน",
+    "plugin.kstuff.status.autoload": "โหลดพร้อม OnionHEN",
+    "plugin.kstuff.status.manual": "ไม่โหลดอัตโนมัติ"
   },
   "notifications": {
     "notify.boot.starting": "OnionHEN กำลังเริ่มทำงาน...",

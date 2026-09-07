@@ -290,6 +290,7 @@ bool resolve_mono_symbols(pid_t pid) {
   KERNEL_DLSYM(libmono, mono_vtable_get_static_field_data);
   KERNEL_DLSYM(libmono, mono_class_get_method_from_name);
   KERNEL_DLSYM(libmono, mono_class_get_field_from_name);
+  KERNEL_DLSYM(libmono, mono_field_get_value);
   KERNEL_DLSYM(libmono, mono_aot_get_method);
   KERNEL_DLSYM(libmono, mono_field_static_set_value);
   KERNEL_DLSYM(libmono, mono_assembly_setrootdir);
@@ -551,6 +552,12 @@ bool install_hooks(const ShellImages& img) {
       {"SettingPage.OnCreating", img.legacy, UI3_dec.c_str(), "SettingPage",
        "OnCreating", 1, reinterpret_cast<void*>(&OnPreCreate_Hook),
        reinterpret_cast<void**>(&oOnPreCreate), false},
+      {"SettingPage.OnActivated", img.legacy, UI3_dec.c_str(), "SettingPage",
+       "OnActivated", 1, reinterpret_cast<void *>(&SettingPageOnActivated_Hook),
+       reinterpret_cast<void **>(&oSettingPageOnActivated), false},
+      {"SettingList.Cleanup", img.legacy, UI3_dec.c_str(), "SettingList",
+       "Cleanup", 0, reinterpret_cast<void *>(&SettingListCleanup_Hook),
+       reinterpret_cast<void **>(&oSettingListCleanup), false},
       {"UserCustomElementUI.Reset", img.legacy, UI3_dec.c_str(),
        "UserCustomElementUI", "Reset", 1,
        reinterpret_cast<void*>(&UserCustomElementReset_Hook),

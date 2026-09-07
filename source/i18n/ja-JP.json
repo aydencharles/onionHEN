@@ -236,8 +236,6 @@
     "cheats.on_off": "オン/オフ",
     "cheats.enable_fmt": "%s の %s を有効/無効",
     "cheats.group.unnamed": "ソース",
-    "plapps.title": "OnionHEN Payload 自作ソフト - アプリケーション",
-    "plapps.version_fmt": "%s | バージョン: %s",
     "plugins.link": "プラグイン",
     "plugins.link.sub": "Kstuff、インストール済みプラグインを管理",
     "sprx.link": "SPRX",

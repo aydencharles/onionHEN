@@ -236,8 +236,6 @@
     "cheats.on_off": "开/关",
     "cheats.enable_fmt": "为 %s 启用/禁用 %s",
     "cheats.group.unnamed": "来源",
-    "plapps.title": "OnionHEN Payload 自制软件 - 应用程序",
-    "plapps.version_fmt": "%s | 版本: %s",
     "plugins.link": "插件",
     "plugins.link.sub": "管理 Kstuff 和已安装插件",
     "sprx.link": "SPRX",

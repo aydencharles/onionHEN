@@ -236,8 +236,6 @@
     "cheats.on_off": "เปิด/ปิด",
     "cheats.enable_fmt": "เปิด/ปิด %s สำหรับ %s",
     "cheats.group.unnamed": "แหล่งที่มา",
-    "plapps.title": "โฮมบรูว์ Payload ของ OnionHEN - แอปพลิเคชัน",
-    "plapps.version_fmt": "%s | เวอร์ชัน: %s",
     "plugins.link": "ปลั๊กอิน",
     "plugins.link.sub": "จัดการ Kstuff และปลั๊กอินที่ติดตั้ง",
     "sprx.link": "SPRX",

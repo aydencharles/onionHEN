@@ -88,25 +88,6 @@ typedef struct {
     std::string version;
 } PayloadEntry;
 
-typedef struct {
-    std::string path;
-    std::string shellui_path;
-    std::string id;
-    std::string name;
-    std::string version;
-} Payloads_Apps;
-
-struct GameEntry {
-    std::string tid;
-    std::string title;
-    std::string version;
-    std::string path;
-    std::string dir_name;
-    std::string icon_path;
-    std::string id;
-};
-
-// games_list: see shellui_state.hpp (ToolboxUiState)
 // all_cpu_usage: overlay.cpu_usage_mode=per_core (config.ini)
 enum Cheats_Shortcut{
     CHEATS_SC_OFF = 0,

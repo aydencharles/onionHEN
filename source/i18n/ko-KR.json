@@ -236,8 +236,6 @@
     "cheats.on_off": "켜기/끄기",
     "cheats.enable_fmt": "%s의 %s 사용/해제",
     "cheats.group.unnamed": "소스",
-    "plapps.title": "OnionHEN Payload 홈브류 - 애플리케이션",
-    "plapps.version_fmt": "%s | 버전: %s",
     "plugins.link": "플러그인",
     "plugins.link.sub": "Kstuff 및 설치된 플러그인 관리",
     "sprx.link": "SPRX",

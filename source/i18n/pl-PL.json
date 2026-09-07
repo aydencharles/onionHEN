@@ -236,8 +236,6 @@
     "cheats.on_off": "Wł./Wył.",
     "cheats.enable_fmt": "Dla %s: włącz/wyłącz %s",
     "cheats.group.unnamed": "Źródło",
-    "plapps.title": "Homebrew payloadów OnionHEN - Aplikacje",
-    "plapps.version_fmt": "%s | wersja: %s",
     "plugins.link": "Wtyczki",
     "plugins.link.sub": "Zarządzaj Kstuff i zainstalowanymi wtyczkami",
     "sprx.link": "SPRX",

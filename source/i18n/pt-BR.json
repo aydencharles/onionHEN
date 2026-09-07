@@ -236,8 +236,6 @@
     "cheats.on_off": "Ligado/Desligado",
     "cheats.enable_fmt": "Para %s, ativar/desativar %s",
     "cheats.group.unnamed": "Origem",
-    "plapps.title": "Homebrew de payload OnionHEN - Aplicativos",
-    "plapps.version_fmt": "%s | versão: %s",
     "plugins.link": "Plugins",
     "plugins.link.sub": "Gerenciar Kstuff e plugins instalados",
     "sprx.link": "SPRX",

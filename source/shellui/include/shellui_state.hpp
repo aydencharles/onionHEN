@@ -33,8 +33,6 @@ struct ToolboxUiState {
 
   std::vector<PayloadEntry> payloads_list;
   std::vector<PayloadEntry> auto_payloads_list;
-  std::vector<Payloads_Apps> payloads_apps_list;
-  std::vector<GameEntry> games_list;
 
   std::vector<PluginInventoryItem> external_plugins;
   std::vector<SprxInventoryItem> external_sprx;

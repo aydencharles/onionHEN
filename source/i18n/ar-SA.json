@@ -236,8 +236,6 @@
     "cheats.on_off": "تشغيل/إيقاف",
     "cheats.enable_fmt": "تفعيل/تعطيل %s لـ %s",
     "cheats.group.unnamed": "المصدر",
-    "plapps.title": "برامج OnionHEN المنزلية - التطبيقات",
-    "plapps.version_fmt": "%s | الإصدار: %s",
     "plugins.link": "الإضافات",
     "plugins.link.sub": "إدارة Kstuff والإضافات المثبتة",
     "sprx.link": "SPRX",

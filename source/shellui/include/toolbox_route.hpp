@@ -22,7 +22,6 @@ enum class Page : unsigned char {
   Cheats,
   AutoPayloads,
   Account,
-  Plapps,
   CheatProgress,
   RemotePlay,
   DynamicPlugin,     /**< SDK-provided UI contribution page */
@@ -55,7 +54,6 @@ struct RouteFlags {
   bool is_cheats = false;
   bool is_auto_payload = false;
   bool is_account = false;
-  bool is_plapps = false;
   bool is_cheat_progress = false;
   bool is_remote_play = false;
 };
@@ -85,8 +83,6 @@ inline constexpr std::string_view kSprxXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.sprx.xml";
 inline constexpr std::string_view kAccountXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.account.xml";
-inline constexpr std::string_view kPlappsXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.plapps.xml";
 inline constexpr std::string_view kCheatProgressXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.cheat_progress.xml";
 inline constexpr std::string_view kRemotePlayXml =

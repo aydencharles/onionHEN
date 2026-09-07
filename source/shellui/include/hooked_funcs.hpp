@@ -374,7 +374,6 @@ void SettingPageStackOnPopping_Hook(MonoObject* Instance,
 MonoImage * getDLLimage(const char* dll_file);
 MonoString* CxmlUri_Hook(MonoObject* obj, MonoString* uri);
 MonoObject* InvokeByDesc(MonoClass* p_Class, const char* p_MethodDesc, void* p_Instance, void* p_Args);
-void generate_plapps_xml(std::string& new_xml);
 MonoString* GetString(MonoString* str);
 int ItemzLaunchByUri(const char* uri);
 void GoToHome();

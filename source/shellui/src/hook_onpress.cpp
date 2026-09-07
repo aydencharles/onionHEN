@@ -79,9 +79,6 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
   case toolbox::OnPressDomain::Account:
     run_exact(onpress_account_exact);
     break;
-  case toolbox::OnPressDomain::Plapps:
-    run_prefix(onpress_packages_prefix);
-    break;
   case toolbox::OnPressDomain::Progress:
     break;
   case toolbox::OnPressDomain::RemotePlay:

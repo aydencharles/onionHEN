@@ -61,14 +61,10 @@ static int test_cheats_page(void) {
   return 0;
 }
 
-static int test_auto_payloads_and_plapps(void) {
+static int test_auto_payloads(void) {
   RouteResult a = resolve_resource(make_in(kAutoPayloadsXml));
   TEST_ASSERT_TRUE(a.page == Page::AutoPayloads);
   TEST_ASSERT_TRUE(a.flags.is_auto_payload);
-
-  RouteResult p = resolve_resource(make_in(kPlappsXml));
-  TEST_ASSERT_TRUE(p.page == Page::Plapps);
-  TEST_ASSERT_TRUE(p.flags.is_plapps);
   return 0;
 }
 
@@ -365,7 +361,7 @@ extern "C" int test_toolbox_route_suite(void) {
   fails += onion_test_run("route.payloads", test_payloads_page);
   fails += onion_test_run("route.debug", test_debug_settings_page);
   fails += onion_test_run("route.cheats", test_cheats_page);
-  fails += onion_test_run("route.auto_plapps", test_auto_payloads_and_plapps);
+  fails += onion_test_run("route.auto_payloads", test_auto_payloads);
   fails += onion_test_run("route.plugins", test_plugins_page);
   fails += onion_test_run("route.sprx", test_sprx_page);
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);

@@ -29,7 +29,6 @@
 #include <cstdlib>
 #include <unordered_map>
 #include <unordered_set>
-#include <random>
 #include <vector>
 #include <string>
 
@@ -94,36 +93,6 @@ void append_payload_entry(G& page, const std::string& directory, const char* fil
     g_ui.payloads_list.push_back(entry);
   else
     g_ui.auto_payloads_list.push_back(entry);
-}
-
-template <typename G>
-void append_homebrew_game(G& page, const std::string& game_dir, const char* dir_name,
-                          int random_num) {
-  const std::string elf_path = game_dir + "/eboot.elf";
-  if (access(elf_path.c_str(), F_OK) != 0)
-    return;
-
-#if SHELL_DEBUG == 1
-  LOG_DEBUG("Found Game: %s", game_dir.c_str());
-#endif
-
-  std::string title_id, title, ver;
-  const std::string shown_path = toolbox::display_path_for_ui(game_dir);
-  const std::string icon_path = game_dir + "/sce_sys/icon0.png";
-
-  GameEntry game;
-  game.tid = title_id;
-  game.title = title;
-  game.version = ver;
-  game.path = shown_path;
-  game.dir_name = dir_name;
-  game.icon_path = icon_path;
-  game.id = "id_onionhen_pl_loader_" + title_id + "_" + std::to_string(random_num);
-  g_ui.games_list.push_back(game);
-
-  page.button(game.id, "(" + title_id + ") " + title,
-              toolbox_i18n::format("plapps.version_fmt", shown_path.c_str(), ver.c_str()),
-              std::nullopt, icon_path);
 }
 
 std::string read_file_to_string(const char* path) {
@@ -449,54 +418,6 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
 
   append_cheat_entries(page, res_json.get(), g_ui.running_tid, game_name,
                        g_ui.is_game_open && g_ui.is_current_game_open);
-  new_xml = page.build();
-}
-
-void generate_plapps_xml(std::string& new_xml) {
-  static const std::vector<std::string> kHomebrewDirs = {
-      "/user/data/homebrew/games",
-      "/usb0/homebrew",
-      "/usb1/homebrew/games",
-      "/usb2/homebrew/games",
-      "/usb3/homebrew/games",
-      "/mnt/ext1/homebrew/games",
-      "/mnt/ext2/homebrew/games",
-      "/mnt/ext0/homebrew/games",
-  };
-
-  ps5ui::Page page("id_plapps", toolbox_i18n::tr("plapps.title"));
-
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(1000, 9999);
-
-  for (const auto& directory : kHomebrewDirs) {
-    DIR* dir = opendir(directory.c_str());
-    if (!dir) {
-#if SHELL_DEBUG == 1
-      LOG_ERROR("Failed to open directory: %s", directory.c_str());
-#endif
-      continue;
-    }
-
-    while (struct dirent* entry = readdir(dir)) {
-      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-        continue;
-
-      const std::string game_dir = directory + "/" + entry->d_name;
-      struct stat st {};
-      if (stat(game_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-#if SHELL_DEBUG == 1
-        LOG_WARN("Skipping non-directory: %s", game_dir.c_str());
-#endif
-        continue;
-      }
-
-      append_homebrew_game(page, game_dir, entry->d_name, dist(gen));
-    }
-    closedir(dir);
-  }
-
   new_xml = page.build();
 }
 

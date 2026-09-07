@@ -236,8 +236,6 @@
     "cheats.on_off": "Вкл./выкл.",
     "cheats.enable_fmt": "Для %s: вкл./выкл. %s",
     "cheats.group.unnamed": "Источник",
-    "plapps.title": "Homebrew-нагрузки OnionHEN — приложения",
-    "plapps.version_fmt": "%s | версия: %s",
     "plugins.link": "Плагины",
     "plugins.link.sub": "Управление Kstuff и установленными плагинами",
     "sprx.link": "SPRX",

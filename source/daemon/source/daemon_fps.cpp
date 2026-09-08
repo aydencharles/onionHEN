@@ -370,7 +370,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
     const onion::Settings cfg = g_settings.snapshot();
     const bool enabled = cfg.overlay_enabled && cfg.overlay_fps;
     if (last_enabled != static_cast<int>(enabled)) {
-      LOG_INFO("fps-diag: vsync config overlay=%d fps=%d enabled=%d",
+      LOG_DEBUG("fps-diag: vsync config overlay=%d fps=%d enabled=%d",
                cfg.overlay_enabled ? 1 : 0, cfg.overlay_fps ? 1 : 0,
                enabled ? 1 : 0);
       last_enabled = static_cast<int>(enabled);
@@ -389,14 +389,14 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
     int app_id = 0;
     if (!Get_Running_App_TID(tid, app_id)) {
       if (had_app)
-        LOG_INFO("fps-diag: vsync target cleared (no running big app)");
+        LOG_DEBUG("fps-diag: vsync target cleared (no running big app)");
       had_app = false;
       cached_tid.clear();
       scanout_st = {};
       logged_active = false;
       clear_vsync_state();
       if (diag_due(last_diag_ns))
-        LOG_INFO("fps-diag: vsync state=no-app dce_open=%d unavailable=%d "
+        LOG_DEBUG("fps-diag: vsync state=no-app dce_open=%d unavailable=%d "
                  "errno=%d",
                  dce.is_open() ? 1 : 0, dce.unavailable() ? 1 : 0,
                  dce.last_errno());
@@ -409,7 +409,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
       logged_active = false;
       clear_vsync_state();
       cached_tid = tid;
-      LOG_INFO("fps-diag: vsync target tid=%s app=%d native=%d bc=%d",
+      LOG_DEBUG("fps-diag: vsync target tid=%s app=%d native=%d bc=%d",
                tid.c_str(), app_id,
                onion::fps::is_ps5_native_title(tid.c_str()) ? 1 : 0,
                onion::fps::is_ps4_bc_title(tid.c_str()) ? 1 : 0);
@@ -419,7 +419,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
     if (onion::fps::is_ps4_bc_title(tid.c_str())) {
       clear_vsync_state();
       if (diag_due(last_diag_ns))
-        LOG_INFO("fps-diag: vsync tid=%s app=%d state=ps4-bc-skipped",
+        LOG_DEBUG("fps-diag: vsync tid=%s app=%d state=ps4-bc-skipped",
                  tid.c_str(), app_id);
       usleep(kSampleUs);
       continue;
@@ -442,7 +442,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
       }
     }
     if (diag_due(last_diag_ns)) {
-      LOG_INFO("fps-diag: vsync tid=%s app=%d dce_open=%d unavailable=%d "
+      LOG_DEBUG("fps-diag: vsync tid=%s app=%d dce_open=%d unavailable=%d "
                "abi=%s sample=%s errno=%d count=%llu rate=%s delta=%llu "
                "dt=%.4f raw_hz=%.2f bus_update=%d fps=%.2f",
                tid.c_str(), app_id, dce.is_open() ? 1 : 0,
@@ -505,7 +505,7 @@ void *fps_sampler_thread(void *args) noexcept {
     const onion::Settings cfg = g_settings.snapshot();
     const bool enabled = cfg.overlay_enabled && cfg.overlay_fps;
     if (last_enabled != static_cast<int>(enabled)) {
-      LOG_INFO("fps-diag: render config overlay=%d fps=%d enabled=%d",
+      LOG_DEBUG("fps-diag: render config overlay=%d fps=%d enabled=%d",
                cfg.overlay_enabled ? 1 : 0, cfg.overlay_fps ? 1 : 0,
                enabled ? 1 : 0);
       last_enabled = static_cast<int>(enabled);
@@ -521,7 +521,7 @@ void *fps_sampler_thread(void *args) noexcept {
     int app_id = 0;
     if (!Get_Running_App_TID(tid, app_id)) {
       if (had_app)
-        LOG_INFO("fps-diag: render target cleared (no running big app)");
+        LOG_DEBUG("fps-diag: render target cleared (no running big app)");
       had_app = false;
       cached_pid = -1;
       cached_tid.clear();
@@ -542,7 +542,7 @@ void *fps_sampler_thread(void *args) noexcept {
       last_publish_valid = -1;
       publish_invalid(-1, nullptr);
       if (diag_due(last_diag_ns))
-        LOG_INFO("fps-diag: render state=no-app publish_valid=0");
+        LOG_DEBUG("fps-diag: render state=no-app publish_valid=0");
       sleep(kIdleSleepSec);
       continue;
     }
@@ -581,7 +581,7 @@ void *fps_sampler_thread(void *args) noexcept {
       else
         cached_proc_name = "?";
       if (pid != old_pid || tid != old_tid) {
-        LOG_INFO("fps-diag: render target tid=%s app=%d pid=%d name=%s "
+        LOG_DEBUG("fps-diag: render target tid=%s app=%d pid=%d name=%s "
                  "old_pid=%d pid_alive=%d native=%d bc=%d",
                  tid.c_str(), app_id, static_cast<int>(pid),
                  cached_proc_name.c_str(),
@@ -595,7 +595,7 @@ void *fps_sampler_thread(void *args) noexcept {
     if (cached_pid <= 0) {
       publish_invalid(-1, nullptr);
       if (diag_due(last_diag_ns))
-        LOG_INFO("fps-diag: render tid=%s app=%d pid=%d name=%s state=%s "
+        LOG_DEBUG("fps-diag: render tid=%s app=%d pid=%d name=%s state=%s "
                  "publish_valid=0",
                  tid.c_str(), app_id, static_cast<int>(cached_pid),
                  cached_proc_name.c_str(), "pid-not-found");
@@ -618,7 +618,7 @@ void *fps_sampler_thread(void *args) noexcept {
           last_bc_install_ns = now_ns;
           bc_status = bc_hook.install(cached_pid);
           bc_last_status = bc_status;
-          LOG_INFO("fps-diag: bc-hook install tid=%s pid=%d status=%s "
+          LOG_DEBUG("fps-diag: bc-hook install tid=%s pid=%d status=%s "
                    "target=0x%llx counter=0x%llx len=%u",
                    tid.c_str(), static_cast<int>(cached_pid),
                    onion::fps::bc_hook_status_name(bc_status),
@@ -634,7 +634,7 @@ void *fps_sampler_thread(void *args) noexcept {
         }
         if (!bc_ok && bc_last_status != bc_status) {
           bc_last_status = bc_status;
-          LOG_INFO("fps-diag: bc-hook sample tid=%s pid=%d status=%s "
+          LOG_DEBUG("fps-diag: bc-hook sample tid=%s pid=%d status=%s "
                    "counter=%llu",
                    tid.c_str(), static_cast<int>(cached_pid),
                    onion::fps::bc_hook_status_name(bc_status),
@@ -674,7 +674,7 @@ void *fps_sampler_thread(void *args) noexcept {
         publish_invalid(static_cast<int>(cached_pid), tid.c_str());
       }
       if (diag_due(last_diag_ns))
-        LOG_INFO("fps-diag: bc-render tid=%s pid=%d installed=%d "
+        LOG_DEBUG("fps-diag: bc-render tid=%s pid=%d installed=%d "
                  "counter=%llu rate=%s hz=%.2f publish_valid=%d dead=%d",
                  tid.c_str(), static_cast<int>(cached_pid),
                  bc_hook.installed() ? 1 : 0,
@@ -774,14 +774,14 @@ void *fps_sampler_thread(void *args) noexcept {
 
     if (last_publish_valid != static_cast<int>(sample.valid)) {
       if (diag_due(last_publish_diag_ns))
-        LOG_INFO("fps-diag: publish state tid=%s pid=%d valid=%d fps=%.2f "
+        LOG_DEBUG("fps-diag: publish state tid=%s pid=%d valid=%d fps=%.2f "
                  "source=0x%02x dead=%d",
                  tid.c_str(), sample.pid, sample.valid ? 1 : 0, sample.fps,
                  static_cast<unsigned>(sample.source), dead_ticks);
       last_publish_valid = static_cast<int>(sample.valid);
     }
     if (diag_due(last_diag_ns)) {
-      LOG_INFO("fps-diag: render-source tid=%s app=%d pid=%d name=%s alive=%d "
+      LOG_DEBUG("fps-diag: render-source tid=%s app=%d pid=%d name=%s alive=%d "
                "native=%d ring_sample=%s ring_size=%u ring_idx=%u "
                "ring_count=%llu ring_rate=%s "
                "ring_delta=%llu ring_dt=%.4f ring_hz=%.2f global_sample=%s "
@@ -804,7 +804,7 @@ void *fps_sampler_thread(void *args) noexcept {
                rate_status_name(global_rate_diag.status),
                static_cast<unsigned long long>(global_rate_diag.delta),
                global_rate_diag.dt, global_rate_diag.raw_hz);
-      LOG_INFO("fps-diag: render-output tid=%s pid=%d vsync=%s age_ms=%.1f "
+      LOG_DEBUG("fps-diag: render-output tid=%s pid=%d vsync=%s age_ms=%.1f "
                "vsync_fps=%.2f calibration=%u/100 avg=%.2f ready=%d "
                "multipass=%d fallback=%d publish_valid=%d publish_fps=%.2f "
                "source=0x%02x dead=%d",

@@ -370,7 +370,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
     const onion::Settings cfg = g_settings.snapshot();
     const bool enabled = cfg.overlay_enabled && cfg.overlay_fps;
     if (last_enabled != static_cast<int>(enabled)) {
-      LOG_DEBUG("fps-diag: vsync config overlay=%d fps=%d enabled=%d",
+      LOG_TRACE("fps-diag: vsync config overlay=%d fps=%d enabled=%d",
                cfg.overlay_enabled ? 1 : 0, cfg.overlay_fps ? 1 : 0,
                enabled ? 1 : 0);
       last_enabled = static_cast<int>(enabled);
@@ -389,14 +389,14 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
     int app_id = 0;
     if (!Get_Running_App_TID(tid, app_id)) {
       if (had_app)
-        LOG_DEBUG("fps-diag: vsync target cleared (no running big app)");
+        LOG_TRACE("fps-diag: vsync target cleared (no running big app)");
       had_app = false;
       cached_tid.clear();
       scanout_st = {};
       logged_active = false;
       clear_vsync_state();
       if (diag_due(last_diag_ns))
-        LOG_DEBUG("fps-diag: vsync state=no-app dce_open=%d unavailable=%d "
+        LOG_TRACE("fps-diag: vsync state=no-app dce_open=%d unavailable=%d "
                  "errno=%d",
                  dce.is_open() ? 1 : 0, dce.unavailable() ? 1 : 0,
                  dce.last_errno());
@@ -409,7 +409,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
       logged_active = false;
       clear_vsync_state();
       cached_tid = tid;
-      LOG_DEBUG("fps-diag: vsync target tid=%s app=%d native=%d bc=%d",
+      LOG_TRACE("fps-diag: vsync target tid=%s app=%d native=%d bc=%d",
                tid.c_str(), app_id,
                onion::fps::is_ps5_native_title(tid.c_str()) ? 1 : 0,
                onion::fps::is_ps4_bc_title(tid.c_str()) ? 1 : 0);
@@ -419,7 +419,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
     if (onion::fps::is_ps4_bc_title(tid.c_str())) {
       clear_vsync_state();
       if (diag_due(last_diag_ns))
-        LOG_DEBUG("fps-diag: vsync tid=%s app=%d state=ps4-bc-skipped",
+        LOG_TRACE("fps-diag: vsync tid=%s app=%d state=ps4-bc-skipped",
                  tid.c_str(), app_id);
       usleep(kSampleUs);
       continue;
@@ -442,7 +442,7 @@ void *vsync_fps_sampler_thread(void *args) noexcept {
       }
     }
     if (diag_due(last_diag_ns)) {
-      LOG_DEBUG("fps-diag: vsync tid=%s app=%d dce_open=%d unavailable=%d "
+      LOG_TRACE("fps-diag: vsync tid=%s app=%d dce_open=%d unavailable=%d "
                "abi=%s sample=%s errno=%d count=%llu rate=%s delta=%llu "
                "dt=%.4f raw_hz=%.2f bus_update=%d fps=%.2f",
                tid.c_str(), app_id, dce.is_open() ? 1 : 0,

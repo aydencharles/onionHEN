@@ -14,6 +14,7 @@
 #include "ps5_settings_ui.hpp"
 #include "toolbox_i18n.hpp"
 #include "toolbox_navigation.hpp"
+#include "progress_auto_return.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -27,6 +28,12 @@
 #include <unistd.h>
 
 namespace {
+
+toolbox::ProgressAutoReturn g_cheat_auto_return({
+    toolbox::Page::CheatProgress,
+    800,  // success dwell ms
+    2000  // error dwell ms
+});
 
 constexpr int kPollIntervalMs = 500;
 constexpr int kRecvTimeoutMs = 800;
@@ -130,6 +137,7 @@ void reset_progress_locked() {
   g_progress.task_id = 0;
   release_widget(g_progress.page);
   g_progress.task_may_be_running = false;
+  g_cheat_auto_return.reset();
 }
 
 bool session_is_current(uint64_t generation) {
@@ -846,6 +854,18 @@ bool cheat_progress_handle_popping(MonoObject *outgoing) {
 }
 
 void shellui_poll_cheat_progress(void) {
-  std::lock_guard<std::mutex> lock(g_progress.mu);
-  apply_progress_locked();
+  toolbox::ProgressOutcome outcome = toolbox::ProgressOutcome::Ongoing;
+  {
+    std::lock_guard<std::mutex> lock(g_progress.mu);
+    apply_progress_locked();
+
+    if (g_progress.state == SyncState::Ok) {
+      outcome = toolbox::ProgressOutcome::Success;
+    } else if (g_progress.state == SyncState::Error) {
+      outcome = toolbox::ProgressOutcome::Failed;
+    }
+  }
+
+  g_cheat_auto_return.poll(outcome);
 }
+

@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "Łatka jądra dla obsługi fSELF / fPKG, ładowana przy starcie OnionHEN",
     "plugin.kstuff.status.autoload": "Ładowany z OnionHEN",
-    "plugin.kstuff.status.manual": "Nie jest ładowany automatycznie"
+    "plugin.kstuff.status.manual": "Nie jest ładowany automatycznie",
+    "plugins.external.progress_title": "Operacje wtyczki",
+    "plugins.external.progress_starting": "Uruchamianie wtyczki...",
+    "plugins.external.progress_starting_sub": "Proszę czekać, wtyczka jest inicjowana i rejestruje interfejs",
+    "plugins.external.progress_stopping": "Zatrzymywanie wtyczki...",
+    "plugins.external.progress_stopping_sub": "Proszę czekać, trwa zamykanie wtyczki",
+    "plugins.external.progress_completed": "Ukończono",
+    "plugins.external.progress_failed": "Operacja nie powiodła się"
   },
   "notifications": {
     "notify.payload.config_invalid": "Wpisz liczbę całkowitą od 0 do %d.",

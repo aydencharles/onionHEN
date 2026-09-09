@@ -155,6 +155,8 @@ TEST_CXX_SRCS := \
 	test_sprx_plugin_manager.cpp \
 	test_plugin_ui.cpp \
 	test_plugin_sprx_pages.cpp \
+	test_plugin_progress.cpp \
+	test_progress_auto_return.cpp \
 	test_settings_page_update.cpp \
 	test_plugin_manager.cpp \
 	test_trampoline_arena.cpp \
@@ -206,6 +208,7 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_ui_bridge_server.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_host_services.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/dynamic_ui_xml.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/dynamic_ui_runtime.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/progress_auto_return.o
 
 TEST_C_OBJS := $(patsubst %.c,$(BUILD_DIR)/tests/%.o,$(TEST_C_SRCS))
 TEST_CXX_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_CXX_SRCS))
@@ -287,6 +290,10 @@ $(BUILD_DIR)/prod/shellui/dynamic_ui_xml.o: $(REPO_ROOT)/source/shellui/src/dyna
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/shellui/dynamic_ui_runtime.o: $(REPO_ROOT)/source/shellui/src/dynamic_ui_runtime.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/progress_auto_return.o: $(REPO_ROOT)/source/shellui/src/progress_auto_return.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

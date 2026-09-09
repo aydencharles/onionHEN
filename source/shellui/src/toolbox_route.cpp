@@ -30,6 +30,7 @@ RouteResult resolve_resource(const RouteInput &in) {
       parse_external_plugin_config_resource(in.resource, nullptr);
   out.flags.is_account = (in.resource == kAccountXml);
   out.flags.is_cheat_progress = (in.resource == kCheatProgressXml);
+  out.flags.is_plugin_progress = (in.resource == kPluginProgressXml);
   out.flags.is_remote_play = (in.resource == kRemotePlayXml);
   out.flags.is_su_menu = (in.resource == kSuperuserXml);
 
@@ -66,6 +67,8 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::Account;
   } else if (out.flags.is_cheat_progress) {
     out.page = Page::CheatProgress;
+  } else if (out.flags.is_plugin_progress) {
+    out.page = Page::PluginProgress;
   } else if (out.flags.is_remote_play) {
     out.page = Page::RemotePlay;
   } else if (out.flags.is_su_menu) {

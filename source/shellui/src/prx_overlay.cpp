@@ -8,6 +8,7 @@
 #include <onion/fps_sample.h>
 #include <onion/net.h>
 #include <onion/settings.hpp>
+#include "plugin_progress.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -665,4 +666,5 @@ void OnRender_Hook(MonoObject* instance) {
    * the final value committed for this frame is the daemon state.
    */
   shellui_poll_cheat_progress();
+  shellui_poll_plugin_progress();
 }

@@ -289,6 +289,14 @@ static int test_cheat_progress_page(void) {
   return 0;
 }
 
+static int test_plugin_progress_page(void) {
+  RouteResult r = resolve_resource(make_in(kPluginProgressXml));
+  TEST_ASSERT_TRUE(r.page == Page::PluginProgress);
+  TEST_ASSERT_TRUE(r.flags.is_plugin_progress);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+  return 0;
+}
+
 static int test_remote_play_page(void) {
   RouteResult r = resolve_resource(make_in(kRemotePlayXml));
   TEST_ASSERT_TRUE(r.page == Page::RemotePlay);
@@ -478,6 +486,7 @@ extern "C" int test_toolbox_route_suite(void) {
                           test_payload_config_restores_parent);
   fails += onion_test_run("route.account", test_account_page);
   fails += onion_test_run("route.cheat_progress", test_cheat_progress_page);
+  fails += onion_test_run("route.plugin_progress", test_plugin_progress_page);
   fails += onion_test_run("route.remote_play", test_remote_play_page);
   fails += onion_test_run("route.superuser", test_superuser_pass_through);
   fails += onion_test_run("route.og_debug", test_og_debug_redirect);

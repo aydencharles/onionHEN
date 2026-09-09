@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "支援 fSELF / fPKG 的核心修補，於 OnionHEN 啟動時載入",
     "plugin.kstuff.status.autoload": "隨 OnionHEN 啟動載入",
-    "plugin.kstuff.status.manual": "啟動時不自動載入"
+    "plugin.kstuff.status.manual": "啟動時不自動載入",
+    "plugins.external.progress_title": "插件操作",
+    "plugins.external.progress_starting": "正在啟動插件...",
+    "plugins.external.progress_starting_sub": "正在初始化插件行程並連接介面橋接，請稍候",
+    "plugins.external.progress_stopping": "正在停止插件...",
+    "plugins.external.progress_stopping_sub": "正在關閉插件行程並清理資源，請稍候",
+    "plugins.external.progress_completed": "已完成",
+    "plugins.external.progress_failed": "操作失敗"
   },
   "notifications": {
     "notify.payload.config_invalid": "請輸入 0 到 %d 之間的整數。",

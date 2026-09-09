@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "Patch de kernel para suporte a fSELF / fPKG, carregado na inicialização do OnionHEN",
     "plugin.kstuff.status.autoload": "Carrega com o OnionHEN",
-    "plugin.kstuff.status.manual": "Não carrega automaticamente"
+    "plugin.kstuff.status.manual": "Não carrega automaticamente",
+    "plugins.external.progress_title": "Operações de plugin",
+    "plugins.external.progress_starting": "Iniciando plugin...",
+    "plugins.external.progress_starting_sub": "Aguarde enquanto o plugin inicializa e registra sua interface",
+    "plugins.external.progress_stopping": "Parando plugin...",
+    "plugins.external.progress_stopping_sub": "Aguarde enquanto o plugin é encerrado",
+    "plugins.external.progress_completed": "Concluído",
+    "plugins.external.progress_failed": "Falha na operação"
   },
   "notifications": {
     "notify.payload.config_invalid": "Digite um número inteiro entre 0 e %d.",

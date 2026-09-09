@@ -55,6 +55,7 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
   case Page::Account:
     return OnPressDomain::Account;
   case Page::CheatProgress:
+  case Page::PluginProgress:
     return OnPressDomain::Progress;
   case Page::RemotePlay:
     return OnPressDomain::RemotePlay;

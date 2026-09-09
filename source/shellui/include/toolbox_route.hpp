@@ -28,6 +28,7 @@ enum class Page : unsigned char {
   CheatProgress,
   RemotePlay,
   DynamicPlugin,     /**< SDK-provided UI contribution page */
+  PluginProgress,    /**< external plugin start/stop progress transition page */
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
 };
@@ -62,6 +63,7 @@ struct RouteFlags {
   bool is_account = false;
   bool is_cheat_progress = false;
   bool is_remote_play = false;
+  bool is_plugin_progress = false;
 };
 
 struct RouteResult {
@@ -79,7 +81,8 @@ constexpr bool restores_parent_on_pop(Page page) {
          page == Page::PayloadConfig || page == Page::OverlayMetricConfig ||
          page == Page::PluginConfig ||
          page == Page::SprxConfig ||
-         page == Page::DynamicPlugin;
+         page == Page::DynamicPlugin ||
+         page == Page::PluginProgress;
 }
 
 /** Fixed Legacy resource paths (Sony Settings.Plugins module name is fixed). */
@@ -93,6 +96,8 @@ inline constexpr std::string_view kAccountXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.account.xml";
 inline constexpr std::string_view kCheatProgressXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.cheat_progress.xml";
+inline constexpr std::string_view kPluginProgressXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.plugin_progress.xml";
 inline constexpr std::string_view kRemotePlayXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.remote_play.xml";
 inline constexpr std::string_view kSuperuserXml =

@@ -179,6 +179,9 @@ void shellui_poll_home_reload(void);
 /** UI-thread ticker for the cheat-download XML progress page. */
 void shellui_poll_cheat_progress(void);
 
+/** UI-thread ticker for the external plugin progress page. */
+void shellui_poll_plugin_progress(void);
+
 bool SetVersionString(const char* str);
 int SendShelluiNotify();
 

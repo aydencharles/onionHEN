@@ -7,6 +7,7 @@
 #include "shellui_state.hpp"
 #include "onpress_policy.hpp"
 #include "progress_dialog.hpp"
+#include "plugin_progress.hpp"
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
 #include "dynamic_ui_runtime.hpp"
@@ -183,6 +184,9 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     break;
   case toolbox::Page::CheatProgress:
     generate_cheat_progress_xml(new_xml_string);
+    break;
+  case toolbox::Page::PluginProgress:
+    generate_plugin_progress_xml(new_xml_string);
     break;
   case toolbox::Page::RemotePlay:
     generate_remote_play_xml(new_xml_string);

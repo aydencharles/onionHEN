@@ -10,6 +10,7 @@
 #include "external_symbols.hpp"
 #include "hooked_funcs.hpp"
 #include "progress_dialog.hpp"
+#include "plugin_progress.hpp"
 #include "shellui_state.hpp"
 
 namespace {
@@ -49,17 +50,28 @@ MonoObject *get_setting_element(MonoObject *instance) {
 void UserCustomElementReset_Hook(MonoObject *instance, MonoObject *item) {
   call_original(instance, item);
 
-  if (!shellui_hooks_are_ready() || !instance || !item ||
-      g_ui.active_page != toolbox::Page::CheatProgress) {
+  if (!shellui_hooks_are_ready() || !instance || !item) {
+    return;
+  }
+
+  if (g_ui.active_page != toolbox::Page::CheatProgress &&
+      g_ui.active_page != toolbox::Page::PluginProgress) {
     return;
   }
 
   MonoObject *element = get_setting_element(instance);
   if (!element) {
-    LOG_ERROR("cheat_progress_ui3: UserCustomElementUI.Element unavailable");
+    LOG_ERROR("progress_ui3: UserCustomElementUI.Element unavailable");
     return;
   }
   const std::string id = GetPropertyValue(element, "Id");
-  LOG_DEBUG("cheat_progress_ui3: UserCustomElementUI.Reset id=%s", id.c_str());
-  cheat_progress_attach_panel(id, item);
+  LOG_DEBUG("progress_ui3: UserCustomElementUI.Reset id=%s page=%u",
+            id.c_str(), static_cast<unsigned>(g_ui.active_page));
+
+  if (g_ui.active_page == toolbox::Page::CheatProgress) {
+    cheat_progress_attach_panel(id, item);
+  } else if (g_ui.active_page == toolbox::Page::PluginProgress) {
+    plugin_progress_attach_panel(id, item);
+  }
 }
+

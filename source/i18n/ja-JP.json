@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "fSELF / fPKG をサポートするカーネルパッチ。OnionHEN 起動時に読み込みます",
     "plugin.kstuff.status.autoload": "OnionHEN 起動時に読み込み",
-    "plugin.kstuff.status.manual": "起動時に自動読み込みしません"
+    "plugin.kstuff.status.manual": "起動時に自動読み込みしません",
+    "plugins.external.progress_title": "プラグイン操作",
+    "plugins.external.progress_starting": "プラグインを起動しています...",
+    "plugins.external.progress_starting_sub": "プラグインの初期化とインターフェース登録を行っています。しばらくお待ちください",
+    "plugins.external.progress_stopping": "プラグインを停止しています...",
+    "plugins.external.progress_stopping_sub": "プラグインプロセスを終了しリソースをクリーンアップしています。しばらくお待ちください",
+    "plugins.external.progress_completed": "完了しました",
+    "plugins.external.progress_failed": "操作に失敗しました"
   },
   "notifications": {
     "notify.payload.config_invalid": "0 から %d までの整数を入力してください。",

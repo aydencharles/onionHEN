@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "Correctif noyau pour la prise en charge fSELF / fPKG, chargé au démarrage d’OnionHEN",
     "plugin.kstuff.status.autoload": "Chargé avec OnionHEN",
-    "plugin.kstuff.status.manual": "Pas de chargement automatique"
+    "plugin.kstuff.status.manual": "Pas de chargement automatique",
+    "plugins.external.progress_title": "Opérations sur le plugin",
+    "plugins.external.progress_starting": "Démarrage du plugin...",
+    "plugins.external.progress_starting_sub": "Veuillez patienter pendant l'initialisation du plugin et l'enregistrement de l'interface",
+    "plugins.external.progress_stopping": "Arrêt du plugin...",
+    "plugins.external.progress_stopping_sub": "Veuillez patienter pendant l'arrêt du plugin",
+    "plugins.external.progress_completed": "Terminé",
+    "plugins.external.progress_failed": "Échec de l'opération"
   },
   "notifications": {
     "notify.payload.config_invalid": "Saisissez un nombre entier entre 0 et %d.",

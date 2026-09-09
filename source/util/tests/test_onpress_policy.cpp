@@ -50,6 +50,8 @@ static int test_page_domain_matrix(void) {
                    OnPressDomain::Account);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::CheatProgress) ==
                    OnPressDomain::Progress);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::PluginProgress) ==
+                   OnPressDomain::Progress);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::SuperuserPass) ==
                    OnPressDomain::PassThrough);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::RedirectOgDebug) ==

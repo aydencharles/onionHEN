@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "แพตช์เคอร์เนลสำหรับรองรับ fSELF / fPKG โหลดเมื่อ OnionHEN เริ่มทำงาน",
     "plugin.kstuff.status.autoload": "โหลดพร้อม OnionHEN",
-    "plugin.kstuff.status.manual": "ไม่โหลดอัตโนมัติ"
+    "plugin.kstuff.status.manual": "ไม่โหลดอัตโนมัติ",
+    "plugins.external.progress_title": "การดำเนินการปลั๊กอิน",
+    "plugins.external.progress_starting": "กำลังเริ่มปลั๊กอิน...",
+    "plugins.external.progress_starting_sub": "โปรดรอสักครู่ขณะปลั๊กอินกำลังเริ่มต้นและลงทะเบียนอินเทอร์เฟซ",
+    "plugins.external.progress_stopping": "กำลังหยุดปลั๊กอิน...",
+    "plugins.external.progress_stopping_sub": "โปรดรอสักครู่ขณะปลั๊กอินกำลังปิดการทำงาน",
+    "plugins.external.progress_completed": "เสร็จสมบูรณ์",
+    "plugins.external.progress_failed": "การดำเนินการล้มเหลว"
   },
   "notifications": {
     "notify.payload.config_invalid": "กรุณาป้อนจำนวนเต็มตั้งแต่ 0 ถึง %d",

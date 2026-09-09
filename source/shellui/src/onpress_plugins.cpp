@@ -3,12 +3,25 @@
 #include "onpress.hpp"
 #include "shellui_payload_state.hpp"
 #include "external_plugin_ui.hpp"
+#include "plugin_progress.hpp"
+#include "plugin_sprx_pages.hpp"
 #include "toolbox_i18n.hpp"
 
 namespace {
 
 OnPressResult external_plugin_control(OnPressContext &ctx) {
   ctx.dirty = false;
+  std::string plugin_id;
+  if (onion::shellui::plugin_pages::split_control_id(
+          ctx.id, onion::shellui::plugin_pages::kPluginRunPrefix, plugin_id, 9, 9)) {
+    const bool start = ctx.value == "1" || ctx.value == "true";
+    plugin_progress_show(plugin_id, start);
+    if (!plugin_progress_open_page()) {
+      notify("plugins.external.operation_failed_fmt", plugin_id.c_str());
+    }
+    return OnPressResult::Consumed;
+  }
+
   const onion::shellui::external_plugins::DispatchResult result =
       onion::shellui::external_plugins::dispatch(ctx.id, ctx.value);
   if (!result.owned) return OnPressResult::NotMine;

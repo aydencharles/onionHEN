@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "Патч ядра для поддержки fSELF / fPKG, загружается при запуске OnionHEN",
     "plugin.kstuff.status.autoload": "Загружается вместе с OnionHEN",
-    "plugin.kstuff.status.manual": "Не загружается автоматически"
+    "plugin.kstuff.status.manual": "Не загружается автоматически",
+    "plugins.external.progress_title": "Операции с плагином",
+    "plugins.external.progress_starting": "Запуск плагина...",
+    "plugins.external.progress_starting_sub": "Пожалуйста, подождите, пока плагин инициализируется и регистрирует интерфейс",
+    "plugins.external.progress_stopping": "Остановка плагина...",
+    "plugins.external.progress_stopping_sub": "Пожалуйста, подождите, пока плагин завершает работу",
+    "plugins.external.progress_completed": "Завершено",
+    "plugins.external.progress_failed": "Сбой операции"
   },
   "notifications": {
     "notify.payload.config_invalid": "Введите целое число от 0 до %d.",

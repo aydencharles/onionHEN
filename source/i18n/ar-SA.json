@@ -303,7 +303,14 @@
     "plugin.kstuff.title": "Kstuff",
     "plugin.kstuff.sub": "تصحيح النواة لدعم fSELF / fPKG، يُحمَّل عند بدء OnionHEN",
     "plugin.kstuff.status.autoload": "يُحمَّل مع OnionHEN",
-    "plugin.kstuff.status.manual": "لا يُحمَّل تلقائيًا"
+    "plugin.kstuff.status.manual": "لا يُحمَّل تلقائيًا",
+    "plugins.external.progress_title": "عمليات الإضافة",
+    "plugins.external.progress_starting": "جارٍ تشغيل الإضافة...",
+    "plugins.external.progress_starting_sub": "يرجى الانتظار بينما تتم تهيئة الإضافة وتسجيل واجهتها",
+    "plugins.external.progress_stopping": "جارٍ إيقاف الإضافة...",
+    "plugins.external.progress_stopping_sub": "يرجى الانتظار بينما يتم إيقاف الإضافة",
+    "plugins.external.progress_completed": "اكتمل",
+    "plugins.external.progress_failed": "فشلت العملية"
   },
   "notifications": {
     "notify.payload.config_invalid": "أدخل عدداً صحيحاً من 0 إلى %d.",

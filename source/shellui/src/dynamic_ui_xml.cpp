@@ -54,7 +54,9 @@ ps5ui::Node render_node(const plugin_ui::Document &document,
   node.attrs.id = control_id(document, source.id);
   node.attrs.title = source.title;
   if (!source.description.empty()) node.attrs.description = source.description;
-  if ((source.flags & (1u << 1)) != 0) node.attrs.confirm = "true";
+  if ((source.flags & (1u << 1)) != 0) {
+    node.attrs.confirm = source.description.empty() ? "" : source.description;
+  }
 
   switch (source.kind) {
   case plugin_ui::NodeKind::Group:

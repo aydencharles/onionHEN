@@ -61,7 +61,7 @@ static int test_default_zh(void) {
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download"),
                                "下载金手指合集") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download.desc"),
-                               "鸣谢 TeeKay87") == 0);
+                               "鸣谢 TeeKay87（官方金手指仓库）& PS5_Xiexiyu（中文镜像仓库）") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.mirror.auto"), "自动") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("pkg.msg.options"),
                                "PKG 安装器选项") == 0);
@@ -126,7 +126,8 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download"),
                                "Download cheat collection") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download.desc"),
-                               "Credits to TeeKay87") == 0);
+                               "Thanks to TeeKay87 (Official Cheats Repo) & "
+                               "PS5_Xiexiyu (Chinese Mirror Repo).") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("pkg.msg.installing"),
                                "OnionHEN is installing the selected PKG") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("pkg.msg.select_all"), "Select all") == 0);

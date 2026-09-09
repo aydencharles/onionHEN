@@ -21,8 +21,8 @@ static int test_auto_zh_hans_prefers_cnb(void) {
   TEST_ASSERT_STREQ("cnb", pick.primary->name());
   TEST_ASSERT_STREQ("github", pick.fallback->name());
   const std::string url = pick.primary->archiveUrl(cat);
-  TEST_ASSERT_STREQ("https://cnb.cool/kylin-core/hen-cheats-cnb-mirror/-/git/"
-                    "archive/refs/heads/master.zip",
+  TEST_ASSERT_STREQ("https://cnb.cool/PS5-xiexiyu/CN-Cheats-Collection/-/git/"
+                    "archive/refs/heads/chinese-build.zip",
                     url.c_str());
   TEST_ASSERT_STREQ("cnb.cool", pick.primary->archiveHost());
   return 0;

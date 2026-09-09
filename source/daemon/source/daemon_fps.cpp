@@ -555,7 +555,7 @@ void *fps_sampler_thread(void *args) noexcept {
         tid != cached_tid || now - last_pid_check >= kPidRefreshSec) {
       const pid_t old_pid = cached_pid;
       const std::string old_tid = cached_tid;
-      const pid_t pid = onion_find_pid_ex("", false, true, false);
+      const pid_t pid = onion_find_pid_ex("", false, true);
       last_pid_check = now;
       if (pid != cached_pid || tid != cached_tid) {
         ring_st = {};

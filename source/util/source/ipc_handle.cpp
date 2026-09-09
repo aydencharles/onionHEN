@@ -4,6 +4,7 @@
  */
 #include <onion/platform.h>
 #include <onion/payload.h>
+#include <onion/proc_query.h>
 #include "ipc.hpp"
 #include "util_language.h"
 #include <msg.hpp>
@@ -24,6 +25,8 @@ extern "C" {
 #include "cheats/runtime.h"
 #include "cheats/sync/cheat_sync_service.hpp"
 #include <cstdio>
+#include <cerrno>
+#include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -33,14 +36,18 @@ extern "C" {
 #include <sstream>
 #include <string>
 #include <vector>
+#include <atomic>
 
 extern bool is_handler_enabled;
+extern "C" int sceKernelGetProcessName(int pid, char *name);
 
 void reply(int sender_socket, bool error, std::string out_var = "Nothing");
 extern "C" {
 int launchApp(const char *titleId);
 }
 namespace {
+
+std::atomic<uint64_t> g_cheat_request_id{1};
 
 bool is_payload_path_identity(const std::string &id) {
   if (id.size() != ONION_PAYLOAD_IDENTITY_SIZE - 1 || id[0] != 'p')
@@ -178,11 +185,60 @@ void handleIPC(clientArgs *client, std::string &inputStr,
         std::string(onion_cjson::string_item(my_json.get(), "tid", ""));
     int pid = onion_cjson::int_item(my_json.get(), "pid");
     int appid = onion_cjson::int_item(my_json.get(), "appid");
-    std::string shm_path = "/user/data/OnionHEN/" + title_id + "_cheats";
+    const char *mode = onion_cjson::string_item(my_json.get(), "mode", "browse");
+    if (std::strcmp(mode, "browse") != 0 && std::strcmp(mode, "runtime") != 0) {
+      LOG_ERROR("[cheats] invalid list mode '%s'", mode);
+      reply(sender_app, true);
+      break;
+    }
+    char resolved_version[32] = {};
+    if (util_resolve_game_version(title_id.c_str(), resolved_version,
+                                  sizeof(resolved_version)) < 0) {
+      reply(sender_app, true);
+      break;
+    }
+    const std::string request_id = std::to_string(
+        static_cast<unsigned long long>(g_cheat_request_id.fetch_add(1)));
+    std::string shm_path = "/user/data/OnionHEN/" + title_id + "_cheats_" +
+                           request_id;
+
+    onion::cheats::CheatRequest request;
+    request.mode = std::strcmp(mode, "runtime") == 0
+                       ? onion::cheats::CheatViewMode::Runtime
+                       : onion::cheats::CheatViewMode::Browse;
+    request.game = {title_id, resolved_version};
+    if (request.mode == onion::cheats::CheatViewMode::Runtime) {
+      onion::cheats::ProcessIdentity process;
+      process.pid = pid;
+      process.appid = appid;
+      process.process_name = onion_cjson::string_item(
+          my_json.get(), "process", "");
+      if (process.process_name.empty() && process.pid > 0) {
+        char name[ONION_PROC_PROCESS_NAME_LEN] = {};
+        if (sceKernelGetProcessName(process.pid, name) == 0) {
+          process.process_name = name;
+        }
+      }
+      const char *generation =
+          onion_cjson::string_item(my_json.get(), "generation", "");
+      if (generation[0] != '\0') {
+        char *end = nullptr;
+        errno = 0;
+        process.session_generation = std::strtoull(generation, &end, 10);
+        if (errno == ERANGE || end == generation || *end != '\0') {
+          process.session_generation = 0;
+        }
+      }
+      if (!process.valid()) {
+        reply(sender_app, true);
+        break;
+      }
+      request.process = process;
+    }
 
     auto &cheats = onion::cheats::CheatService::instance();
     cheats.ensureDir();
-    if (cheats.exportList(title_id, pid, appid, shm_path) == 0) {
+    if (cheats.exportList(request, shm_path) == 0) {
       reply(sender_app, false, shm_path);
     } else {
       onion_notify(true, "notify.cheats.none", title_id.c_str());
@@ -192,18 +248,15 @@ void handleIPC(clientArgs *client, std::string &inputStr,
   }
 
   case BREW_UTIL_TOGGLE_CHEAT: {
-    std::string title_id =
-        std::string(onion_cjson::string_item(my_json.get(), "tid", ""));
-    int pid = onion_cjson::int_item(my_json.get(), "pid");
-    int appid = onion_cjson::int_item(my_json.get(), "appid");
-    int cheat_id = onion_cjson::int_item(my_json.get(), "cheat_id");
+    const std::string session_id = onion_cjson::string_item(
+        my_json.get(), "session_id", "");
+    const std::string cheat_key = onion_cjson::string_item(
+        my_json.get(), "cheat_key", "");
+    const bool enabled = onion_cjson::bool_item(my_json.get(), "enabled");
     std::string status;
 
-    LOG_DEBUG("Received toggle command for cheat %d on %s PID %d", cheat_id,
-              title_id.c_str(), pid);
-
     auto &cheats = onion::cheats::CheatService::instance();
-    if (cheats.toggle(pid, appid, title_id, cheat_id, status) == 0) {
+    if (cheats.toggle(session_id, cheat_key, enabled, status) == 0) {
       LOG_DEBUG("Cheat toggle reply: %s", status.c_str());
       reply(sender_app, false, status);
     } else {

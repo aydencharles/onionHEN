@@ -389,7 +389,6 @@ int sceSystemServiceGetAppId(const char *tid);
 int usbpath();
 extern "C" int sceUserServiceGetInitialUser(int* uid);
 extern "C" int sceUserServiceGetForegroundUser(int* uid);
-void ParseCheatID(const char* id, char* tid, int* cheat_id);
 int Launch_FG_Game(const char *path, const char* title_id, const char* title);
 bool uri_boot_hook(MonoString* uri, int opt, MonoString* titleIdForBootAction);
 bool uri_boot_hook_2(MonoString* uri, int opt);

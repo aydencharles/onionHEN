@@ -185,18 +185,18 @@ ShellUI
   ▼
 util handleIPC ──► param.json / sfo ──► version 字符串
   │
-  │ GET_GAME_CHEAT(tid, version)
+  │ GET_GAME_CHEAT(mode, tid, version, [pid, appid, process, generation])
   ▼
 cheat_service_export_list
-  │  resolve all /data/OnionHEN/cheats/<TID>_<VER>[_PROCESS][_SOURCE_ID].{json,shn,mc4,ShnExt}
-  │  load + parse → 写 /user/data/OnionHEN/<tid>_cheats
+  │  Browse: title/version; Runtime: title/version/process + source identity
+  │  load + parse → 写带请求 ID 的 /user/data/OnionHEN/<tid>_cheats_* 文件
   ▼
-ShellUI 读列表 JSON，渲染开关
+ShellUI 读列表 JSON；只有 Runtime 响应可切换
   │
-  │ TOGGLE_CHEAT(tid, version, pid, cheat_id)
+  │ TOGGLE_CHEAT(session_id, cheat_key, enabled)
   ▼
-cheat_service_toggle_index
-  │  refresh 文件签名 → onion_toggle_cheat
+cheat_service_toggle
+  │  校验 session_id、稳定 CheatKey 和文件签名 → onion_toggle_cheat
   ▼
 cheat_engine_runtime
   │  util_find_module → base

@@ -101,10 +101,12 @@ public:
   IPC_Ret LaunchPayload(std::string payload_path, std::string tid);
   bool GameVerFromTid(std::string tid, std::string &out_ver);
   bool Remount(const char *src, const char *dest);
-  bool GetGameCheats(const std::string &tid, std::string &cheats, int pid = 0,
-                     int appid = 0);
-  bool ToggleGameCheat(int pid, const std::string &tid, int cheat_index,
-                       std::string &cheat_enabled);
+  bool GetGameCheats(const std::string &tid, std::string &cheats,
+                     const std::string &mode, int pid = 0, int appid = 0,
+                     const std::string &process = {}, uint64_t generation = 0);
+  bool ToggleGameCheat(const std::string &session_id,
+                       const std::string &cheat_key, bool enabled,
+                       std::string &cheat_status);
   bool DownloadCheats(const char *catalog, const char *mirror,
                       std::string &out);
   bool CheatSyncStatus(std::string &out);

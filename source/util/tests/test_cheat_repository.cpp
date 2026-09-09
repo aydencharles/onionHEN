@@ -8,10 +8,13 @@
 #include <unistd.h>
 
 #include "cheats/cheat_repository.hpp"
+#include "cheats/cheat_types.hpp"
 #include "cheats/runtime.h"
 #include "test_harness.h"
 
 using onion::cheats::CheatRepository;
+using onion::cheats::GameKey;
+using onion::cheats::ProcessIdentity;
 
 namespace {
 
@@ -43,13 +46,37 @@ private:
   std::vector<std::string> paths_;
 };
 
-game_context_t makeGame(const char *title_id, const char *version,
-                        const char *process) {
-  game_context_t game{};
-  std::snprintf(game.title_id, sizeof(game.title_id), "%s", title_id);
-  std::snprintf(game.version, sizeof(game.version), "%s", version);
-  std::snprintf(game.process_name, sizeof(game.process_name), "%s", process);
+struct TestGame {
+  GameKey key;
+  ProcessIdentity process;
+};
+
+TestGame makeGame(const char *title_id, const char *version,
+                  const char *process) {
+  TestGame game;
+  game.key = {title_id, version};
+  game.process = {123, 1, process, 1};
   return game;
+}
+
+std::vector<std::string> resolveAllPaths(const TestGame &game) {
+  std::vector<onion::cheats::CheatSourceDescriptor> sources;
+  if (game.process.process_name.empty()) {
+    sources = CheatRepository::resolveBrowse(game.key);
+  } else {
+    sources = CheatRepository::resolveRuntime(game.key, game.process);
+  }
+  std::vector<std::string> paths;
+  paths.reserve(sources.size());
+  for (const auto &source : sources) {
+    paths.push_back(source.path);
+  }
+  return paths;
+}
+
+std::string resolveFirstPath(const TestGame &game) {
+  const auto paths = resolveAllPaths(game);
+  return paths.empty() ? std::string() : paths.front();
 }
 
 int test_compatibility_alias_for_eboot() {
@@ -57,10 +84,10 @@ int test_compatibility_alias_for_eboot() {
   ScopedCheatFiles files({alias});
   TEST_ASSERT_TRUE(files.create(alias));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17168", "01.004.000", "eboot.bin");
   const std::string expected = ScopedCheatFiles::path(alias);
-  const std::string actual = CheatRepository::resolvePath(game);
+  const std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -71,15 +98,15 @@ int test_standard_name_has_priority() {
   ScopedCheatFiles files({alias, standard});
   TEST_ASSERT_TRUE(files.create(alias));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17169", "01.004.000", "eboot.bin");
   const std::string alias_path = ScopedCheatFiles::path(alias);
-  std::string actual = CheatRepository::resolvePath(game);
+  std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(alias_path.c_str(), actual.c_str());
 
   TEST_ASSERT_TRUE(files.create(standard));
   const std::string standard_path = ScopedCheatFiles::path(standard);
-  actual = CheatRepository::resolvePath(game);
+  actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(standard_path.c_str(), actual.c_str());
   return 0;
 }
@@ -91,10 +118,10 @@ int test_process_name_has_priority() {
   TEST_ASSERT_TRUE(files.create(alias));
   TEST_ASSERT_TRUE(files.create(process));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17170", "01.004.000", "eboot.bin");
   const std::string expected = ScopedCheatFiles::path(process);
-  const std::string actual = CheatRepository::resolvePath(game);
+  const std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -104,10 +131,10 @@ int test_source_id_generic_matches_processes() {
   ScopedCheatFiles files({alias});
   TEST_ASSERT_TRUE(files.create(alias));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17171", "01.004.000", "worker.bin");
   const std::string expected = ScopedCheatFiles::path(alias);
-  const std::string actual = CheatRepository::resolvePath(game);
+  const std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -119,10 +146,10 @@ int test_multiple_source_ids_pick_lexicographic() {
   TEST_ASSERT_TRUE(files.create(first));
   TEST_ASSERT_TRUE(files.create(second));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17172", "01.004.000", "eboot.bin");
   const std::string expected = ScopedCheatFiles::path(first);
-  const std::string actual = CheatRepository::resolvePath(game);
+  const std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -136,7 +163,7 @@ int test_resolve_paths_returns_all_formats() {
   TEST_ASSERT_TRUE(files.create(shn));
   TEST_ASSERT_TRUE(files.create(mc4));
 
-  const std::vector<std::string> paths = CheatRepository::resolvePaths(
+  const std::vector<std::string> paths = resolveAllPaths(
       makeGame("PPSA17182", "01.004.000", "eboot.bin"));
   const std::string json_path = ScopedCheatFiles::path(json);
   const std::string shn_path = ScopedCheatFiles::path(shn);
@@ -159,12 +186,12 @@ int test_resolve_paths_keep_generic_and_matching_process() {
 
   const std::string generic_path = ScopedCheatFiles::path(generic);
   const std::string worker_path = ScopedCheatFiles::path(worker);
-  const std::vector<std::string> eboot = CheatRepository::resolvePaths(
+  const std::vector<std::string> eboot = resolveAllPaths(
       makeGame("PPSA17183", "01.004.000", "eboot.bin"));
   TEST_ASSERT_EQ_INT(1, static_cast<int>(eboot.size()));
   TEST_ASSERT_STREQ(generic_path.c_str(), eboot[0].c_str());
 
-  const std::vector<std::string> worker_paths = CheatRepository::resolvePaths(
+  const std::vector<std::string> worker_paths = resolveAllPaths(
       makeGame("PPSA17183", "01.004.000", "worker.bin"));
   TEST_ASSERT_EQ_INT(2, static_cast<int>(worker_paths.size()));
   TEST_ASSERT_STREQ(worker_path.c_str(), worker_paths[0].c_str());
@@ -180,10 +207,10 @@ int test_multiple_source_ids_all_resolve() {
   TEST_ASSERT_TRUE(files.create(second));
 
   const std::string expected = ScopedCheatFiles::path(first);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("PPSA17181", "01.004.000", "eboot.bin"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
-  const std::vector<std::string> paths = CheatRepository::resolvePaths(
+  const std::vector<std::string> paths = resolveAllPaths(
       makeGame("PPSA17181", "01.004.000", "eboot.bin"));
   TEST_ASSERT_EQ_INT(2, static_cast<int>(paths.size()));
   return 0;
@@ -195,16 +222,16 @@ int test_deleted_cached_alias_is_rescanned() {
   ScopedCheatFiles files({first, second});
   TEST_ASSERT_TRUE(files.create(first));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17173", "01.004.000", "eboot.bin");
   std::string expected = ScopedCheatFiles::path(first);
-  std::string actual = CheatRepository::resolvePath(game);
+  std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
 
   TEST_ASSERT_EQ_INT(0, ::unlink(expected.c_str()));
   TEST_ASSERT_TRUE(files.create(second));
   expected = ScopedCheatFiles::path(second);
-  actual = CheatRepository::resolvePath(game);
+  actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -244,10 +271,10 @@ int test_thousands_of_files_do_not_block_standard_name() {
   TEST_ASSERT_TRUE(decoys.created() >= 3000);
   TEST_ASSERT_TRUE(files.create(standard));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17174", "01.004.000", "eboot.bin");
   const std::string expected = ScopedCheatFiles::path(standard);
-  const std::string actual = CheatRepository::resolvePath(game);
+  const std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -259,10 +286,10 @@ int test_thousands_of_files_do_not_block_compatibility_alias() {
   TEST_ASSERT_TRUE(decoys.created() >= 3000);
   TEST_ASSERT_TRUE(files.create(alias));
 
-  const game_context_t game =
+  const TestGame game =
       makeGame("PPSA17175", "01.004.000", "eboot.bin");
   const std::string expected = ScopedCheatFiles::path(alias);
-  const std::string actual = CheatRepository::resolvePath(game);
+  const std::string actual = resolveFirstPath(game);
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
 }
@@ -272,13 +299,13 @@ int test_unknown_version_is_rejected() {
   ScopedCheatFiles files({standard});
   TEST_ASSERT_TRUE(files.create(standard));
   TEST_ASSERT_TRUE(
-      CheatRepository::resolvePath(makeGame("PPSA17176", "unknown", "eboot.bin"))
+      resolveFirstPath(makeGame("PPSA17176", "unknown", "eboot.bin"))
           .empty());
   TEST_ASSERT_TRUE(
-      CheatRepository::resolvePath(makeGame("PPSA17176", "", "eboot.bin"))
+      resolveFirstPath(makeGame("PPSA17176", "", "eboot.bin"))
           .empty());
   TEST_ASSERT_TRUE(
-      CheatRepository::resolvePath(makeGame("", "01.004.000", "eboot.bin"))
+      resolveFirstPath(makeGame("", "01.004.000", "eboot.bin"))
           .empty());
   return 0;
 }
@@ -291,7 +318,7 @@ int test_json_alias_outranks_shn_alias() {
   TEST_ASSERT_TRUE(files.create(shn_alias));
 
   const std::string expected = ScopedCheatFiles::path(json_alias);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("PPSA17177", "01.004.000", "eboot.bin"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
@@ -301,12 +328,12 @@ int test_real_process_file_is_not_eboot_alias() {
   constexpr const char *process = "PPSA17178_01.004.000_worker.bin.json";
   ScopedCheatFiles files({process});
   TEST_ASSERT_TRUE(files.create(process));
-  TEST_ASSERT_TRUE(CheatRepository::resolvePath(
+  TEST_ASSERT_TRUE(resolveFirstPath(
                        makeGame("PPSA17178", "01.004.000", "eboot.bin"))
                        .empty());
 
   const std::string expected = ScopedCheatFiles::path(process);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("PPSA17178", "01.004.000", "worker.bin"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
@@ -318,7 +345,7 @@ int test_eboot_without_bin_suffix_uses_alias() {
   TEST_ASSERT_TRUE(files.create(alias));
 
   const std::string expected = ScopedCheatFiles::path(alias);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("PPSA17179", "01.004.000", "eboot"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
@@ -334,9 +361,9 @@ int test_process_scoped_beats_generic_source_id() {
 
   const std::string process_path = ScopedCheatFiles::path(process);
   const std::string generic_path = ScopedCheatFiles::path(generic);
-  const std::string default_elf = CheatRepository::resolvePath(
+  const std::string default_elf = resolveFirstPath(
       makeGame("CUSA00018", "01.21", "default.elf"));
-  const std::string eboot = CheatRepository::resolvePath(
+  const std::string eboot = resolveFirstPath(
       makeGame("CUSA00018", "01.21", "eboot.bin"));
   TEST_ASSERT_STREQ(process_path.c_str(), default_elf.c_str());
   TEST_ASSERT_STREQ(generic_path.c_str(), eboot.c_str());
@@ -352,9 +379,9 @@ int test_process_scoped_beats_generic() {
 
   const std::string process_path = ScopedCheatFiles::path(process);
   const std::string generic_path = ScopedCheatFiles::path(generic);
-  const std::string tllr = CheatRepository::resolvePath(
+  const std::string tllr = resolveFirstPath(
       makeGame("PPSA05686", "01.002.000", "tllr-boot.bin"));
-  const std::string eboot = CheatRepository::resolvePath(
+  const std::string eboot = resolveFirstPath(
       makeGame("PPSA05686", "01.002.000", "eboot.bin"));
   TEST_ASSERT_STREQ(process_path.c_str(), tllr.c_str());
   TEST_ASSERT_STREQ(generic_path.c_str(), eboot.c_str());
@@ -367,7 +394,7 @@ int test_generic_fallback_for_unknown_process() {
   TEST_ASSERT_TRUE(files.create(generic));
 
   const std::string expected = ScopedCheatFiles::path(generic);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("PPSA05687", "01.002.000", "tllr-boot.bin"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
   return 0;
@@ -380,10 +407,10 @@ int test_underscored_process_source_id() {
   TEST_ASSERT_TRUE(files.create(name));
 
   const std::string expected = ScopedCheatFiles::path(name);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("CUSA02343", "01.00", "big2-ps4_Shipping.elf"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
-  TEST_ASSERT_TRUE(CheatRepository::resolvePath(
+  TEST_ASSERT_TRUE(resolveFirstPath(
                        makeGame("CUSA02343", "01.00", "eboot.bin"))
                        .empty());
   return 0;
@@ -396,9 +423,43 @@ int test_game_name_prefix_resolves() {
   TEST_ASSERT_TRUE(files.create(name));
 
   const std::string expected = ScopedCheatFiles::path(name);
-  const std::string actual = CheatRepository::resolvePath(
+  const std::string actual = resolveFirstPath(
       makeGame("PPSA07231", "01.012.000", "eboot.bin"));
   TEST_ASSERT_STREQ(expected.c_str(), actual.c_str());
+  return 0;
+}
+
+int test_battlefield_browse_and_running() {
+  constexpr const char *name =
+      "PPSA19534_01.000.016_BattlefieldGame.Main_Ps5_retail_e373c103.mc4";
+  ScopedCheatFiles files({name});
+  TEST_ASSERT_TRUE(files.create(name));
+  const std::string expected = ScopedCheatFiles::path(name);
+  const GameKey game{"PPSA19534", "01.000.016"};
+  TEST_ASSERT_TRUE(resolveAllPaths(makeGame("PPSA19534", "01.000.016", "")) ==
+                   std::vector<std::string>{expected});
+
+  TEST_ASSERT_TRUE(CheatRepository::resolveRuntime(
+                       game, ProcessIdentity{123, 1, "eboot.bin", 1})
+                       .empty());
+  TEST_ASSERT_TRUE(CheatRepository::resolveRuntime(
+                       game, ProcessIdentity{123, 1, "BattlefieldGame.Main_Ps5_retail", 1})
+                       .size() == 1);
+  const auto runtime_sources = CheatRepository::resolveRuntime(
+      game, ProcessIdentity{123, 1, "BattlefieldGame.Main_Ps5_retail", 1});
+  TEST_ASSERT_STREQ(expected.c_str(), runtime_sources.front().path.c_str());
+
+  const GameKey wrong_version{"PPSA19534", "01.000.017"};
+  TEST_ASSERT_TRUE(CheatRepository::resolveBrowse(wrong_version).empty());
+  return 0;
+}
+
+int test_standard_source_has_stable_empty_source_id() {
+  constexpr const char *name = "PPSA19535_01.000.016.mc4";
+  ScopedCheatFiles files({name});
+  TEST_ASSERT_TRUE(files.create(name));
+  const GameKey game{"PPSA19535", "01.000.016"};
+  TEST_ASSERT_TRUE(CheatRepository::resolveBrowse(game).size() == 1);
   return 0;
 }
 
@@ -424,6 +485,10 @@ int test_file_signature_identity() {
 
 extern "C" int test_cheat_repository_suite(void) {
   int failures = 0;
+  failures += onion_test_run("repository.battlefield_browse_and_running",
+                             test_battlefield_browse_and_running);
+  failures += onion_test_run("repository.standard_empty_source_id",
+                             test_standard_source_has_stable_empty_source_id);
   failures += onion_test_run("repository.compatibility_alias",
                              test_compatibility_alias_for_eboot);
   failures += onion_test_run("repository.standard_priority",

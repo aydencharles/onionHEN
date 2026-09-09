@@ -398,17 +398,27 @@ bool IPC_Client::Remount(const char *src, const char *dest) {
 }
 
 bool IPC_Client::GetGameCheats(const std::string &tid, std::string &cheats,
-                               int pid, int appid) {
+                               const std::string &mode, int pid, int appid,
+                               const std::string &process,
+                               uint64_t generation) {
   if (!require_util("GetGameCheats")) {
     return false;
   }
   cJSON *request = cJSON_CreateObject();
   cJSON_AddStringToObject(request, "tid", tid.c_str());
+  cJSON_AddStringToObject(request, "mode", mode.c_str());
   if (pid > 0) {
     cJSON_AddNumberToObject(request, "pid", pid);
   }
   if (appid > 0) {
     cJSON_AddNumberToObject(request, "appid", appid);
+  }
+  if (!process.empty()) {
+    cJSON_AddStringToObject(request, "process", process.c_str());
+  }
+  if (generation != 0) {
+    cJSON_AddStringToObject(request, "generation",
+                            std::to_string(generation).c_str());
   }
   std::string json = json_object_str(request);
   if (!IPCSendCommand(BREW_UTIL_GET_GAME_CHEAT, cheats, json)) {
@@ -418,18 +428,19 @@ bool IPC_Client::GetGameCheats(const std::string &tid, std::string &cheats,
   return true;
 }
 
-bool IPC_Client::ToggleGameCheat(int pid, const std::string &tid,
-                                 int cheat_index, std::string &cheat_enabled) {
+bool IPC_Client::ToggleGameCheat(const std::string &session_id,
+                                 const std::string &cheat_key, bool enabled,
+                                 std::string &cheat_status) {
   if (!require_util("ToggleGameCheat")) {
     return false;
   }
   cJSON *j = cJSON_CreateObject();
-  cJSON_AddStringToObject(j, "tid", tid.c_str());
-  cJSON_AddNumberToObject(j, "cheat_id", cheat_index);
-  cJSON_AddNumberToObject(j, "pid", pid);
+  cJSON_AddStringToObject(j, "session_id", session_id.c_str());
+  cJSON_AddStringToObject(j, "cheat_key", cheat_key.c_str());
+  cJSON_AddBoolToObject(j, "enabled", enabled);
   std::string json = json_object_str(j);
-  if (!IPCSendCommand(BREW_UTIL_TOGGLE_CHEAT, cheat_enabled, json)) {
-    LOG_ERROR("Failed to enable cheats for %s", tid.c_str());
+  if (!IPCSendCommand(BREW_UTIL_TOGGLE_CHEAT, cheat_status, json)) {
+    LOG_ERROR("Failed to toggle cheat key %s", cheat_key.c_str());
     return false;
   }
   return true;

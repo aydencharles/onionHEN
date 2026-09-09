@@ -143,19 +143,6 @@ bool try_payload_control_value(const std::string &id, std::string &out) {
   return false;
 }
 
-bool try_cheat_value(const std::string &id, std::string &out) {
-  if (id.find("id_cheat_") == std::string::npos)
-    return false;
-  if (!g_ui.is_current_game_open)
-    return false;
-
-  char tid[32] = {};
-  int cheat_id = 0;
-  ParseCheatID(id.c_str(), tid, &cheat_id);
-  out = bool_str(g_ui.get_cheat_enabled(cheat_id));
-  return true;
-}
-
 bool try_external_plugin_value(const std::string &id, std::string &out) {
   using onion::shellui::plugin_pages::kPluginAutoStartPrefix;
   using onion::shellui::plugin_pages::kPluginRunPrefix;
@@ -203,8 +190,6 @@ std::string resolve_toolbox_control_value(const std::string &id) {
   if (try_payload_control_value(id, value))
     return value;
   if (try_exact_value(id, value))
-    return value;
-  if (try_cheat_value(id, value))
     return value;
   if (try_external_plugin_value(id, value))
     return value;

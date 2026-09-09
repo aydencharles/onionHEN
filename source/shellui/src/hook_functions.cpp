@@ -187,11 +187,6 @@ int ioctl_hook(int fd, unsigned long request, void *argp) {
   return ret;
 }
 
-void ParseCheatID(const char* id, char* tid, int* cheat_id)
-{
-    sscanf(id, "id_cheat_%[^_]_%d", tid, cheat_id);
-}
-
 // threads → hook_background.cpp
 MonoString * CxmlUri_Hook(MonoObject * Instance, MonoString * uri) {
 

@@ -385,16 +385,6 @@ static int test_progress_page_restore_is_reusable(void) {
   return 0;
 }
 
-static int test_dynamic_cheat_state(void) {
-  ToolboxUiState state;
-  state.set_cheat_enabled(511, true);
-  TEST_ASSERT_TRUE(state.get_cheat_enabled(511));
-  TEST_ASSERT_TRUE(!state.get_cheat_enabled(512));
-  TEST_ASSERT_TRUE(state.reset_cheats_if_tid_changed("CUSA00016"));
-  TEST_ASSERT_TRUE(!state.get_cheat_enabled(511));
-  return 0;
-}
-
 extern "C" int test_toolbox_route_suite(void) {
   int fails = 0;
   fails += onion_test_run("route.unknown", test_unknown_passthrough);
@@ -433,6 +423,5 @@ extern "C" int test_toolbox_route_suite(void) {
                           test_remote_play_cancel_wins_terminal_race);
   fails += onion_test_run("remote_play.success_wins_terminal_race",
                           test_remote_play_success_wins_terminal_race);
-  fails += onion_test_run("cheatmap.dynamic", test_dynamic_cheat_state);
   return fails;
 }

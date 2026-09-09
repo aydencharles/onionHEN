@@ -223,7 +223,7 @@ int get_game_pid() {
    * Returns process pid (not appid).
    */
   pid_t pid = onion_find_pid_ex(/*name=*/"", /*needle=*/false,
-                                /*for_bigapp=*/true, /*need_eboot=*/false);
+                                /*for_bigapp=*/true);
   if (pid > 0) {
     return static_cast<int>(pid);
   }

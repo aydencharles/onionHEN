@@ -161,8 +161,9 @@ std::string join_authors(cJSON* root) {
 }
 
 template <typename G>
-void append_cheat_array(G& page, cJSON* cheats, const std::string& tid,
-                        const std::string& game_name, bool can_toggle) {
+void append_cheat_array(G& page, cJSON* cheats,
+                        const std::string& game_name, bool can_toggle,
+                        const std::string& session_id) {
   if (!cJSON_IsArray(cheats))
     return;
 
@@ -173,9 +174,9 @@ void append_cheat_array(G& page, cJSON* cheats, const std::string& tid,
         onion_cjson::string_item(entry, "description", "");
     if (desc.empty())
       desc = toolbox_i18n::tr("cheats.on_off");
-    const int id = onion_cjson::int_item(entry, "id");
     const bool enabled = onion_cjson::bool_item(entry, "enabled");
-    const std::string id_attr = "id_cheat_" + tid + "_" + std::to_string(id);
+    const std::string key = onion_cjson::string_item(entry, "key", "");
+    const std::string id_attr = "id_cheat_" + session_id + "|" + key;
 
     if (can_toggle) {
       page.toggle(id_attr, name, enabled, std::nullopt, desc, "tex_game_icon");
@@ -185,17 +186,17 @@ void append_cheat_array(G& page, cJSON* cheats, const std::string& tid,
                             name.c_str()),
                   desc, "tex_game_icon");
     }
-    g_ui.set_cheat_enabled(id, enabled);
   }
 }
 
 template <typename G>
-void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
-                          const std::string& game_name, bool can_toggle) {
+void append_cheat_entries(G& page, cJSON* root,
+                          const std::string& game_name, bool can_toggle,
+                          const std::string& session_id) {
   cJSON* groups = onion_cjson::item(root, "groups");
   if (!cJSON_IsArray(groups) || cJSON_GetArraySize(groups) == 0) {
-    append_cheat_array(page, onion_cjson::item(root, "cheats"), tid,
-                       game_name, can_toggle);
+    append_cheat_array(page, onion_cjson::item(root, "cheats"), game_name,
+                       can_toggle, session_id);
     return;
   }
 
@@ -218,8 +219,8 @@ void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
                  ps5ui::Style::Center);
     page.label("id_cheat_group_" + std::to_string(group_index++), heading,
                ps5ui::Style::Center);
-    append_cheat_array(page, onion_cjson::item(group, "cheats"), tid,
-                       game_name, can_toggle);
+    append_cheat_array(page, onion_cjson::item(group, "cheats"), game_name,
+                       can_toggle, session_id);
   }
 }
 
@@ -460,11 +461,25 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
   }
 
   std::string cheat_path;
-  const int cheat_pid =
-      g_ui.is_game_open ? onion_find_pid_ex(g_ui.running_tid.c_str(), false,
-                                             true, true)
-                         : 0;
-  if (!client.GetGameCheats(g_ui.running_tid, cheat_path, cheat_pid, appid)) {
+  onion_bigapp_process_t process{};
+  int process_result = -1;
+  if (g_ui.is_current_game_open) {
+    process_result = onion_resolve_running_bigapp(&process);
+    if (process_result != 0) {
+      LOG_WARN("[cheats] runtime process identity unavailable result=%d; "
+               "falling back to read-only browse",
+               process_result);
+    }
+  }
+  const bool runtime_request =
+      g_ui.is_game_open && g_ui.is_current_game_open &&
+      process_result == 0;
+  const std::string mode = runtime_request ? "runtime" : "browse";
+  const int cheat_pid = runtime_request ? process.pid : 0;
+  if (!client.GetGameCheats(g_ui.running_tid, cheat_path, mode, cheat_pid,
+                            runtime_request ? process.appid : 0,
+                            runtime_request ? process.process_name : "",
+                            runtime_request ? process.session_generation : 0)) {
     page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
                ps5ui::Style::Center);
     new_xml = page.build();
@@ -493,8 +508,10 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
   page.label("credits", toolbox_i18n::format("cheats.authors_fmt", authors.c_str()),
              ps5ui::Style::Center);
 
-  append_cheat_entries(page, res_json.get(), g_ui.running_tid, game_name,
-                       g_ui.is_game_open && g_ui.is_current_game_open);
+  append_cheat_entries(
+      page, res_json.get(), game_name,
+      onion_cjson::bool_item(res_json.get(), "canToggle"),
+      onion_cjson::string_item(res_json.get(), "sessionId", ""));
   new_xml = page.build();
 }
 

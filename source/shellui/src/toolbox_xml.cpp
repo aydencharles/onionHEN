@@ -178,15 +178,16 @@ void append_cheat_array(G& page, cJSON* cheats,
       desc = toolbox_i18n::tr("cheats.on_off");
     const bool enabled = onion_cjson::bool_item(entry, "enabled");
     const std::string key = onion_cjson::string_item(entry, "key", "");
-    const std::string id_attr = "id_cheat_" + session_id + "|" + key;
-
     if (can_toggle) {
-      page.toggle(id_attr, name, enabled, std::nullopt, desc, "tex_game_icon");
+      const std::string id_attr = "id_cheat_" + session_id + "|" + key;
+      page.toggle(id_attr, name, enabled, std::nullopt, desc);
     } else {
-      page.button(id_attr, name,
+      /* Browse entries are informational. They must never enter the runtime
+       * toggle route, even if a stale page event arrives after navigation. */
+      page.button("id_cheat_view_" + key, name,
                   toolbox_i18n::format("cheats.enable_fmt", game_name.c_str(),
                             name.c_str()),
-                  desc, "tex_game_icon");
+                  desc);
     }
   }
 }
@@ -498,10 +499,11 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       running_as_debug_settings ? "id_debug_settings" : "id_cheat_title";
 
   int appid = -1;
-  g_ui.is_game_open = Get_Running_App_TID(g_ui.running_tid, appid);
+  std::string running_tid;
+  g_ui.is_game_open = Get_Running_App_TID(running_tid, appid);
   g_ui.is_current_game_open =
       g_ui.is_game_open &&
-      g_ui.running_tid == (show_while_not_open ? not_open_tid : g_ui.running_tid);
+      running_tid == (show_while_not_open ? not_open_tid : running_tid);
 
   if (!g_ui.is_game_open && !show_while_not_open) {
     ps5ui::Page page(list_id, toolbox_i18n::tr("cheats.none"));
@@ -511,21 +513,22 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
     return;
   }
 
-  g_ui.running_tid = show_while_not_open ? not_open_tid : g_ui.running_tid;
+  const std::string target_tid =
+      show_while_not_open ? not_open_tid : running_tid;
   IPC_Client& client = IPC_Client::getInstance(true);
 
   std::string game_ver;
-  const bool have_version = client.GameVerFromTid(g_ui.running_tid, game_ver);
+  const bool have_version = client.GameVerFromTid(target_tid, game_ver);
   const std::string display_ver =
       have_version ? game_ver : toolbox_i18n::tr("cheats.ver_unknown");
 
   ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
-                                      g_ui.running_tid.c_str(),
+                                      target_tid.c_str(),
                                       display_ver.c_str()));
 
   if (!g_ui.is_game_open && show_while_not_open) {
     page.label("id_cheat_disclaimer",
-               toolbox_i18n::format("cheats.not_running_fmt", g_ui.running_tid.c_str()),
+               toolbox_i18n::format("cheats.not_running_fmt", target_tid.c_str()),
                ps5ui::Style::Center);
   }
 
@@ -545,7 +548,7 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       process_result == 0;
   const std::string mode = runtime_request ? "runtime" : "browse";
   const int cheat_pid = runtime_request ? process.pid : 0;
-  if (!client.GetGameCheats(g_ui.running_tid, cheat_path, mode, cheat_pid,
+  if (!client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,
                             runtime_request ? process.appid : 0,
                             runtime_request ? process.process_name : "",
                             runtime_request ? process.session_generation : 0)) {

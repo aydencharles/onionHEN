@@ -22,7 +22,6 @@ struct ToolboxUiState {
   bool cheats_shortcut_activated = false;
   bool cheats_shortcut_activated_not_open = false;
 
-  std::string running_tid;
   bool is_game_open = true;
   bool is_current_game_open = true;
   std::string current_menu_tid;

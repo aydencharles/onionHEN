@@ -22,6 +22,9 @@ static OnPressResult prefix_id_cheat(OnPressContext &ctx) {
     return OnPressResult::Consumed;
   }
   const std::string session_id = payload.substr(0, separator);
+  if (session_id.empty()) {
+    return OnPressResult::Consumed;
+  }
   const std::string cheat_key = payload.substr(separator + 1);
   std::string reply;
   const bool enabled = ctx.value == "1";
@@ -43,7 +46,16 @@ static OnPressResult prefix_id_cheat(OnPressContext &ctx) {
   return OnPressResult::Consumed;
 }
 
+static OnPressResult prefix_id_cheat_view(OnPressContext &ctx) {
+  if (ctx.id.rfind("id_cheat_view_", 0) != 0) {
+    return OnPressResult::NotMine;
+  }
+  ctx.dirty = false;
+  return OnPressResult::Consumed;
+}
+
 static const OnPressPrefixEntry kPrefix[] = {
+    {"id_cheat_view_", prefix_id_cheat_view},
     {"id_cheat_", prefix_id_cheat},
 };
 

@@ -20,13 +20,11 @@ along with this program; see the file COPYING. If not, see
 #include "toolbox_i18n.hpp"
 #include <onion/platform.h>
 #include "detour.h"
-#include "ipc.hpp"
 #include <climits>
 #include <msg.hpp>
 #include <pthread.h>
 #include <sys/_pthreadtypes.h>
 #include <sys/signal.h>
-#include <sys/stat.h>
 #include <fstream>
 #include <unistd.h>
 #include <vector>
@@ -218,24 +216,7 @@ MonoString * CxmlUri_Hook(MonoObject * Instance, MonoString * uri) {
 #endif
     return mono_str_ui("/system_ex/vsh_asset/onionhen.png");
   }
-  if (uri_string.rfind("tex_game_icon") != std::string::npos) {
-    //LOG_DEBUG("CxmlUri_Hook: Returning store icon");
-    std::string icon = "/user/appmeta/" + g_ui.running_tid + "/icon0.png";
-    if(!if_exists(icon.c_str())){
-        icon = "/user/appmeta/external/" + g_ui.running_tid + "/icon0.png";
-
-        if(!if_exists(icon.c_str())){ // pirated PS5 Games
-           std::string game_src = "/system_ex/app/" + g_ui.running_tid + "/sce_sys/icon0.png"; // shellui cant access this path
-           icon = "/user/appmeta/" + g_ui.running_tid;
-           mkdir(icon.c_str(), 0777);
-           icon = "/user/appmeta/" + g_ui.running_tid + "/icon0.png";
-           IPC_Client::getInstance(false).CopyFile(game_src, icon);
-        }
-    }
-   // LOG_DEBUG("CxmlUri_Hook: %s", icon.c_str());
-    return mono_str_ui(icon.c_str());
-  }
-  else if (uri_string.rfind("//usb") != std::string::npos || uri_string.rfind("//data") != std::string::npos || uri_string.rfind("//user//data") != std::string::npos){
+  if (uri_string.rfind("//usb") != std::string::npos || uri_string.rfind("//data") != std::string::npos || uri_string.rfind("//user//data") != std::string::npos){
     //replace // with//
     std::string new_uri = uri_string;
     size_t pos = 0;

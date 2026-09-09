@@ -25,6 +25,7 @@ along with this program; see the file COPYING. If not, see
 #include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
+#include "toolbox_i18n.hpp"
 #include "ucred.h"
 #include "webserver.hpp"
 
@@ -790,6 +791,9 @@ int main(int argc, char const* argv[]) {
 
   LOG_DEBUG("Performed Magic");
   setup_proc_hooks();
+
+  /* SystemService cannot be queried under PTRACE_AUTHID. */
+  toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
 
   shellui_hooks_publish_ready();
   /*

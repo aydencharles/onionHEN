@@ -44,8 +44,10 @@ void apply_ui_lang(int ui_lang);
 /**
  * Apply the stored UI language setting.
  * 0=system, 1=zh-Hans, 2=en, 3=ar, 4=zh-Hant, 5=ja, 6=fr, 7=de, 8=ko,
- * 9=es, 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th. This is a configuration
- * boundary: system is queried here once, then XML and notifications
+ * 9=es, 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th.
+ * 0 queries SCE_SYSTEM_SERVICE_PARAM_ID_LANG. Call this only when
+ * SystemService can answer (not under PTRACE_AUTHID). A failed query
+ * leaves the current language unchanged; XML and notifications then
  * reuse the resolved language.
  */
 void apply_system_or_ui_lang(int ui_lang);

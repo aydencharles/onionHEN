@@ -7,6 +7,8 @@
 #include <cstring>
 #include <string>
 
+extern "C" void onion_test_system_language_configure(int result, int value);
+
 using namespace toolbox_i18n;
 
 static int test_default_zh(void) {
@@ -308,11 +310,37 @@ static int test_apply_ui_lang(void) {
   return 0;
 }
 
-static int test_system_lang_host_fallback(void) {
-  apply_system_or_ui_lang(2);
-  TEST_ASSERT_TRUE(active_lang() == Lang::En);
+static int test_system_lang_follows_query(void) {
+  onion_test_system_language_configure(0, 11);
+  apply_system_or_ui_lang(0);
+  TEST_ASSERT_TRUE(active_lang() == Lang::ZhHans);
+
+  onion_test_system_language_configure(0, 1);
   apply_system_or_ui_lang(0);
   TEST_ASSERT_TRUE(active_lang() == Lang::En);
+
+  apply_system_or_ui_lang(2);
+  TEST_ASSERT_TRUE(active_lang() == Lang::En);
+  onion_test_system_language_configure(0, 11);
+  apply_system_or_ui_lang(2);
+  TEST_ASSERT_TRUE(active_lang() == Lang::En);
+
+  onion_test_system_language_configure(0, 1);
+  return 0;
+}
+
+static int test_system_lang_query_failure_keeps_current(void) {
+  set_lang(Lang::ZhHans);
+  onion_test_system_language_configure(-1, 1);
+  apply_system_or_ui_lang(0);
+  TEST_ASSERT_TRUE(active_lang() == Lang::ZhHans);
+
+  set_lang(Lang::En);
+  onion_test_system_language_configure(-1, 11);
+  apply_system_or_ui_lang(0);
+  TEST_ASSERT_TRUE(active_lang() == Lang::En);
+
+  onion_test_system_language_configure(0, 1);
   return 0;
 }
 
@@ -386,8 +414,10 @@ extern "C" int test_toolbox_i18n_suite(void) {
   fails += onion_test_run("i18n.pl", test_pl);
   fails += onion_test_run("i18n.th", test_th);
   fails += onion_test_run("i18n.apply_ui_lang", test_apply_ui_lang);
-  fails += onion_test_run("i18n.system_lang_host_fallback",
-                          test_system_lang_host_fallback);
+  fails += onion_test_run("i18n.system_lang_follows_query",
+                          test_system_lang_follows_query);
+  fails += onion_test_run("i18n.system_lang_query_failure_keeps_current",
+                          test_system_lang_query_failure_keeps_current);
   fails += onion_test_run("i18n.missing_key", test_missing_key);
   fails += onion_test_run("i18n.format", test_format);
   return fails;

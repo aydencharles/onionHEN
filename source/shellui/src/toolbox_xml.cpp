@@ -180,6 +180,7 @@ void append_cheat_array(G& page, cJSON* cheats,
     const std::string key = onion_cjson::string_item(entry, "key", "");
     if (can_toggle) {
       const std::string id_attr = "id_cheat_" + session_id + "|" + key;
+      g_ui.set_cheat_toggle(id_attr, enabled);
       page.toggle(id_attr, name, enabled, std::nullopt, desc);
     } else {
       /* Browse entries are informational. They must never enter the runtime
@@ -537,15 +538,23 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
   int process_result = -1;
   if (g_ui.is_current_game_open) {
     process_result = onion_resolve_running_bigapp(&process);
-    if (process_result != 0) {
+    if (process_result == -2 && process.pid > 0) {
+      LOG_WARN("[cheats] runtime process identity is ambiguous result=%d; "
+               "using best match pid=%d process='%s'",
+               process_result, static_cast<int>(process.pid),
+               process.process_name);
+    } else if (process_result != 0) {
       LOG_WARN("[cheats] runtime process identity unavailable result=%d; "
                "falling back to read-only browse",
                process_result);
     }
   }
+  const bool have_process = process.pid > 0 &&
+                            process.session_generation != 0 &&
+                            process.process_name[0] != '\0';
   const bool runtime_request =
-      g_ui.is_game_open && g_ui.is_current_game_open &&
-      process_result == 0;
+      g_ui.is_game_open && g_ui.is_current_game_open && have_process &&
+      (process_result == 0 || process_result == -2);
   const std::string mode = runtime_request ? "runtime" : "browse";
   const int cheat_pid = runtime_request ? process.pid : 0;
   if (!client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,

@@ -180,6 +180,14 @@ bool try_payload_control_value(const std::string &id, std::string &out) {
   return false;
 }
 
+bool try_cheat_value(const std::string &id, std::string &out) {
+  bool enabled = false;
+  if (!g_ui.cheat_toggle_value(id, &enabled))
+    return false;
+  out = bool_str(enabled);
+  return true;
+}
+
 bool try_external_plugin_value(const std::string &id, std::string &out) {
   using onion::shellui::plugin_pages::kPluginAutoStartPrefix;
   using onion::shellui::plugin_pages::kPluginRunPrefix;
@@ -227,6 +235,8 @@ std::string resolve_toolbox_control_value(const std::string &id) {
   if (try_payload_control_value(id, value))
     return value;
   if (try_exact_value(id, value))
+    return value;
+  if (try_cheat_value(id, value))
     return value;
   if (try_external_plugin_value(id, value))
     return value;

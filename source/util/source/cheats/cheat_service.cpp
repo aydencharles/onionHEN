@@ -151,9 +151,14 @@ int CheatService::ensureRuntimeLocked(const CheatRequest &request) {
     return -1;
   }
 
-  const ProcessIdentity requested = *request.process;
-  const bool same = runtime_ && runtime_->game == request.game &&
-                    same_process(runtime_->process, requested);
+  const bool live_same_game =
+      runtime_ && runtime_->game == request.game &&
+      onion_proc_is_alive(runtime_->process.pid);
+  const ProcessIdentity requested =
+      live_same_game ? runtime_->process : *request.process;
+  const bool same = live_same_game ||
+                    (runtime_ && runtime_->game == request.game &&
+                     same_process(runtime_->process, requested));
   const std::vector<CheatSourceDescriptor> sources =
       CheatRepository::resolveRuntime(request.game, requested);
   if (sources.empty()) {

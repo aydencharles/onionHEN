@@ -30,6 +30,7 @@ static OnPressResult prefix_id_cheat(OnPressContext &ctx) {
   const bool enabled = ctx.value == "1";
   if (IPC_Client::getInstance(true).ToggleGameCheat(session_id, cheat_key,
                                                     enabled, reply)) {
+    g_ui.set_cheat_toggle(ctx.id, enabled);
     const char *name =
         !ctx.title.empty() ? ctx.title.c_str() : reply.c_str();
     notify("notify.cheats.toggle_banner", name,

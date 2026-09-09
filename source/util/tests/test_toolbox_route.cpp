@@ -334,6 +334,26 @@ static int test_matrix(void) {
   return 0;
 }
 
+static int test_dynamic_cheat_state(void) {
+  ToolboxUiState state;
+  const std::string id =
+      "id_cheat_cheat-1-123-1|src|/user/data/OnionHEN/cheats/game.json|0";
+  TEST_ASSERT_TRUE(ToolboxUiState::is_cheat_toggle_id(id));
+  TEST_ASSERT_TRUE(!ToolboxUiState::is_cheat_toggle_id("id_cheat_title"));
+  TEST_ASSERT_TRUE(!ToolboxUiState::is_cheat_toggle_id("id_cheat_view_0"));
+  bool enabled = true;
+  TEST_ASSERT_TRUE(!state.cheat_toggle_value(id, &enabled));
+  state.set_cheat_toggle("id_cheat_title", true);
+  TEST_ASSERT_TRUE(!state.cheat_toggle_value("id_cheat_title", &enabled));
+  state.set_cheat_toggle(id, true);
+  TEST_ASSERT_TRUE(state.cheat_toggle_value(id, &enabled));
+  TEST_ASSERT_TRUE(enabled);
+  state.set_cheat_toggle(id, false);
+  TEST_ASSERT_TRUE(state.cheat_toggle_value(id, &enabled));
+  TEST_ASSERT_TRUE(!enabled);
+  return 0;
+}
+
 static int test_session_flags_clear(void) {
   RouteFlags f{};
   f.is_payloads = true;
@@ -475,5 +495,6 @@ extern "C" int test_toolbox_route_suite(void) {
                           test_remote_play_cancel_wins_terminal_race);
   fails += onion_test_run("remote_play.success_wins_terminal_race",
                           test_remote_play_success_wins_terminal_race);
+  fails += onion_test_run("cheatmap.dynamic", test_dynamic_cheat_state);
   return fails;
 }

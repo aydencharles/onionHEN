@@ -9,6 +9,7 @@
 
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <onion/ipc_client.hpp>
@@ -25,6 +26,8 @@ struct ToolboxUiState {
   bool is_game_open = true;
   bool is_current_game_open = true;
   std::string current_menu_tid;
+  /* SettingPage.OnCreating ignores XML toggle values; bind from here. */
+  std::unordered_map<std::string, char> cheat_toggle_state;
 
   std::vector<PayloadEntry> payloads_list;
 
@@ -77,6 +80,26 @@ struct ToolboxUiState {
 
   bool any_cheat_shortcut() const {
     return cheats_shortcut_activated || cheats_shortcut_activated_not_open;
+  }
+
+  static bool is_cheat_toggle_id(const std::string &id) {
+    return id.compare(0, 9, "id_cheat_") == 0 &&
+           id.find('|') != std::string::npos;
+  }
+
+  void set_cheat_toggle(const std::string &id, bool enabled) {
+    if (!is_cheat_toggle_id(id))
+      return;
+    cheat_toggle_state[id] = enabled ? 1 : 0;
+  }
+
+  bool cheat_toggle_value(const std::string &id, bool *out) const {
+    const auto it = cheat_toggle_state.find(id);
+    if (it == cheat_toggle_state.end())
+      return false;
+    if (out)
+      *out = it->second != 0;
+    return true;
   }
 
 };

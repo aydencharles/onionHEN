@@ -450,6 +450,83 @@ const char *cpu_usage_mode_name(bool per_core) {
   return per_core ? "per_core" : "average";
 }
 
+int parse_overlay_font_size(const char *s, int def) {
+  if (streq_ci(s, "small")) {
+    return kOverlayFontSmall;
+  }
+  if (streq_ci(s, "medium")) {
+    return kOverlayFontMedium;
+  }
+  if (streq_ci(s, "large")) {
+    return kOverlayFontLarge;
+  }
+  return def;
+}
+
+int parse_overlay_metric_token(const char *s) {
+  if (streq_ci(s, "fps")) {
+    return kOverlayMetricFps;
+  }
+  if (streq_ci(s, "cpu")) {
+    return kOverlayMetricCpu;
+  }
+  if (streq_ci(s, "gpu")) {
+    return kOverlayMetricGpu;
+  }
+  if (streq_ci(s, "memory") || streq_ci(s, "ram")) {
+    return kOverlayMetricMemory;
+  }
+  if (streq_ci(s, "ip")) {
+    return kOverlayMetricIp;
+  }
+  if (streq_ci(s, "fan")) {
+    return kOverlayMetricFan;
+  }
+  return -1;
+}
+
+void parse_overlay_order(const char *s,
+                         std::array<int, kOverlayMetricCount> *out) {
+  if (!s || !out) {
+    return;
+  }
+  std::array<int, kOverlayMetricCount> parsed{};
+  bool seen[kOverlayMetricCount] = {};
+  int n = 0;
+  const std::string input(s);
+  std::size_t start = 0;
+  while (start <= input.size()) {
+    const std::size_t comma = input.find(',', start);
+    const std::string token = trim_copy(input.substr(
+        start, comma == std::string::npos ? std::string::npos : comma - start));
+    const int metric = parse_overlay_metric_token(token.c_str());
+    if (metric >= 0 && !seen[metric] && n < kOverlayMetricCount) {
+      seen[metric] = true;
+      parsed[n++] = metric;
+    }
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  overlay_normalize_order(parsed);
+  *out = parsed;
+}
+
+std::string
+serialize_overlay_order(const std::array<int, kOverlayMetricCount> &order) {
+  auto normalized = order;
+  overlay_normalize_order(normalized);
+  std::string out;
+  for (int i = 0; i < kOverlayMetricCount; ++i) {
+    if (i != 0) {
+      out += ',';
+    }
+    out += overlay_metric_name(normalized[i]);
+  }
+  return out;
+}
+
 int parse_cheats_shortcut(const char *s, int def) {
   if (streq_ci(s, "off")) {
     return 0;
@@ -592,6 +669,11 @@ bool apply_parser(IniParser *parser, Settings *out) {
                                out->overlay_ip);
   out->overlay_fan = parse_bool(ini_get(parser, "overlay.show_fan_duty"),
                                 out->overlay_fan);
+  out->overlay_font_size = parse_overlay_font_size(
+      ini_get(parser, "overlay.font_size"), out->overlay_font_size);
+  if (const char *order = ini_get(parser, "overlay.order")) {
+    parse_overlay_order(order, &out->overlay_order);
+  }
   out->cheats_shortcut_opt =
       parse_cheats_shortcut(ini_get(parser, "shortcuts.cheats_menu"),
                             out->cheats_shortcut_opt);
@@ -755,6 +837,13 @@ std::string settings_serialize(const Settings &in) {
   b += "# show_fan_duty displays the current fan duty in percent.\n";
   b += "# Available values: true, false\n";
   b += "show_fan_duty=" + bool_text(in.overlay_fan) + "\n";
+  b += "# font_size sets the monitor bar text size.\n";
+  b += "# Available values: small, medium, large\n";
+  b += "font_size=" + std::string(overlay_font_size_name(in.overlay_font_size)) +
+       "\n";
+  b += "# order is the left-to-right metric sequence on the bar.\n";
+  b += "# Available values: comma-separated fps, cpu, gpu, memory, ip, fan\n";
+  b += "order=" + serialize_overlay_order(in.overlay_order) + "\n";
   b += "\n";
   b += "[shortcuts]\n";
   b += "# cheats_menu controls the shortcut that opens the cheats menu.\n";

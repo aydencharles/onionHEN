@@ -24,6 +24,15 @@ int test_per_core_padding_does_not_expand_slot() {
   return 0;
 }
 
+int test_font_size_scales_width() {
+  const float medium = onion::overlay::estimate_text_width("FPS");
+  const float large = onion::overlay::estimate_text_width("FPS", 24.0f);
+  TEST_ASSERT_TRUE(large > medium);
+  TEST_ASSERT_EQ_INT(static_cast<int>(medium * 24.0f / 18.0f),
+                     static_cast<int>(large));
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_overlay_text_metrics_suite(void) {
@@ -34,5 +43,7 @@ extern "C" int test_overlay_text_metrics_suite(void) {
                              test_short_labels_keep_minimum_width);
   failures += onion_test_run("overlay_text_metrics.per_core_padding",
                              test_per_core_padding_does_not_expand_slot);
+  failures += onion_test_run("overlay_text_metrics.font_scale",
+                             test_font_size_scales_width);
   return failures;
 }

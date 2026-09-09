@@ -22,6 +22,9 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_sprx_config = parse_sprx_config_resource(in.resource, nullptr);
   out.flags.is_payload_config =
       parse_payload_config_resource(in.resource, nullptr);
+  out.flags.is_overlay_metrics = (in.resource == kOverlayMetricsXml);
+  out.flags.is_overlay_metric =
+      parse_overlay_metric_resource(in.resource, nullptr);
   out.flags.is_plugin_config =
       (onion::plugins::find_by_config_xml_resource(in.resource) != nullptr) ||
       parse_external_plugin_config_resource(in.resource, nullptr);
@@ -42,6 +45,10 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::Payloads;
   } else if (out.flags.is_payload_config) {
     out.page = Page::PayloadConfig;
+  } else if (out.flags.is_overlay_metrics) {
+    out.page = Page::OverlayMetrics;
+  } else if (out.flags.is_overlay_metric) {
+    out.page = Page::OverlayMetricConfig;
   } else if (out.flags.is_plugins) {
     out.page = Page::Plugins;
   } else if (out.flags.is_sprx) {

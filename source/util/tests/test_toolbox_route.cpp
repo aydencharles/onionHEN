@@ -134,6 +134,54 @@ static int test_sprx_config_page(void) {
   return 0;
 }
 
+static int test_overlay_metrics_page(void) {
+  RouteResult list = resolve_resource(make_in(kOverlayMetricsXml));
+  TEST_ASSERT_TRUE(list.page == Page::OverlayMetrics);
+  TEST_ASSERT_TRUE(list.flags.is_overlay_metrics);
+  TEST_ASSERT_TRUE(!list.flags.is_overlay_metric);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(list.page) == OnPressDomain::Root);
+  TEST_ASSERT_TRUE(!restores_parent_on_pop(list.page));
+  TEST_ASSERT_TRUE(
+      !parse_overlay_metric_resource(kOverlayMetricsXml, nullptr));
+  return 0;
+}
+
+static int test_overlay_metric_page(void) {
+  RouteResult r = resolve_resource(make_in(cfg_res("overlay_fps.xml")));
+  TEST_ASSERT_TRUE(r.page == Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(r.flags.is_overlay_metric);
+  TEST_ASSERT_TRUE(!r.flags.is_overlay_metrics);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::Root);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+
+  std::string id;
+  TEST_ASSERT_TRUE(parse_overlay_metric_resource(cfg_res("overlay_memory.xml"),
+                                                 &id));
+  TEST_ASSERT_STREQ("memory", id.c_str());
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("overlay_ram.xml"))).page == Page::None);
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("overlay_.xml"))).page == Page::None);
+  TEST_ASSERT_STREQ("overlay_cpu.xml",
+                    overlay_metric_xml("cpu").c_str());
+  return 0;
+}
+
+static int test_overlay_metric_restores_parent(void) {
+  ToolboxUiState state;
+  state.set_active_page(Page::OverlayMetrics);
+  state.set_active_page(Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::OverlayMetrics);
+  TEST_ASSERT_TRUE(state.child_page == Page::OverlayMetricConfig);
+
+  state.leave_page(Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::OverlayMetrics);
+  TEST_ASSERT_TRUE(state.parent_page == Page::None);
+  TEST_ASSERT_TRUE(state.child_page == Page::None);
+  return 0;
+}
+
 static int test_payload_config_page(void) {
   RouteResult list = resolve_resource(make_in("payloads.xml"));
   TEST_ASSERT_TRUE(list.page == Page::Payloads);
@@ -397,6 +445,10 @@ extern "C" int test_toolbox_route_suite(void) {
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);
   fails += onion_test_run("route.sprx_config", test_sprx_config_page);
   fails += onion_test_run("route.payload_config", test_payload_config_page);
+  fails += onion_test_run("route.overlay_metrics", test_overlay_metrics_page);
+  fails += onion_test_run("route.overlay_metric", test_overlay_metric_page);
+  fails += onion_test_run("overlay.metric_restores_parent",
+                          test_overlay_metric_restores_parent);
   fails += onion_test_run("plugins.registry", test_plugins_registry);
   fails += onion_test_run("plugins.config_restores_parent",
                           test_plugin_config_restores_parent);

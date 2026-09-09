@@ -139,6 +139,9 @@ void ReloadRNPSApp(const char* title_id);
 void generate_payload_xml(std::string& xml_buffer);
 void generate_payload_config_xml(std::string& xml_buffer,
                                  const std::string& payload_id);
+void generate_overlay_metrics_xml(std::string& xml_buffer);
+void generate_overlay_metric_xml(std::string& xml_buffer,
+                                 const std::string& metric_id);
 void generate_account_xml(std::string& xml_buffer);
 void generate_toolbox_xml(std::string& new_xml);
 void Patch_Main_thread_Check(MonoImage * image_core);

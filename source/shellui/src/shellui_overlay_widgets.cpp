@@ -1,7 +1,7 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — P0 split.
  *
  * Horizontal monitor bar:
- *   font_size=18, font_style=1 (Bold), font_weight=900
+ *   font_size from overlay.font_size (14/18/24), font_style=1 (Bold), font_weight=900
  *   per-metric label colors; values white
  *   bg_color=000000B4 (~70% black Panel)
  *   EnableThemedTextShadow, UI2.Panel Background*
@@ -63,7 +63,6 @@ namespace {
 
 constexpr const char *kBgPanelName = "id_onion_overlay_bg";
 
-constexpr int kFontSize = 18;
 constexpr int kFontStyle = 1;    /* 1 = Bold bit */
 constexpr int kFontWeight = 900; /* CSS black */
 
@@ -342,7 +341,9 @@ bool CreateGameWidget(CreateWidget widget) {
     return false;
 
   apply_overlay_layout(screen_w, screen_h);
-  MonoObject *bar_font = CreateUIFont(kFontSize, kFontStyle, kFontWeight);
+  MonoObject *bar_font = CreateUIFont(
+      onion::overlay_font_pt(g_settings.overlay_font_size), kFontStyle,
+      kFontWeight);
   if (!bar_font)
     return false;
 

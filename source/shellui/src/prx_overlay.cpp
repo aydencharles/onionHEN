@@ -160,7 +160,7 @@ constexpr int kCpuCores = 8;
 constexpr int kOverlayInitDelayFrames = 30;
 constexpr int kOverlayUpdateIntervalFrames = 60;
 constexpr int kFpsUpdateIntervalFrames = 2;
-constexpr int kOverlayFontSize = 18;
+
 constexpr int kClockIdRealtime = 4;
 constexpr int kVmSystem = 1;
 constexpr int kPageTableRam = 1;
@@ -226,10 +226,13 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
                        const char *cpu_usage, const char *gpu_temp,
                        const char *gpu_usage, const char *ram_str,
                        const char *ip_str, const char *fan_str) {
-  constexpr float kPairGap = 8.0f;   /* label → first value */
-  constexpr float kValGap = 10.0f;   /* value → value (temp / usage) */
-  constexpr float kSepGap = 10.0f;   /* last value → "|" */
-  constexpr float kAfterSep = 16.0f; /* "|" → next group label */
+  const float font_pt =
+      static_cast<float>(onion::overlay_font_pt(g_settings.overlay_font_size));
+  const float scale = font_pt / onion::overlay::kRefFontSize;
+  const float kPairGap = 8.0f * scale;   /* label → first value */
+  const float kValGap = 10.0f * scale;   /* value → value (temp / usage) */
+  const float kSepGap = 10.0f * scale;   /* last value → "|" */
+  const float kAfterSep = 16.0f * scale; /* "|" → next group label */
   constexpr float kOff = -4096.0f;
 
   struct Piece {
@@ -243,6 +246,7 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   pieces.reserve(24);
 
   struct GroupSpec {
+    bool on;
     const char *id_l;
     const char *lab;
     const char *id_v0;
@@ -251,37 +255,68 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
     const char *v1;
     const char *id_sep;
   };
-  GroupSpec groups[6];
-  int ng = 0;
+  GroupSpec specs[onion::kOverlayMetricCount]{};
+  specs[onion::kOverlayMetricFps] = {g_settings.overlay_fps && fps_str,
+                                     "id_fps_label",
+                                     "FPS",
+                                     "id_fps_value",
+                                     fps_str,
+                                     nullptr,
+                                     nullptr,
+                                     "id_fps_sep"};
+  specs[onion::kOverlayMetricCpu] = {
+      (g_settings.overlay_cpu || g_settings.all_cpu_usage) && cpu_temp,
+      "id_cpu_label",
+      "CPU",
+      "id_cpu_temp_value",
+      cpu_temp,
+      "id_cpu_usage_value",
+      cpu_usage,
+      "id_cpu_sep"};
+  specs[onion::kOverlayMetricGpu] = {g_settings.overlay_gpu && gpu_temp,
+                                     "id_gpu_label",
+                                     "GPU",
+                                     "id_gpu_temp_value",
+                                     gpu_temp,
+                                     "id_gpu_usage_value",
+                                     gpu_usage,
+                                     "id_gpu_sep"};
+  specs[onion::kOverlayMetricMemory] = {g_settings.overlay_ram && ram_str,
+                                        "id_ram_label",
+                                        "RAM",
+                                        "id_ram_value",
+                                        ram_str,
+                                        nullptr,
+                                        nullptr,
+                                        "id_ram_sep"};
+  specs[onion::kOverlayMetricIp] = {g_settings.overlay_ip && ip_str,
+                                    "id_ip_label",
+                                    "IP",
+                                    "id_ip_value",
+                                    ip_str,
+                                    nullptr,
+                                    nullptr,
+                                    "id_ip_sep"};
+  specs[onion::kOverlayMetricFan] = {g_settings.overlay_fan && fan_str,
+                                     "id_fan_label",
+                                     "FAN",
+                                     "id_fan_value",
+                                     fan_str,
+                                     nullptr,
+                                     nullptr,
+                                     "id_fan_sep"};
 
-  if (g_settings.overlay_fps && fps_str)
-    groups[ng++] = {"id_fps_label", "FPS", "id_fps_value", fps_str, nullptr,
-                    nullptr, "id_fps_sep"};
-  if ((g_settings.overlay_cpu || g_settings.all_cpu_usage) && cpu_temp)
-    groups[ng++] = {"id_cpu_label",
-                    "CPU",
-                    "id_cpu_temp_value",
-                    cpu_temp,
-                    "id_cpu_usage_value",
-                    cpu_usage,
-                    "id_cpu_sep"};
-  if (g_settings.overlay_gpu && gpu_temp)
-    groups[ng++] = {"id_gpu_label",
-                    "GPU",
-                    "id_gpu_temp_value",
-                    gpu_temp,
-                    "id_gpu_usage_value",
-                    gpu_usage,
-                    "id_gpu_sep"};
-  if (g_settings.overlay_ram && ram_str)
-    groups[ng++] = {"id_ram_label", "RAM", "id_ram_value", ram_str, nullptr,
-                    nullptr, "id_ram_sep"};
-  if (g_settings.overlay_ip && ip_str)
-    groups[ng++] = {"id_ip_label", "IP", "id_ip_value", ip_str, nullptr,
-                    nullptr, "id_ip_sep"};
-  if (g_settings.overlay_fan && fan_str)
-    groups[ng++] = {"id_fan_label", "FAN", "id_fan_value", fan_str, nullptr,
-                    nullptr, "id_fan_sep"};
+  auto order = g_settings.overlay_order;
+  onion::overlay_normalize_order(order);
+  GroupSpec groups[onion::kOverlayMetricCount];
+  int ng = 0;
+  for (int metric : order) {
+    if (metric < 0 || metric >= onion::kOverlayMetricCount)
+      continue;
+    if (!specs[metric].on)
+      continue;
+    groups[ng++] = specs[metric];
+  }
 
   if (ng == 0)
     return;
@@ -291,16 +326,20 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
     if (!gs.v0 || !gs.v0[0])
       continue;
     pieces.push_back({gs.id_l, gs.lab,
-                      onion::overlay::estimate_text_width(gs.lab), true, false});
+                      onion::overlay::estimate_text_width(gs.lab, font_pt), true,
+                      false});
     pieces.push_back({gs.id_v0, gs.v0,
-                      onion::overlay::estimate_text_width(gs.v0), false, false});
+                      onion::overlay::estimate_text_width(gs.v0, font_pt), false,
+                      false});
     if (gs.id_v1 && gs.v1 && gs.v1[0])
-      pieces.push_back({gs.id_v1, gs.v1,
-                        onion::overlay::estimate_text_width(gs.v1), false, false});
+      pieces.push_back(
+          {gs.id_v1, gs.v1,
+           onion::overlay::estimate_text_width(gs.v1, font_pt), false, false});
     /* Pipe after every item except the last. */
     if (g + 1 < ng)
       pieces.push_back({gs.id_sep, "|",
-                        onion::overlay::estimate_text_width("|"), false, true});
+                        onion::overlay::estimate_text_width("|", font_pt), false,
+                        true});
   }
 
   if (pieces.empty())
@@ -387,7 +426,8 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
     return true;
 
   /* style=Bold(1), weight=900 */
-  font = CreateUIFont(kOverlayFontSize, 1, 900);
+  font = CreateUIFont(onion::overlay_font_pt(g_settings.overlay_font_size), 1,
+                      900);
   if (!font)
     return false;
 

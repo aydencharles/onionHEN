@@ -35,6 +35,8 @@
 #include "shellui_state.hpp"
 #include "shellui_payload_state.hpp"
 #include "toolbox_helpers.hpp"
+#include "overlay_metrics.hpp"
+#include "toolbox_route.hpp"
 
 #include <onion/payload_identity.h>
 
@@ -358,6 +360,73 @@ void generate_payload_config_xml(std::string& xml_buffer,
   }
 }
 
+void generate_overlay_metric_xml(std::string& xml_buffer,
+                                 const std::string& metric_id) {
+  const auto *row = onion::overlay::metric_ui_by_name(metric_id);
+  if (!row) {
+    ps5ui::Page page("id_overlay_metric", toolbox_i18n::tr("overlay.group"));
+    page.label("id_overlay_metric_missing",
+               toolbox_i18n::tr("overlay.group.sub"));
+    xml_buffer = page.build();
+    return;
+  }
+
+  ps5ui::Page page("id_overlay_metric", toolbox_i18n::tr(row->title_key));
+  page.toggle(row->enable_id, toolbox_i18n::tr(row->title_key),
+              onion::overlay::metric_toggle_on(g_settings, row->metric),
+              toolbox_i18n::tr(row->desc_key))
+      .list(
+          row->order_id, toolbox_i18n::tr("overlay.item.order"),
+          [](ps5ui::ListBuilder& L) {
+            L.item("id_overlay_order_1", "1", "1")
+                .item("id_overlay_order_2", "2", "2")
+                .item("id_overlay_order_3", "3", "3")
+                .item("id_overlay_order_4", "4", "4")
+                .item("id_overlay_order_5", "5", "5")
+                .item("id_overlay_order_6", "6", "6");
+          },
+          toolbox_i18n::tr("overlay.item.order.sub"),
+          std::to_string(onion::overlay_metric_position(
+              g_settings.overlay_order, row->metric)));
+  if (row->metric == onion::kOverlayMetricCpu) {
+    page.toggle("id_all_cpu_usage", toolbox_i18n::tr("overlay.cpu_all"),
+                g_settings.all_cpu_usage,
+                toolbox_i18n::tr("overlay.cpu_all.desc"));
+  }
+  xml_buffer = page.build();
+}
+
+static bool overlay_metrics_model(ps5ui::Node &model) {
+  constexpr const char *kIcon =
+      "/user/data/OnionHEN/assets/icon_xml_overlay.png";
+  ps5ui::Page page("id_overlay_metrics", toolbox_i18n::tr("overlay.items"));
+  auto order = g_settings.overlay_order;
+  onion::overlay_normalize_order(order);
+  for (int metric : order) {
+    const auto *row = onion::overlay::metric_ui_by_metric(metric);
+    if (!row)
+      continue;
+    const int pos =
+        onion::overlay_metric_position(g_settings.overlay_order, metric);
+    const bool on = onion::overlay::metric_toggle_on(g_settings, metric);
+    page.link(std::string("id_overlay_item_") + row->name,
+              toolbox_i18n::tr(row->title_key),
+              toolbox::overlay_metric_xml(row->name),
+              toolbox_i18n::format(on ? "overlay.item.status_on_fmt"
+                                      : "overlay.item.status_off_fmt",
+                                   pos),
+              kIcon);
+  }
+  model = page.root();
+  return true;
+}
+
+void generate_overlay_metrics_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  overlay_metrics_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, overlay_metrics_model);
+}
+
 static bool plugins_model(ps5ui::Node &model) {
   using namespace onion::plugins;
 
@@ -657,27 +726,20 @@ void append_toolbox_display_group(ps5ui::Group& g) {
                    },
                    toolbox_i18n::tr("overlay.align.sub"),
                    toolbox_val("id_overlay_align"))
-             .toggle("id_overlay_gpu", toolbox_i18n::tr("overlay.gpu"),
-                     toolbox_on("id_overlay_gpu"), std::nullopt,
-                     toolbox_i18n::tr("overlay.gpu.desc"))
-             .toggle("id_overlay_fps", toolbox_i18n::tr("overlay.fps"),
-                     toolbox_on("id_overlay_fps"), std::nullopt,
-                     toolbox_i18n::tr("overlay.fps.desc"))
-             .toggle("id_overlay_cpu", toolbox_i18n::tr("overlay.cpu"),
-                     toolbox_on("id_overlay_cpu"), std::nullopt,
-                     toolbox_i18n::tr("overlay.cpu.desc"))
-             .toggle("id_all_cpu_usage", toolbox_i18n::tr("overlay.cpu_all"),
-                     toolbox_on("id_all_cpu_usage"), std::nullopt,
-                     toolbox_i18n::tr("overlay.cpu_all.desc"))
-             .toggle("id_overlay_ram", toolbox_i18n::tr("overlay.ram"),
-                     toolbox_on("id_overlay_ram"), std::nullopt,
-                     toolbox_i18n::tr("overlay.ram.desc"))
-             .toggle("id_overlay_ip", toolbox_i18n::tr("overlay.ip"),
-                     toolbox_on("id_overlay_ip"), std::nullopt,
-                     toolbox_i18n::tr("overlay.ip.desc"))
-             .toggle("id_overlay_fan", toolbox_i18n::tr("overlay.fan"),
-                     toolbox_on("id_overlay_fan"), std::nullopt,
-                     toolbox_i18n::tr("overlay.fan.desc"));
+             .list("id_overlay_font_size", toolbox_i18n::tr("overlay.font"),
+                   [](ps5ui::ListBuilder& L) {
+                     L.item("id_overlay_font_small",
+                            toolbox_i18n::tr("overlay.font.small"), "0")
+                         .item("id_overlay_font_medium",
+                               toolbox_i18n::tr("overlay.font.medium"), "1")
+                         .item("id_overlay_font_large",
+                               toolbox_i18n::tr("overlay.font.large"), "2");
+                   },
+                   toolbox_i18n::tr("overlay.font.sub"),
+                   toolbox_val("id_overlay_font_size"))
+             .link("id_overlay_items", toolbox_i18n::tr("overlay.items"),
+                   "overlay_metrics.xml",
+                   toolbox_i18n::tr("overlay.items.sub"));
        },
        toolbox_i18n::tr("overlay.group.sub"), kIconOverlay,
        "id_overlay_enabled")

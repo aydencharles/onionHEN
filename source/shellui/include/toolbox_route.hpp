@@ -16,6 +16,8 @@ enum class Page : unsigned char {
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
   PayloadConfig,      /**< per-Payload configuration page */
+  OverlayMetrics,     /**< overlay metric list (overlay_metrics.xml) */
+  OverlayMetricConfig, /**< per-overlay metric page (overlay_<id>.xml) */
   Sprx,
   SprxConfig,         /**< per-module SPRX catalog page (sprx_<id>.xml) */
   Plugins,            /**< built-in and externally discovered plugins */
@@ -47,6 +49,8 @@ struct RouteInput {
 struct RouteFlags {
   bool is_payloads = false;
   bool is_payload_config = false;
+  bool is_overlay_metrics = false;
+  bool is_overlay_metric = false;
   bool is_plugins = false;
   bool is_sprx = false;
   bool is_sprx_config = false;
@@ -72,7 +76,8 @@ RouteResult resolve_resource(const RouteInput &in);
 /** Child routes whose page-stack pop should restore the owning parent route. */
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
-         page == Page::PayloadConfig || page == Page::PluginConfig ||
+         page == Page::PayloadConfig || page == Page::OverlayMetricConfig ||
+         page == Page::PluginConfig ||
          page == Page::SprxConfig ||
          page == Page::DynamicPlugin;
 }
@@ -94,6 +99,8 @@ inline constexpr std::string_view kSuperuserXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.superuser.xml";
 inline constexpr std::string_view kOgDebugXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.og_debug.xml";
+inline constexpr std::string_view kOverlayMetricsXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.overlay_metrics.xml";
 
 /** Sony Settings.Plugins module prefix shared by toolbox child resources. */
 inline constexpr std::string_view kSettingsPluginsPrefix =
@@ -101,6 +108,7 @@ inline constexpr std::string_view kSettingsPluginsPrefix =
 inline constexpr std::string_view kExternalPluginXmlPrefix = "plugin_";
 inline constexpr std::string_view kSprxConfigXmlPrefix = "sprx_";
 inline constexpr std::string_view kPayloadConfigXmlPrefix = "payload_";
+inline constexpr std::string_view kOverlayMetricXmlPrefix = "overlay_";
 
 inline bool settings_plugins_relative(std::string_view resource,
                                       std::string_view *out) {
@@ -139,6 +147,11 @@ inline bool valid_sprx_config_id(std::string_view id) {
       return false;
   }
   return true;
+}
+
+inline bool valid_overlay_metric_id(std::string_view id) {
+  return id == "fps" || id == "cpu" || id == "gpu" || id == "memory" ||
+         id == "ip" || id == "fan";
 }
 
 inline bool valid_payload_config_id(std::string_view id) {
@@ -219,6 +232,24 @@ inline std::string sprx_config_xml(std::string_view id) {
 
 inline std::string payload_config_xml(std::string_view id) {
   return std::string(kPayloadConfigXmlPrefix) + std::string(id) + ".xml";
+}
+
+inline bool parse_overlay_metric_resource(std::string_view resource,
+                                          std::string *out_id) {
+  std::string_view relative;
+  if (!settings_plugins_relative(resource, &relative))
+    return false;
+  std::string id;
+  if (!parse_prefixed_xml(relative, kOverlayMetricXmlPrefix, &id) ||
+      !valid_overlay_metric_id(id))
+    return false;
+  if (out_id)
+    *out_id = std::move(id);
+  return true;
+}
+
+inline std::string overlay_metric_xml(std::string_view id) {
+  return std::string(kOverlayMetricXmlPrefix) + std::string(id) + ".xml";
 }
 
 } // namespace toolbox

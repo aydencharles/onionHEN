@@ -38,6 +38,9 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
     return OnPressDomain::Payloads;
   case Page::PayloadConfig:
     return OnPressDomain::PayloadConfig;
+  case Page::OverlayMetrics:
+  case Page::OverlayMetricConfig:
+    return OnPressDomain::Root;
   case Page::Sprx:
   case Page::SprxConfig:
     return OnPressDomain::Sprx;

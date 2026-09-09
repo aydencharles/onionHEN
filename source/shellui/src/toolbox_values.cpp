@@ -87,6 +87,43 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return int_str(g_settings.overlay_pos); }},
     {"id_overlay_align",
      +[]() -> std::string { return int_str(g_settings.overlay_align); }},
+    {"id_overlay_font_size",
+     +[]() -> std::string { return int_str(g_settings.overlay_font_size); }},
+    {"id_overlay_fps_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricFps));
+     }},
+    {"id_overlay_cpu_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricCpu));
+     }},
+    {"id_overlay_gpu_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricGpu));
+     }},
+    {"id_overlay_ram_order",
+     +[]() -> std::string {
+       return int_str(onion::overlay_metric_position(
+           g_settings.overlay_order, onion::kOverlayMetricMemory));
+     }},
+    {"id_overlay_ip_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricIp));
+     }},
+    {"id_overlay_fan_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricFan));
+     }},
     /* Exact list id only — not id_toolbox_shortcut_N list_items. */
     {"id_toolbox_shortcut",
      +[]() -> std::string { return int_str(g_settings.toolbox_shortcut_opt); }},

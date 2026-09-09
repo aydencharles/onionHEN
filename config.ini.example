@@ -100,6 +100,12 @@ show_ip_address=false
 # show_fan_duty displays the current fan duty in percent.
 # Available values: true, false
 show_fan_duty=false
+# font_size sets the monitor bar text size.
+# Available values: small, medium, large
+font_size=medium
+# order is the left-to-right metric sequence on the bar.
+# Available values: comma-separated fps, cpu, gpu, memory, ip, fan
+order=fps,cpu,gpu,memory,ip,fan
 
 [shortcuts]
 # cheats_menu controls the shortcut that opens the cheats menu.

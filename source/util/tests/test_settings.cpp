@@ -50,6 +50,9 @@ static int test_defaults_and_serialize_keys(void) {
                                  "enabled=true\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("edge=top") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("align=center") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("font_size=medium") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("order=fps,cpu,gpu,memory,ip,fan") !=
+                   std::string::npos);
   TEST_ASSERT_TRUE(text.find("background=true") != std::string::npos);
   TEST_ASSERT_TRUE(
       text.find("exact_title_ids=ITEM00001,NPXS39041,PKGI13337,PKGI12345,"
@@ -125,6 +128,10 @@ static int test_full_schema_roundtrip(void) {
   in.all_cpu_usage = true;
   in.overlay_pos = 2;
   in.overlay_align = onion::kOverlayAlignRight;
+  in.overlay_font_size = onion::kOverlayFontLarge;
+  in.overlay_order = {onion::kOverlayMetricFan, onion::kOverlayMetricFps,
+                      onion::kOverlayMetricCpu, onion::kOverlayMetricGpu,
+                      onion::kOverlayMetricMemory, onion::kOverlayMetricIp};
   in.cheats_shortcut_opt = 4;
   in.toolbox_shortcut_opt = 2;
   in.ui_lang = onion::kUiLanguageZhHans;
@@ -159,6 +166,10 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(out.all_cpu_usage == in.all_cpu_usage);
   TEST_ASSERT_EQ_INT(in.overlay_pos, out.overlay_pos);
   TEST_ASSERT_EQ_INT(in.overlay_align, out.overlay_align);
+  TEST_ASSERT_EQ_INT(in.overlay_font_size, out.overlay_font_size);
+  TEST_ASSERT_EQ_INT(in.overlay_order[0], out.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(in.overlay_order[1], out.overlay_order[1]);
+  TEST_ASSERT_EQ_INT(in.overlay_order[5], out.overlay_order[5]);
   TEST_ASSERT_EQ_INT(in.cheats_shortcut_opt, out.cheats_shortcut_opt);
   TEST_ASSERT_EQ_INT(in.toolbox_shortcut_opt, out.toolbox_shortcut_opt);
   TEST_ASSERT_EQ_INT(in.ui_lang, out.ui_lang);
@@ -258,6 +269,9 @@ static int test_serialize_contains_overlay_keys(void) {
   TEST_ASSERT_TRUE(text.find("show_ip_address=true") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("cpu_usage_mode=per_core") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("edge=bottom") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("font_size=medium") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("order=fps,cpu,gpu,memory,ip,fan") !=
+                   std::string::npos);
   return 0;
 }
 
@@ -562,6 +576,66 @@ static int test_overlay_edge_and_align(void) {
   return 0;
 }
 
+static int test_overlay_font_and_order(void) {
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontPtMedium,
+                     onion::overlay_font_pt(onion::kOverlayFontMedium));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontPtSmall,
+                     onion::overlay_font_pt(onion::kOverlayFontSmall));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontPtLarge,
+                     onion::overlay_font_pt(onion::kOverlayFontLarge));
+  TEST_ASSERT_STREQ("medium", onion::overlay_font_size_name(
+                                  onion::kOverlayFontMedium));
+  TEST_ASSERT_STREQ("fps", onion::overlay_metric_name(onion::kOverlayMetricFps));
+  TEST_ASSERT_STREQ("memory",
+                    onion::overlay_metric_name(onion::kOverlayMetricMemory));
+
+  onion::Settings s{};
+  TEST_ASSERT_EQ_INT(1, onion::overlay_metric_position(s.overlay_order,
+                                                       onion::kOverlayMetricFps));
+  TEST_ASSERT_EQ_INT(6, onion::overlay_metric_position(s.overlay_order,
+                                                       onion::kOverlayMetricFan));
+  onion::overlay_move_metric(s.overlay_order, onion::kOverlayMetricFan, 1);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFan, s.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, s.overlay_order[1]);
+  TEST_ASSERT_EQ_INT(1, onion::overlay_metric_position(s.overlay_order,
+                                                       onion::kOverlayMetricFan));
+  onion::overlay_move_metric(s.overlay_order, onion::kOverlayMetricFps, 6);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, s.overlay_order[5]);
+
+  std::string path = temp_ini_path();
+  TEST_ASSERT_TRUE(!path.empty());
+  FILE *f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[overlay]\n"
+        "font_size=large\norder=fan,ip,ram\n",
+        f);
+  fclose(f);
+  onion::Settings out{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontLarge, out.overlay_font_size);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFan, out.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricIp, out.overlay_order[1]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricMemory, out.overlay_order[2]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, out.overlay_order[3]);
+  TEST_ASSERT_TRUE(onion::settings_serialize(out).find("font_size=large") !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(onion::settings_serialize(out).find(
+                       "order=fan,ip,memory,fps,cpu,gpu") != std::string::npos);
+
+  f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[overlay]\nfont_size=tiny\norder=\n", f);
+  fclose(f);
+  onion::Settings invalid{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &invalid));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontMedium, invalid.overlay_font_size);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, invalid.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFan, invalid.overlay_order[5]);
+
+  unlink(path.c_str());
+  return 0;
+}
+
 extern "C" int test_settings_suite(void) {
   int failures = 0;
   failures += onion_test_run("settings_defaults_serialize", test_defaults_and_serialize_keys);
@@ -574,6 +648,8 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_serialize_overlay_keys", test_serialize_contains_overlay_keys);
   failures += onion_test_run("settings_overlay_edge_and_align",
                              test_overlay_edge_and_align);
+  failures += onion_test_run("settings_overlay_font_and_order",
+                             test_overlay_font_and_order);
   failures += onion_test_run("settings_empty_file_defaults", test_empty_file_loads_defaults);
   failures += onion_test_run("settings_app_jailbreak_allowlist",
                              test_app_jailbreak_allowlist_parse_policy);

@@ -4,6 +4,9 @@
 
 namespace onion::overlay {
 
+inline constexpr float kRefFontSize = 18.0f;
+inline constexpr float kMinTextWidth = 32.0f;
+
 /* Approximate 18pt bold advances; padded per-core spaces are much narrower. */
 inline constexpr float glyph_advance(unsigned char ch) {
   if (ch == ' ')
@@ -23,15 +26,19 @@ inline constexpr float glyph_advance(unsigned char ch) {
   }
 }
 
-inline float estimate_text_width(const char *text) {
+inline float estimate_text_width(const char *text,
+                                 float font_size = kRefFontSize) {
   if (!text || !text[0])
     return 0.0f;
 
-  float width = 6.0f;
+  const float scale =
+      (font_size > 0.0f ? font_size : kRefFontSize) / kRefFontSize;
+  float width = 6.0f * scale;
   for (std::size_t i = 0; text[i]; ++i)
-    width += glyph_advance(static_cast<unsigned char>(text[i]));
+    width += glyph_advance(static_cast<unsigned char>(text[i])) * scale;
 
-  return width < 32.0f ? 32.0f : width;
+  const float min_width = kMinTextWidth * scale;
+  return width < min_width ? min_width : width;
 }
 
 } // namespace onion::overlay

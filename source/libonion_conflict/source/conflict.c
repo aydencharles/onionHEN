@@ -49,7 +49,16 @@ const OnionConflictStrategy *onion_conflict_strategies(size_t *out_count) {
 }
 
 enum { kNameAltMax = 64 };
-enum { kCandMax = 8 };
+enum { kCandMax = 16 };
+
+/* onion_find_pid matches ki_comm *and* ki_tdname, and the kernel truncates
+ * each to a different length. Probe both, longest first: a thread-name-only
+ * hit would otherwise be invisible. */
+static const size_t kTruncLens[] = {
+    (size_t)ONION_PROC_KI_COMM_LEN,
+    (size_t)ONION_PROC_KI_TDNAM_LEN,
+};
+enum { kTruncLensCount = sizeof(kTruncLens) / sizeof(kTruncLens[0]) };
 
 static int add_unique_name(const char **list, size_t *count, size_t cap,
                            const char *name) {
@@ -63,7 +72,8 @@ static int add_unique_name(const char **list, size_t *count, size_t cap,
   return 1;
 }
 
-/* Live ki_comm may keep or drop ".elf", and is truncated to COMMLEN. */
+/* Live name may keep or drop ".elf", and is truncated to ki_comm (COMMLEN)
+ * or ki_tdname (TDNAMLEN) depending on which field the kernel exposes. */
 static int conflict_pid_live(onion_conflict_find_pid_fn find_pid,
                              const char *name) {
   if (!name || !name[0])
@@ -78,7 +88,7 @@ static int conflict_pid_live(onion_conflict_find_pid_fn find_pid,
 
   char stem[kNameAltMax];
   char with_elf[kNameAltMax];
-  char truncs[3][kNameAltMax];
+  char truncs[kCandMax][kNameAltMax];
   memcpy(stem, name, stem_n);
   stem[stem_n] = '\0';
 
@@ -98,14 +108,16 @@ static int conflict_pid_live(onion_conflict_find_pid_fn find_pid,
 
   const size_t base_n = nc;
   size_t nt = 0;
-  for (size_t i = 0; i < base_n && nt < 3; ++i) {
+  for (size_t i = 0; i < base_n && nt < kCandMax; ++i) {
     const size_t ln = strlen(cands[i]);
-    if (ln <= (size_t)ONION_PROC_KI_COMM_LEN)
-      continue;
-    memcpy(truncs[nt], cands[i], (size_t)ONION_PROC_KI_COMM_LEN);
-    truncs[nt][ONION_PROC_KI_COMM_LEN] = '\0';
-    add_unique_name(cands, &nc, kCandMax, truncs[nt]);
-    ++nt;
+    for (size_t k = 0; k < (size_t)kTruncLensCount && nt < kCandMax; ++k) {
+      if (ln <= kTruncLens[k])
+        continue;
+      memcpy(truncs[nt], cands[i], kTruncLens[k]);
+      truncs[nt][kTruncLens[k]] = '\0';
+      add_unique_name(cands, &nc, kCandMax, truncs[nt]);
+      ++nt;
+    }
   }
 
   for (size_t i = 0; i < nc; ++i) {

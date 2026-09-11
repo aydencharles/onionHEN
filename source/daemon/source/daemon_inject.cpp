@@ -5,10 +5,12 @@
 
 #include "daemon_ops.hpp"
 #include "daemon_power_state.hpp"
+#include "globalconf.hpp"
 #include "toolbox_injection.hpp"
 #include <onion/platform.h>
 #include <onion/proc_query.h>
 #include <onion/ready.h>
+#include <onion/settings.hpp>
 #include <ps5/kernel.h>
 #include <atomic>
 #include <cstdint>
@@ -103,6 +105,33 @@ bool toolbox_wait_shellui_sprx(pid_t pid, uint32_t gen) {
   return true;
 }
 
+bool toolbox_wait_resume_delay(pid_t pid, uint32_t gen) {
+  uint64_t delay = g_settings.snapshot().rest_mode_delay_seconds;
+  if (delay > static_cast<uint64_t>(onion::kRestModeDelayMaxSeconds))
+    delay = onion::kRestModeDelayMaxSeconds;
+  if (delay == 0)
+    return true;
+
+  LOG_DEBUG("rest: resume delay %llu s after trophy sprx pid=%d",
+            static_cast<unsigned long long>(delay), static_cast<int>(pid));
+  for (uint64_t i = 0; i < delay; ++i) {
+    if (g_rest_gen.load(std::memory_order_acquire) != gen) {
+      LOG_DEBUG("rest: resume delay superseded gen=%u pid=%d", gen,
+                static_cast<int>(pid));
+      return false;
+    }
+    if (!isProcessAlive(pid)) {
+      LOG_DEBUG("rest: resume delay pid=%d died at %llu/%llu s",
+                static_cast<int>(pid), static_cast<unsigned long long>(i),
+                static_cast<unsigned long long>(delay));
+      return false;
+    }
+    sleep(1);
+  }
+  return g_rest_gen.load(std::memory_order_acquire) == gen &&
+         isProcessAlive(pid);
+}
+
 void toolbox_wait_kstuff() {
   if (!onion_ready_wait(ONION_READY_KSTUFF, /*timeout_ms=*/5000,
                         /*poll_ms=*/200))
@@ -172,7 +201,8 @@ bool toolbox_inject_immediate(pid_t expected_pid = 0) {
   return outcome.ready();
 }
 
-bool toolbox_inject_rest(pid_t exec_pid, pid_t previous_pid, uint32_t gen) {
+bool toolbox_inject_rest(pid_t exec_pid, pid_t previous_pid, uint32_t gen,
+                         bool apply_user_delay) {
   LOG_DEBUG("rest: SysCore EXEC shellui pid=%d previous=%d gen=%u",
             static_cast<int>(exec_pid), static_cast<int>(previous_pid), gen);
   const bool replacement = previous_pid > 1 && previous_pid != exec_pid;
@@ -180,6 +210,11 @@ bool toolbox_inject_rest(pid_t exec_pid, pid_t previous_pid, uint32_t gen) {
             static_cast<int>(previous_pid), static_cast<int>(exec_pid));
   if (!toolbox_wait_shellui_sprx(exec_pid, gen)) {
     LOG_DEBUG("rest: skip inject, pid=%d not ready for ELF load",
+              static_cast<int>(exec_pid));
+    return false;
+  }
+  if (apply_user_delay && !toolbox_wait_resume_delay(exec_pid, gen)) {
+    LOG_DEBUG("rest: skip inject after resume delay pid=%d",
               static_cast<int>(exec_pid));
     return false;
   }
@@ -212,7 +247,9 @@ void *toolbox_rest_worker(void *arg) {
         }
       }
     }
-    if (target > 1 && toolbox_inject_rest(target, job.previous_pid, job.gen)) {
+    if (target > 1 &&
+        toolbox_inject_rest(target, job.previous_pid, job.gen,
+                            /*apply_user_delay=*/attempt == 0)) {
       toolbox_remember_pid(target);
       return nullptr;
     }
@@ -249,7 +286,8 @@ void start_rest_inject(pid_t exec_pid) {
     LOG_ERROR("rest: pthread_create for shellui exec pid=%d failed",
               static_cast<int>(exec_pid));
     delete job;
-    (void)toolbox_inject_rest(exec_pid, previous, gen);
+    (void)toolbox_inject_rest(exec_pid, previous, gen,
+                              /*apply_user_delay=*/true);
     return;
   }
   pthread_detach(thread);

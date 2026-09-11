@@ -34,9 +34,9 @@ static int test_defaults_and_serialize_keys(void) {
   TEST_ASSERT_TRUE(text.find("level=info") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("temperature_threshold_celsius=77") !=
                    std::string::npos);
-  TEST_ASSERT_TRUE(text.find("resume_reinject_delay_seconds") ==
+  TEST_ASSERT_TRUE(text.find("resume_reinject_delay_seconds=10") !=
                    std::string::npos);
-  TEST_ASSERT_TRUE(text.find("[rest_mode]") == std::string::npos);
+  TEST_ASSERT_TRUE(text.find("[rest_mode]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("stop_utility_daemon_on_entry") ==
                    std::string::npos);
   TEST_ASSERT_TRUE(text.find("close_running_game_on_entry") ==
@@ -115,6 +115,7 @@ static int test_full_schema_roundtrip(void) {
   in.debug_app_jb_msg = true;
   in.display_tids = true;
   in.onionhen_game_opts = false;
+  in.rest_mode_delay_seconds = 15;
   in.enable_fan_speed = true;
   in.fan_threshold = 90;
   in.overlay_enabled = false;
@@ -153,6 +154,7 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(out.debug_app_jb_msg == in.debug_app_jb_msg);
   TEST_ASSERT_TRUE(out.display_tids == in.display_tids);
   TEST_ASSERT_TRUE(out.onionhen_game_opts == in.onionhen_game_opts);
+  TEST_ASSERT_EQ_U64(in.rest_mode_delay_seconds, out.rest_mode_delay_seconds);
   TEST_ASSERT_TRUE(out.enable_fan_speed == in.enable_fan_speed);
   TEST_ASSERT_EQ_INT(in.fan_threshold, out.fan_threshold);
   TEST_ASSERT_TRUE(out.overlay_enabled == in.overlay_enabled);
@@ -211,6 +213,7 @@ static int test_partial_ini_keeps_defaults(void) {
   TEST_ASSERT_TRUE(out.overlay_background);
   TEST_ASSERT_TRUE(out.app_jailbreak_enabled);
   TEST_ASSERT_TRUE(out.kstuff_autoload);
+  TEST_ASSERT_EQ_U64(10, out.rest_mode_delay_seconds);
   TEST_ASSERT_EQ_INT(onion::kCheatsMirrorAuto, out.cheats_mirror);
   TEST_ASSERT_EQ_U64(5, out.app_jailbreak_allowlist.exact_title_id_count);
   TEST_ASSERT_STREQ("ITEM00001",
@@ -249,6 +252,44 @@ static int test_startup_open_after_load_parse_policy(void) {
   onion::Settings invalid{};
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &invalid));
   TEST_ASSERT_EQ_INT(onion::kStartupOpenNone, invalid.startup_open_after_load);
+
+  unlink(path.c_str());
+  return 0;
+}
+
+static int test_rest_mode_delay_parse_policy(void) {
+  std::string path = temp_ini_path();
+  TEST_ASSERT_TRUE(!path.empty());
+
+  FILE *f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[rest_mode]\n"
+        "resume_reinject_delay_seconds=0\n",
+        f);
+  fclose(f);
+  onion::Settings zero{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &zero));
+  TEST_ASSERT_EQ_U64(0, zero.rest_mode_delay_seconds);
+
+  f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[rest_mode]\n"
+        "resume_reinject_delay_seconds=255\n",
+        f);
+  fclose(f);
+  onion::Settings max{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &max));
+  TEST_ASSERT_EQ_U64(255, max.rest_mode_delay_seconds);
+
+  f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[rest_mode]\n"
+        "resume_reinject_delay_seconds=256\n",
+        f);
+  fclose(f);
+  onion::Settings invalid{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &invalid));
+  TEST_ASSERT_EQ_U64(10, invalid.rest_mode_delay_seconds);
 
   unlink(path.c_str());
   return 0;
@@ -645,6 +686,8 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_partial_ini_defaults", test_partial_ini_keeps_defaults);
   failures += onion_test_run("settings_startup_open_after_load",
                              test_startup_open_after_load_parse_policy);
+  failures += onion_test_run("settings_rest_mode_delay",
+                             test_rest_mode_delay_parse_policy);
   failures += onion_test_run("settings_serialize_overlay_keys", test_serialize_contains_overlay_keys);
   failures += onion_test_run("settings_overlay_edge_and_align",
                              test_overlay_edge_and_align);

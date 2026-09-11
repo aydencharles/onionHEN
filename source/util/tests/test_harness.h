@@ -44,14 +44,22 @@ int onion_test_fail(const char *file, int line, const char *fmt, ...);
     }                                                                         \
   } while (0)
 
+/* NULL-safe: NULL matches NULL, and NULL vs a non-NULL string is a clean
+ * failure rather than a strcmp() crash that takes down the whole binary. */
 #define TEST_ASSERT_STREQ(expected, actual)                                   \
   do {                                                                        \
     const char *expected_value__ = (expected);                                \
     const char *actual_value__ = (actual);                                    \
-    if (strcmp(expected_value__, actual_value__) != 0) {                      \
+    const int equal__ =                                                       \
+        (expected_value__ == NULL)                                            \
+            ? (actual_value__ == NULL)                                        \
+            : (actual_value__ != NULL &&                                      \
+               strcmp(expected_value__, actual_value__) == 0);                \
+    if (!equal__) {                                                           \
       return onion_test_fail(__FILE__, __LINE__,                              \
-                             "expected \"%s\", got \"%s\"",                  \
-                             expected_value__, actual_value__);                \
+                             "expected \"%s\", got \"%s\"",                   \
+                             expected_value__ ? expected_value__ : "(null)",   \
+                             actual_value__ ? actual_value__ : "(null)");     \
     }                                                                         \
   } while (0)
 

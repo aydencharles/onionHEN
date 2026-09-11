@@ -26,6 +26,7 @@ extern "C" int test_platform_notify_suite(void);
 extern "C" int test_util_language_suite(void);
 extern "C" int test_msg_protocol_suite(void);
 extern "C" int test_app_jailbreak_policy_suite(void);
+extern "C" int test_big_app_collect_policy_suite(void);
 extern "C" int test_debug_settings_route_policy_suite(void);
 extern "C" int test_ipc_harden_suite(void);
 extern "C" int test_toolbox_injection_suite(void);
@@ -80,6 +81,7 @@ int main() {
   failures += test_util_language_suite();
   failures += test_msg_protocol_suite();
   failures += test_app_jailbreak_policy_suite();
+  failures += test_big_app_collect_policy_suite();
   failures += test_debug_settings_route_policy_suite();
   failures += test_ipc_harden_suite();
   failures += test_toolbox_injection_suite();

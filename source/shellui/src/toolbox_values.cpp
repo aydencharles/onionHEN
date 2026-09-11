@@ -60,6 +60,10 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.display_tids); }},
     {"id_enable_fan_speed",
      +[]() -> std::string { return bool_str(g_settings.enable_fan_speed); }},
+    {"id_rest_1",
+     +[]() -> std::string {
+       return int_str(static_cast<int>(g_settings.rest_mode_delay_seconds));
+     }},
     {"id_fan_speed",
      +[]() -> std::string { return int_str(g_settings.fan_threshold); }},
     {"id_cheats_shortcut",

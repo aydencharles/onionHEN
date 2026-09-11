@@ -40,14 +40,22 @@ static int assert_detect(const char *live, const char *family) {
 }
 
 static int test_builtin_hits(void) {
+  /* Live names come from kinfo_proc, so they can never be longer than
+   * ki_comm (19) or ki_tdname (16). The >19 entries below therefore test the
+   * candidate generator, not a state the kernel can actually report; the
+   * <=19 ones are what fires on hardware. Both matter: the first catches a
+   * dropped candidate, the second catches a broken truncation. */
   static const struct {
     const char *live;
     const char *family;
   } kCases[] = {
-      {"etaHEN Utility Daemon", "etaHEN"},
-      {"etaHEN Critical services", "etaHEN"},
-      {"etaHEN Utility Daem", "etaHEN"},
-      {"etaHEN Critical ser", "etaHEN"},
+      {"etaHEN Utility Daemon", "etaHEN"},        /* generator only */
+      {"etaHEN Critical services", "etaHEN"},     /* generator only */
+      {"etaHEN Utility Daemon.elf", "etaHEN"},    /* generator only */
+      {"etaHEN Utility Daem", "etaHEN"},          /* ki_comm */
+      {"etaHEN Critical ser", "etaHEN"},          /* ki_comm */
+      {"etaHEN Utility D", "etaHEN"},             /* ki_tdname */
+      {"etaHEN Critical ", "etaHEN"},             /* ki_tdname, trailing space */
       {"Yoncore.elf", "Yoncore"},
       {"Yoncore", "Yoncore"},
       {"kylin-core.elf", "kylin-core"},
@@ -109,14 +117,28 @@ static int test_elf_suffix_ignored(void) {
   return 0;
 }
 
-static int test_commlen_truncation(void) {
+static int test_truncation_lengths(void) {
   static const char *names[] = {"etaHEN Utility Daemon", NULL};
   static const OnionConflictStrategy table[] = {{"etaHEN", names}};
 
   TEST_ASSERT_TRUE(strlen("etaHEN Utility Daemon") > ONION_PROC_KI_COMM_LEN);
+  TEST_ASSERT_TRUE(ONION_PROC_KI_TDNAM_LEN < ONION_PROC_KI_COMM_LEN);
+
+  /* ki_comm keeps COMMLEN=19 chars. */
   live_reset();
   live_add("etaHEN Utility Daem");
   TEST_ASSERT_STREQ("etaHEN", onion_conflict_scan(table, 1, fake_find_pid));
+
+  /* ki_tdname keeps only TDNAMLEN=16; a thread-name-only hit must still be
+   * detected, otherwise the whole family is missed. */
+  live_reset();
+  live_add("etaHEN Utility D");
+  TEST_ASSERT_STREQ("etaHEN", onion_conflict_scan(table, 1, fake_find_pid));
+
+  /* A shorter truncation than either field is not a hit. */
+  live_reset();
+  live_add("etaHEN Utilit");
+  TEST_ASSERT_TRUE(onion_conflict_scan(table, 1, fake_find_pid) == NULL);
   return 0;
 }
 
@@ -208,8 +230,8 @@ int test_conflict_suite(void) {
                              test_no_live_processes);
   failures += onion_test_run("conflict_elf_suffix_ignored",
                              test_elf_suffix_ignored);
-  failures += onion_test_run("conflict_commlen_truncation",
-                             test_commlen_truncation);
+  failures += onion_test_run("conflict_truncation_lengths",
+                             test_truncation_lengths);
   failures += onion_test_run("conflict_scan_first_family_wins",
                              test_scan_first_family_wins);
   failures += onion_test_run("conflict_builtin_table", test_builtin_table);

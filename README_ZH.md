@@ -264,6 +264,7 @@ OnionHEN 在下面两处读写同一份配置：
 | `startup.open_after_load` | `none` | `none`, `home_menu` |
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
 | `game_menu.show_onionhen_options` | `true` | `true`, `false` |
+| `rest_mode.resume_reinject_delay_seconds` | `10` | `0` 到 `255` 秒 |
 | `cheats.mirror` | `auto` | `auto`, `github`, `cnb` |
 | `app_jailbreak.debug_notifications` | `false` | `true`, `false` |
 | `cooling.fan_control` | `automatic` | `automatic`, `temperature_threshold` |

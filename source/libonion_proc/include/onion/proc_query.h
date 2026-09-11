@@ -19,6 +19,13 @@
 #define ONION_PROC_KI_COMM_LEN 19
 #endif
 
+/* kinfo_proc.ki_tdname usable chars (TDNAMLEN in freebsd-helper.h). Shorter
+ * than ki_comm, and onion_find_pid matches both, so a caller that probes a
+ * long name must try this truncation too or it will silently miss threads. */
+#ifndef ONION_PROC_KI_TDNAM_LEN
+#define ONION_PROC_KI_TDNAM_LEN 16
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

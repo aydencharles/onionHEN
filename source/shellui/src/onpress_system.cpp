@@ -105,6 +105,26 @@ static OnPressResult id_ui_lang(OnPressContext &ctx) {
   return OnPressResult::Handled;
 }
 
+static OnPressResult id_rest_1(OnPressContext &ctx) {
+  char *end = nullptr;
+  const long selected = std::strtol(ctx.value.c_str(), &end, 10);
+  if (end == ctx.value.c_str() || *end != '\0' ||
+      selected < onion::kRestModeDelayMinSeconds ||
+      selected > onion::kRestModeDelayMaxSeconds) {
+    LOG_WARN("Rejected Rest Mode delay: %s", ctx.value.c_str());
+    return OnPressResult::EarlyReturn;
+  }
+  const uint64_t delay = static_cast<uint64_t>(selected);
+  if (delay == g_settings.rest_mode_delay_seconds) {
+    return OnPressResult::EarlyReturn;
+  }
+  g_settings.rest_mode_delay_seconds = delay;
+  ctx.reload_main = true;
+  LOG_INFO("Rest Mode toolbox delay: %llu s",
+           static_cast<unsigned long long>(delay));
+  return OnPressResult::Handled;
+}
+
 static OnPressResult id_enable_fan_speed(OnPressContext &ctx) {
   if (atol(ctx.value.c_str()) == g_settings.enable_fan_speed) {
     LOG_WARN("Fan speed control already %s",
@@ -200,6 +220,7 @@ static const OnPressExactEntry kExact[] = {
     {"id_debug_jb", id_debug_jb},
     {"id_custom_game_opts", id_custom_game_opts},
     {"id_ui_lang", id_ui_lang},
+    {"id_rest_1", id_rest_1},
     {"id_enable_fan_speed", id_enable_fan_speed},
     {"id_fan_speed", id_fan_speed},
     {"id_cheats_mirror", id_cheats_mirror},

@@ -34,6 +34,7 @@ static int test_default_zh(void) {
                                "打开系统安装界面，用于安装 PKG 游戏或应用") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("fan.enable.sub"),
                                "关闭时使用系统默认风扇策略") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("rest.delay"), "延迟工具箱激活（秒）") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("account.warning"),
                                "激活账号后，你可能会丢失现有存档（账号 ID 会改变）。"
                                "请确认你接受这个风险后再继续。") == 0);
@@ -121,6 +122,8 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(std::strcmp(tr("debug.np_env.sub"),
                                "Change the PlayStation Network environment "
                                "string; the console reboots after saving") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("rest.delay"),
+                               "Delay toolbox activation (seconds)") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.game_menu"),
                                "★ OnionHEN Cheats") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.repo.download"),

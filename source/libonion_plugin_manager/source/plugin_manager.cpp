@@ -1,4 +1,5 @@
 #include <onion/plugin_manager.hpp>
+#include <onion/elf_name.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -16,7 +17,8 @@ namespace onion::plugin {
 namespace {
 
 bool has_elf_suffix(std::string_view name) {
-  return name.size() > 4 && name.substr(name.size() - 4) == ".elf";
+  return onion_elf_name_has_suffix(name.data(), name.size()) &&
+         onion_elf_name_stem_n(name.data(), name.size()) > 0;
 }
 
 std::string auto_start_marker_path(std::string_view plugin_path) {

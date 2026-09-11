@@ -14,6 +14,11 @@
 #define ONION_PROC_PROCESS_NAME_LEN 128
 #endif
 
+/* kinfo_proc.ki_comm usable chars (COMMLEN in freebsd-helper.h). */
+#ifndef ONION_PROC_KI_COMM_LEN
+#define ONION_PROC_KI_COMM_LEN 19
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

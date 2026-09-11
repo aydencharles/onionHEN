@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <onion/elf_name.h>
+
 #include <cstddef>
 #include <cstring>
 #include <string>
@@ -36,9 +38,8 @@ inline bool is_payload_elf_name(const char *name) {
   if (std::strstr(name, ".auto_start") != nullptr)
     return false;
   const std::size_t n = std::strlen(name);
-  if (!(n > 4 && std::strcmp(name + (n - 4), ".elf") == 0))
-    return false;
-  return (n - 4) > 0;
+  return onion_elf_name_has_suffix(name, n) &&
+         onion_elf_name_stem_n(name, n) > 0;
 }
 
 /**
@@ -68,9 +69,7 @@ inline bool elf_key_from_name(const char *name, char *out, std::size_t out_sz) {
   base = base ? base + 1 : name;
   if (!base[0] || std::strcmp(base, ".") == 0 || std::strcmp(base, "..") == 0)
     return false;
-  std::size_t n = std::strlen(base);
-  if (n >= 4 && std::strcmp(base + n - 4, ".elf") == 0)
-    n -= 4;
+  std::size_t n = onion_elf_name_stem_n(base, std::strlen(base));
   if (n == 0)
     return false;
   if (n >= out_sz)

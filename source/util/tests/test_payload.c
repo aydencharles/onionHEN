@@ -3,6 +3,7 @@
 #include "test_support.h"
 
 #include <onion/payload.h>
+#include <onion/elf_name.h>
 #include <elfldr_remote.h>
 
 #include <stdio.h>
@@ -32,6 +33,16 @@ static int test_pid_path(void) {
   char path[128];
   onion_payload_pid_path(path, sizeof(path), "mytool");
   TEST_ASSERT_STREQ("/tmp/onionhen/pid/mytool.PID", path);
+  return 0;
+}
+
+static int test_elf_name_stem(void) {
+  TEST_ASSERT_EQ_INT(3, (int)onion_elf_name_stem_n("foo.elf", 7));
+  TEST_ASSERT_EQ_INT(3, (int)onion_elf_name_stem_n("foo", 3));
+  TEST_ASSERT_EQ_INT(0, (int)onion_elf_name_stem_n(".elf", 4));
+  TEST_ASSERT_TRUE(onion_elf_name_has_suffix("foo.elf", 7));
+  TEST_ASSERT_TRUE(!onion_elf_name_has_suffix("foo", 3));
+  TEST_ASSERT_TRUE(!onion_elf_name_has_suffix(".elf.bak", 8));
   return 0;
 }
 
@@ -262,6 +273,7 @@ int test_payload_suite(void) {
   int failures = 0;
   failures += onion_test_run("payload.is_elf", test_is_elf);
   failures += onion_test_run("payload.pid_path", test_pid_path);
+  failures += onion_test_run("payload.elf_name_stem", test_elf_name_stem);
   failures += onion_test_run("payload.elf_key_from_name", test_elf_key_from_name);
   failures += onion_test_run("payload.path_identity", test_path_identity);
   failures += onion_test_run("payload.pid_file_roundtrip",

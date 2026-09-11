@@ -4,6 +4,7 @@
  */
 
 #include <onion/payload.h>
+#include <onion/elf_name.h>
 
 #include <elfldr_remote.h>
 #include <onion/log.h>
@@ -38,9 +39,7 @@ bool onion_payload_elf_key_from_name(const char *name, char *out, size_t out_sz)
   if (!base[0] || strcmp(base, ".") == 0 || strcmp(base, "..") == 0)
     return false;
 
-  size_t n = strlen(base);
-  if (n >= 4 && strcmp(base + n - 4, ".elf") == 0)
-    n -= 4;
+  size_t n = onion_elf_name_stem_n(base, strlen(base));
   if (n == 0)
     return false; /* bare ".elf" */
   if (n >= out_sz)
@@ -208,7 +207,8 @@ bool onion_payload_load_with_key(const char *path, const char *filename,
   }
 
   const size_t base_len = strlen(base);
-  if (!(base_len > 4 && strcmp(base + base_len - 4, ".elf") == 0)) {
+  if (!onion_elf_name_has_suffix(base, base_len) ||
+      onion_elf_name_stem_n(base, base_len) == 0) {
     LOG_WARN("Not a .elf payload: %s", base);
     onion_notify(1, "notify.payload.elf_only", base);
     free(buf);

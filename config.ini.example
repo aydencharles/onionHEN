@@ -38,9 +38,6 @@ show_title_ids=false
 show_onionhen_options=true
 
 [cheats]
-# memory_backend selects the cheat memory access implementation.
-# Available values: default, libhijacker
-memory_backend=default
 # mirror selects the git host for online cheat catalogs.
 # Available values: auto, github, cnb
 # auto uses cnb.cool when the UI/system language is zh-Hans, otherwise GitHub.
@@ -100,6 +97,15 @@ show_memory=true
 # show_ip_address displays the console LAN IP address.
 # Available values: true, false
 show_ip_address=false
+# show_fan_duty displays the current fan duty in percent.
+# Available values: true, false
+show_fan_duty=false
+# font_size sets the monitor bar text size.
+# Available values: small, medium, large
+font_size=medium
+# order is the left-to-right metric sequence on the bar.
+# Available values: comma-separated fps, cpu, gpu, memory, ip, fan
+order=fps,cpu,gpu,memory,ip,fan
 
 [shortcuts]
 # cheats_menu controls the shortcut that opens the cheats menu.
@@ -113,11 +119,3 @@ toolbox=off
 # autoload loads kstuff when OnionHEN starts.
 # Available values: true, false
 autoload=true
-
-[ftp]
-# autoload starts the built-in FTP server the next time OnionHEN launches.
-# Available values: true, false
-autoload=false
-# port selects the TCP listen port for the built-in server.
-# Available values: 1 through 65535
-port=1337

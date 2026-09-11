@@ -34,28 +34,13 @@ file(GLOB SrcFiles CONFIGURE_DEPENDS
  
 )
 
-# ftpsrv is linked into util as a library-style module.  Its standalone main
-# and platform-specific alternatives are intentionally excluded; the service
-# facade owns the worker thread and lifecycle.
-set(FTPSRV_SOURCE_DIR "${ONIONHEN_THIRD_PARTY_DIR}/ftpsrv")
-set(FTPSRV_SOURCES
-  "${FTPSRV_SOURCE_DIR}/srv.c"
-  "${FTPSRV_SOURCE_DIR}/cmd.c"
-  "${FTPSRV_SOURCE_DIR}/cmd-proc.c"
-  "${FTPSRV_SOURCE_DIR}/cmd-comp.c"
-  "${FTPSRV_SOURCE_DIR}/cmd-prospero.c"
-  "${FTPSRV_SOURCE_DIR}/notify.c"
-  "${FTPSRV_SOURCE_DIR}/io.c"
-  "${FTPSRV_SOURCE_DIR}/io-freebsd.c"
-  "${FTPSRV_SOURCE_DIR}/self.c"
-  "${FTPSRV_SOURCE_DIR}/self-prospero.c"
-)
-
 set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS} ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -Wno-unused-const-variable -Wno-deprecated-declarations")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -Wno-unused-const-variable -Wno-deprecated-declarations -ffunction-sections -fdata-sections")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-errors")
+set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
-target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles} ${FTPSRV_SOURCES}
+target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles}
   "${ONIONHEN_COMMON_DIR}/elfldr_remote.c")
 onion_target_debug_define(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -87,28 +72,22 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
 	CURL_STATICLIB
 	ONION_CURL_CA_BUNDLE="${ONION_CURL_CA_BUNDLE}"
-  VERSION_TAG="OnionHEN ftpsrv module"
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
 	"${ONION_CURL_ROOT}/include")
-target_include_directories(${PROJECT_NAME} PRIVATE "${FTPSRV_SOURCE_DIR}")
 # The CA bundle is embedded with .incbin, which is invisible to the compiler's
 # normal dependency scanner.
 set_source_files_properties(
 	"${D_SRC}/cheats/sync/http_transport_ps5.cpp"
 	PROPERTIES OBJECT_DEPENDS "${ONION_CURL_CA_BUNDLE}"
 )
-# Upstream ftpsrv is compiled with a less strict warning profile than the
-# OnionHEN util sources.  Keep the shared target's -Werror for our code while
-# allowing the pinned third-party module to retain its upstream implementation.
-set_source_files_properties(${FTPSRV_SOURCES} PROPERTIES
-  COMPILE_FLAGS "-Wno-error -Wno-unused-parameter -Wno-sign-compare")
 target_link_directories(${PROJECT_NAME} PUBLIC
   "${ONIONHEN_PS5_STUB_DIR}"
   "${ONIONHEN_THIRD_PARTY_DIR}/keystone/lib"
   "${ONION_CURL_ROOT}/lib"
   "${PS5_PAYLOAD_SDK}/target/lib"
 )
+target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--gc-sections" "-Wl,--icf=safe")
 add_dependencies(${PROJECT_NAME} hijacker onion_settings onion_ipc onion_proc onion_platform onion_payload onion_ready onion_elfldr)
 # keystone: ShnExt ASM only
 target_link_libraries(${PROJECT_NAME} PUBLIC
@@ -123,6 +102,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     hijacker
     SceSystemService
     SceUserService
+    SceNotification
     SceNetCtl
     SceNet
     kernel_sys

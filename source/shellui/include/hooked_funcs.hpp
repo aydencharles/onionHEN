@@ -136,7 +136,12 @@ std::string base64_decode(const std::string &encoded_string);
 std::vector<unsigned char> encrypt_decrypt(const unsigned char *data, size_t size, const std::string &key);
 void ReloadRNPSApp(const char* title_id);
 
-void generate_payload_xml(std::string& xml_buffer, bool list_page);
+void generate_payload_xml(std::string& xml_buffer);
+void generate_payload_config_xml(std::string& xml_buffer,
+                                 const std::string& payload_id);
+void generate_overlay_metrics_xml(std::string& xml_buffer);
+void generate_overlay_metric_xml(std::string& xml_buffer,
+                                 const std::string& metric_id);
 void generate_account_xml(std::string& xml_buffer);
 void generate_toolbox_xml(std::string& new_xml);
 void Patch_Main_thread_Check(MonoImage * image_core);
@@ -173,6 +178,9 @@ void shellui_poll_home_reload(void);
 
 /** UI-thread ticker for the cheat-download XML progress page. */
 void shellui_poll_cheat_progress(void);
+
+/** UI-thread ticker for the external plugin progress page. */
+void shellui_poll_plugin_progress(void);
 
 bool SetVersionString(const char* str);
 int SendShelluiNotify();
@@ -321,6 +329,8 @@ result Invoke(MonoImage* Assembly_Image, MonoClass* klass, MonoObject* Instance,
 /* ================================= ORIG HOOKED MONO FUNCS ============================================= */
 extern int (*oOnPress)(MonoObject* Instance, MonoObject* element, MonoObject* e);
 extern int (*oOnPreCreate)(MonoObject* Instance, MonoObject* element);
+extern void (*oSettingPageOnActivated)(MonoObject *, int);
+extern void (*oSettingListCleanup)(MonoObject *);
 extern void (*oUserCustomElementReset)(MonoObject* Instance, MonoObject* item);
 extern void (*oSettingPageStackOnPopping)(MonoObject* Instance,
                                           MonoObject* outgoing,
@@ -363,6 +373,8 @@ MonoObject* New_Object(MonoClass* Klass);
 MonoString *GetString_Hook(MonoObject *Instance, MonoString *str);
 int OnPress_Hook(MonoObject* Instance, MonoObject* element, MonoObject* e);
 int OnPreCreate_Hook(MonoObject* Instance, MonoObject* element);
+void SettingPageOnActivated_Hook(MonoObject *, int);
+void SettingListCleanup_Hook(MonoObject *);
 void UserCustomElementReset_Hook(MonoObject* Instance, MonoObject* item);
 void SettingPageStackOnPopping_Hook(MonoObject* Instance,
                                     MonoObject* outgoing,
@@ -370,7 +382,6 @@ void SettingPageStackOnPopping_Hook(MonoObject* Instance,
 MonoImage * getDLLimage(const char* dll_file);
 MonoString* CxmlUri_Hook(MonoObject* obj, MonoString* uri);
 MonoObject* InvokeByDesc(MonoClass* p_Class, const char* p_MethodDesc, void* p_Instance, void* p_Args);
-void generate_plapps_xml(std::string& new_xml);
 MonoString* GetString(MonoString* str);
 int ItemzLaunchByUri(const char* uri);
 void GoToHome();
@@ -384,7 +395,6 @@ int sceSystemServiceGetAppId(const char *tid);
 int usbpath();
 extern "C" int sceUserServiceGetInitialUser(int* uid);
 extern "C" int sceUserServiceGetForegroundUser(int* uid);
-void ParseCheatID(const char* id, char* tid, int* cheat_id);
 int Launch_FG_Game(const char *path, const char* title_id, const char* title);
 bool uri_boot_hook(MonoString* uri, int opt, MonoString* titleIdForBootAction);
 bool uri_boot_hook_2(MonoString* uri, int opt);

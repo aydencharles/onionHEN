@@ -169,7 +169,7 @@ int ipc_network_recv_full(int socket_fd, void *buffer, int32_t size) {
     }
     got += n;
   }
-  LOG_DEBUG("got %i bytes (full frame)", got);
+  LOG_TRACE("got %i bytes (full frame)", got);
   return got;
 }
 
@@ -237,7 +237,11 @@ void ipc_reply(int sender_socket, DaemonCommands reply_cmd, bool error,
   memcpy(outputMessage.msg, body.data(), body.size());
   ipc_message_force_nul(outputMessage);
 
-  LOG_ERROR("error: %d", outputMessage.error);
+  if (outputMessage.error != 0) {
+    LOG_ERROR("IPC reply error: %d", outputMessage.error);
+  } else {
+    LOG_DEBUG("IPC reply ok");
+  }
   ipc_network_send_full(sender_socket, &outputMessage,
                         static_cast<int32_t>(sizeof(outputMessage)));
 }

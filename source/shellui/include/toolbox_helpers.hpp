@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <onion/elf_name.h>
+
 #include <cstddef>
 #include <cstring>
 #include <string>
@@ -36,9 +38,24 @@ inline bool is_payload_elf_name(const char *name) {
   if (std::strstr(name, ".auto_start") != nullptr)
     return false;
   const std::size_t n = std::strlen(name);
-  if (!(n > 4 && std::strcmp(name + (n - 4), ".elf") == 0))
+  return onion_elf_name_has_suffix(name, n) &&
+         onion_elf_name_stem_n(name, n) > 0;
+}
+
+/**
+ * Previous builds left runtime staging files in the visible /data payload
+ * directory. Keep their reserved identity format out of the list after upgrade.
+ */
+inline bool is_legacy_payload_staging_name(const char *name) {
+  if (!name || std::strlen(name) != 21 || name[0] != 'p' ||
+      std::strcmp(name + 17, ".elf") != 0)
     return false;
-  return (n - 4) > 0;
+  for (std::size_t i = 1; i < 17; ++i) {
+    const char c = name[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+      return false;
+  }
+  return true;
 }
 
 /**
@@ -52,9 +69,7 @@ inline bool elf_key_from_name(const char *name, char *out, std::size_t out_sz) {
   base = base ? base + 1 : name;
   if (!base[0] || std::strcmp(base, ".") == 0 || std::strcmp(base, "..") == 0)
     return false;
-  std::size_t n = std::strlen(base);
-  if (n >= 4 && std::strcmp(base + n - 4, ".elf") == 0)
-    n -= 4;
+  std::size_t n = onion_elf_name_stem_n(base, std::strlen(base));
   if (n == 0)
     return false;
   if (n >= out_sz)

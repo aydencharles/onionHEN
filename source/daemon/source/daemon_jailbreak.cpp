@@ -18,21 +18,28 @@
  */
 
 #include "daemon_ops.hpp"
+#include "app_lifecycle_runtime.hpp"
 #include "globalconf.hpp"
 
 #include <onion/app_jailbreak_policy.hpp>
+#include <onion/app_lifecycle.hpp>
 #include <onion/platform.h>
 #include <onion/proc_query.h>
 #include <onion/settings.hpp>
 #include "onion_cjson.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <cerrno>
 #include <climits>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -63,6 +70,53 @@ namespace {
 pthread_mutex_t jb_control_lock = PTHREAD_MUTEX_INITIALIZER;
 std::atomic_bool jb_listener_enabled{false};
 int jb_control_write_fd = -1;
+
+pthread_mutex_t lifecycle_control_lock = PTHREAD_MUTEX_INITIALIZER;
+int lifecycle_control_write_fd = -1;
+
+enum class LifecycleListenerControlMessage : char {
+  Stop = 'S',
+};
+
+enum class ControlMessage : char {
+  Rebuild = 'R',
+  Lifecycle = 'L',
+};
+
+enum class AppJailbreakCommandType {
+  BigAppStarted,
+  BigAppExited,
+};
+
+struct AppJailbreakCommand {
+  AppJailbreakCommandType type;
+  pid_t pid;
+  uint32_t app_id;
+  std::string title_id;
+  std::mutex completion_mutex;
+  std::condition_variable completion_ready;
+  bool completed = false;
+  bool success = false;
+};
+
+struct ControlMessages {
+  bool rebuild_requested = false;
+  bool lifecycle_requested = false;
+};
+
+std::mutex app_jailbreak_commands_mutex;
+std::deque<std::shared_ptr<AppJailbreakCommand>> app_jailbreak_commands;
+
+constexpr auto kAppJailbreakCommandTimeout = std::chrono::seconds(2);
+constexpr auto kAppJailbreakStartupTimeout = std::chrono::seconds(2);
+
+onion::lifecycle::RuntimeStartupGate app_jailbreak_startup;
+std::atomic_bool app_jailbreak_start_cancelled{false};
+
+bool has_pending_app_jailbreak_commands() {
+  std::lock_guard<std::mutex> lock(app_jailbreak_commands_mutex);
+  return !app_jailbreak_commands.empty();
+}
 
 /** Same authid etaHEN / Hijacker::jailbreak historically used. */
 constexpr uint64_t kJbAuthId = 0x4801000000000013ull;
@@ -256,12 +310,181 @@ struct TrackedApp {
   std::set<pid_t> pids;
 };
 
-class JailbreakEventLoop {
+struct TrackedBigApp {
+  uint32_t app_id = 0;
+  std::string title_id;
+};
+
+/** Identifies foreground Big Apps and only publishes lifecycle events. */
+class SceSysCoreAppLifecycleCollector {
 public:
-  explicit JailbreakEventLoop(int control_read_fd)
+  bool on_exec(pid_t pid, const ExecIdentity &id) {
+    if (id.app_info_rc != 0 || id.tid.empty() || big_apps_.count(pid) != 0)
+      return false;
+
+    std::string current_title_id;
+    int current_app_id = -1;
+    if (!Get_Running_App_TID(current_title_id, current_app_id) ||
+        current_app_id < 0 ||
+        id.info.app_id != static_cast<uint32_t>(current_app_id) ||
+        id.tid != current_title_id || get_game_pid() != pid)
+      return false;
+
+    if (!onion::daemon::app_lifecycle::publish_big_app_started(
+            pid, id.info.app_id, id.tid))
+      return false;
+
+    big_apps_[pid] = {id.info.app_id, id.tid};
+    LOG_INFO("[lifecycle] Big App started pid=%d appid=%u tid=%s",
+             static_cast<int>(pid), id.info.app_id, id.tid.c_str());
+    return true;
+  }
+
+  bool on_exit(pid_t pid) {
+    const auto found = big_apps_.find(pid);
+    if (found == big_apps_.end())
+      return false;
+
+    const TrackedBigApp app = found->second;
+    big_apps_.erase(found);
+    if (!onion::daemon::app_lifecycle::publish_big_app_exited(
+            pid, app.app_id, app.title_id))
+      return false;
+
+    LOG_INFO("[lifecycle] Big App exited pid=%d appid=%u tid=%s",
+             static_cast<int>(pid), app.app_id, app.title_id.c_str());
+    return true;
+  }
+
+private:
+  std::map<pid_t, TrackedBigApp> big_apps_;
+};
+
+/** The sole owner of SceSysCore NOTE_EXEC/NOTE_EXIT subscription. */
+class SceSysCoreAppLifecycleListener {
+public:
+  explicit SceSysCoreAppLifecycleListener(int control_read_fd)
       : control_read_fd_(control_read_fd) {}
 
-  ~JailbreakEventLoop() {
+  ~SceSysCoreAppLifecycleListener() {
+    if (kq_ >= 0)
+      close(kq_);
+  }
+
+  void run() {
+    if (!start())
+      return;
+
+    struct kevent events[16];
+    while (!g_stack_shutting_down.load(std::memory_order_acquire)) {
+      const int count = kevent(kq_, nullptr, 0, events,
+                               sizeof(events) / sizeof(events[0]), nullptr);
+      if (count < 0) {
+        if (errno == EINTR)
+          continue;
+        LOG_ERROR("[lifecycle] SceSysCore kevent wait failed: %s",
+                  strerror(errno));
+        return;
+      }
+
+      for (int index = 0; index < count; ++index) {
+        const struct kevent &event = events[index];
+        if (event.filter == EVFILT_READ &&
+            event.ident == static_cast<uintptr_t>(control_read_fd_)) {
+          drain_control_pipe();
+          return;
+        }
+        if (event.flags & EV_ERROR) {
+          LOG_ERROR("[lifecycle] SceSysCore event error filter=%d ident=%lu "
+                    "error=%lld",
+                    static_cast<int>(event.filter),
+                    static_cast<unsigned long>(event.ident),
+                    static_cast<long long>(event.data));
+          continue;
+        }
+        if (event.filter == EVFILT_PROC && !handle_process_event(event))
+          return;
+      }
+    }
+  }
+
+private:
+  bool start() {
+    kq_ = kqueue();
+    if (kq_ < 0) {
+      LOG_ERROR("[lifecycle] kqueue create failed: %s", strerror(errno));
+      return false;
+    }
+
+    struct kevent event;
+    EV_SET(&event, static_cast<uintptr_t>(control_read_fd_), EVFILT_READ,
+           EV_ADD | EV_ENABLE | EV_CLEAR, 0, 0, nullptr);
+    if (kevent(kq_, &event, 1, nullptr, 0, nullptr) != 0) {
+      LOG_ERROR("[lifecycle] control-pipe watch failed: %s", strerror(errno));
+      return false;
+    }
+
+    syscore_pid_ = onion_find_pid("SceSysCore.elf");
+    if (syscore_pid_ <= 0) {
+      LOG_ERROR("[lifecycle] cannot find SceSysCore.elf; listener inactive");
+      return false;
+    }
+
+    EV_SET(&event, static_cast<uintptr_t>(syscore_pid_), EVFILT_PROC,
+           EV_ADD | EV_ENABLE | EV_CLEAR,
+           NOTE_FORK | NOTE_EXEC | NOTE_TRACK, 0, nullptr);
+    if (kevent(kq_, &event, 1, nullptr, 0, nullptr) != 0) {
+      LOG_ERROR("[lifecycle] cannot watch SceSysCore pid=%d: %s",
+                static_cast<int>(syscore_pid_), strerror(errno));
+      return false;
+    }
+
+    LOG_INFO("[lifecycle] SceSysCore listener active pid=%d",
+             static_cast<int>(syscore_pid_));
+    return true;
+  }
+
+  void drain_control_pipe() const {
+    char buffer[64];
+    while (read(control_read_fd_, buffer, sizeof(buffer)) > 0) {
+    }
+  }
+
+  bool handle_process_event(const struct kevent &event) {
+    const pid_t pid = static_cast<pid_t>(event.ident);
+    if (event.fflags & NOTE_EXEC) {
+      const ExecIdentity id = read_exec_identity(pid);
+      if (identity_is_shellui(id)) {
+        LOG_DEBUG("[lifecycle] SysCore EXEC SceShellUI pid=%d",
+                  static_cast<int>(pid));
+        toolbox_on_new_shellui(pid);
+      }
+      (void)collector_.on_exec(pid, id);
+    }
+    if (event.fflags & NOTE_EXIT) {
+      if (onion::lifecycle::ProcessExitPolicy::should_stop_listener(
+              syscore_pid_, pid)) {
+        LOG_ERROR("[lifecycle] SceSysCore exited; listener stopped");
+        return false;
+      }
+      (void)collector_.on_exit(pid);
+    }
+    return true;
+  }
+
+  int control_read_fd_ = -1;
+  int kq_ = -1;
+  pid_t syscore_pid_ = -1;
+  SceSysCoreAppLifecycleCollector collector_;
+};
+
+/** Owns AppJailbreak's PID and sandbox vnode monitoring state. */
+class AppJailbreakRuntime {
+public:
+  explicit AppJailbreakRuntime(int control_read_fd)
+      : control_read_fd_(control_read_fd) {}
+
+  ~AppJailbreakRuntime() {
     close_vnode_watches();
     if (kq_ >= 0) {
       close(kq_);
@@ -269,12 +492,9 @@ public:
   }
 
   void run() {
-    if (!rebuild()) {
-      return;
-    }
-
     struct kevent events[16];
-    while (!g_stack_shutting_down.load(std::memory_order_acquire)) {
+    while (!g_stack_shutting_down.load(std::memory_order_acquire) &&
+           !app_jailbreak_start_cancelled.load(std::memory_order_acquire)) {
       const int count = kevent(kq_, nullptr, 0, events,
                                sizeof(events) / sizeof(events[0]), nullptr);
       if (count < 0) {
@@ -289,15 +509,25 @@ public:
         const struct kevent &event = events[i];
         if (event.filter == EVFILT_READ &&
             event.ident == static_cast<uintptr_t>(control_read_fd_)) {
-          drain_control_pipe();
-          if (g_stack_shutting_down.load(std::memory_order_acquire)) {
+          const ControlMessages messages = drain_control_pipe();
+          // EAGAIN on the writer means a prior wake is pending, which may be
+          // a rebuild byte rather than a lifecycle byte. Check the queue too.
+          if (messages.lifecycle_requested ||
+              has_pending_app_jailbreak_commands()) {
+            process_app_jailbreak_commands();
+          }
+          if (g_stack_shutting_down.load(std::memory_order_acquire) ||
+              app_jailbreak_start_cancelled.load(std::memory_order_acquire)) {
             return;
           }
-          /* Replacing kqueue invalidates every remaining event in this batch. */
-          if (!rebuild()) {
-            return;
+          if (messages.rebuild_requested) {
+            /* Replacing kqueue invalidates every remaining event in this batch. */
+            if (!rebuild()) {
+              return;
+            }
+            break;
           }
-          break;
+          continue;
         }
 
         if (event.flags & EV_ERROR) {
@@ -309,13 +539,15 @@ public:
         }
 
         if (event.filter == EVFILT_PROC) {
-          handle_process_event(event);
+          handle_tracked_process_event(event);
         } else if (event.filter == EVFILT_VNODE) {
           handle_vnode_event(event);
         }
       }
     }
   }
+
+  bool initialize() { return rebuild(); }
 
 private:
   bool install_control_watch(int kq) const {
@@ -342,7 +574,6 @@ private:
       close(kq_);
     }
     kq_ = new_kq;
-    syscore_pid_ = -1;
     pid_to_tid_.clear();
     active_apps_.clear();
     settings_ = g_settings.snapshot();
@@ -351,74 +582,93 @@ private:
         jb_listener_enabled.load(std::memory_order_acquire) &&
         settings_.app_jailbreak_enabled;
 
-    syscore_pid_ = onion_find_pid("SceSysCore.elf");
-    if (syscore_pid_ <= 0) {
-      LOG_ERROR("[JB] cannot find SceSysCore.elf; lifecycle listener inactive");
-      return true;
-    }
-
-    struct kevent event;
-    EV_SET(&event, static_cast<uintptr_t>(syscore_pid_), EVFILT_PROC,
-           EV_ADD | EV_ENABLE | EV_CLEAR,
-           NOTE_FORK | NOTE_EXEC | NOTE_TRACK, 0, nullptr);
-    if (kevent(kq_, &event, 1, nullptr, 0, nullptr) != 0) {
-      LOG_ERROR("[JB] cannot watch SceSysCore pid=%d: %s",
-                static_cast<int>(syscore_pid_), strerror(errno));
-      syscore_pid_ = -1;
-      return true;
-    }
-
-    LOG_INFO("[JB] event listener active: SceSysCore pid=%d, "
-             "fflags=NOTE_FORK|NOTE_EXEC|NOTE_TRACK, jailbreak=%s",
-             static_cast<int>(syscore_pid_), jb_enabled ? "on" : "off");
+    LOG_INFO("[JB] runtime active: PID/vnode monitoring, jailbreak=%s",
+             jb_enabled ? "on" : "off");
     return true;
   }
 
-  void drain_control_pipe() const {
+  ControlMessages drain_control_pipe() const {
+    ControlMessages messages;
     char buffer[64];
-    while (read(control_read_fd_, buffer, sizeof(buffer)) > 0) {
+    for (;;) {
+      const ssize_t count = read(control_read_fd_, buffer, sizeof(buffer));
+      if (count <= 0) {
+        break;
+      }
+      for (ssize_t index = 0; index < count; ++index) {
+        switch (static_cast<ControlMessage>(buffer[index])) {
+        case ControlMessage::Rebuild:
+          messages.rebuild_requested = true;
+          break;
+        case ControlMessage::Lifecycle:
+          messages.lifecycle_requested = true;
+          break;
+        }
+      }
     }
+    return messages;
   }
 
-  void handle_process_event(const struct kevent &event) {
+  void handle_tracked_process_event(const struct kevent &event) {
     const pid_t pid = static_cast<pid_t>(event.ident);
-
-    LOG_TRACE("[JB][diag] proc event pid=%d fflags=0x%x data=%lld flags=0x%x",
-              static_cast<int>(pid), event.fflags,
-              static_cast<long long>(event.data), event.flags);
-
-    if (event.fflags & NOTE_TRACKERR) {
-      LOG_ERROR("[JB][diag] NOTE_TRACKERR pid=%d parent=%lld; no fallback",
-                static_cast<int>(pid), static_cast<long long>(event.data));
-    }
-    if (event.fflags & NOTE_EXEC) {
-      const ExecIdentity id = read_exec_identity(pid);
-      if (identity_is_shellui(id)) {
-        LOG_DEBUG("[JB] SysCore EXEC SceShellUI pid=%d name='%s' tid='%s'",
-                  static_cast<int>(pid), id.process_name, id.tid.c_str());
-        toolbox_on_new_shellui(pid);
-      }
-      const bool jb_enabled =
-          jb_listener_enabled.load(std::memory_order_acquire) &&
-          settings_.app_jailbreak_enabled;
-      if (jb_enabled) {
-        inspect_app_process(pid, "exec", id);
-      }
-    }
     if (event.fflags & NOTE_EXIT) {
-      if (pid == syscore_pid_) {
-        LOG_ERROR("[JB] SceSysCore exited; lifecycle listener inactive");
-        syscore_pid_ = -1;
-      } else {
-        remove_app_process(pid);
-      }
+      remove_app_process(pid);
     }
   }
 
-  void inspect_app_process(pid_t pid, const char *source,
+  void process_app_jailbreak_commands() {
+    for (;;) {
+      std::shared_ptr<AppJailbreakCommand> command;
+      {
+        std::lock_guard<std::mutex> lock(app_jailbreak_commands_mutex);
+        if (app_jailbreak_commands.empty())
+          return;
+        command = std::move(app_jailbreak_commands.front());
+        app_jailbreak_commands.pop_front();
+      }
+
+      bool success = false;
+      switch (command->type) {
+      case AppJailbreakCommandType::BigAppStarted:
+        success = inspect_big_app_process(command->pid, command->app_id,
+                                          command->title_id);
+        break;
+      case AppJailbreakCommandType::BigAppExited:
+        remove_app_process(command->pid);
+        success = true;
+        break;
+      }
+
+      {
+        std::lock_guard<std::mutex> lock(command->completion_mutex);
+        command->success = success;
+        command->completed = true;
+      }
+      command->completion_ready.notify_one();
+    }
+  }
+
+  bool inspect_big_app_process(pid_t pid, uint32_t app_id,
+                               const std::string &title_id) {
+    if (!jb_listener_enabled.load(std::memory_order_acquire) ||
+        !settings_.app_jailbreak_enabled) {
+      LOG_DEBUG("[JB] Big App start ignored while AppJailbreak is disabled "
+                "pid=%d tid=%s",
+                static_cast<int>(pid), title_id.c_str());
+      return true;
+    }
+
+    ExecIdentity id;
+    id.app_info_rc = 0;
+    id.info.app_id = app_id;
+    id.tid = title_id;
+    return inspect_app_process(pid, "big-app", id);
+  }
+
+  bool inspect_app_process(pid_t pid, const char *source,
                            const ExecIdentity &id) {
     if (pid <= 1 || pid_to_tid_.find(pid) != pid_to_tid_.end()) {
-      return;
+      return true;
     }
 
     if (id.app_info_rc != 0) {
@@ -426,7 +676,7 @@ private:
                 "GetAppInfo rc=%d errno=%d",
                 source, static_cast<int>(pid), id.name_rc, id.process_name,
                 id.app_info_rc, errno);
-      return;
+      return false;
     }
     const std::string &tid = id.tid;
     const bool whitelisted =
@@ -439,7 +689,7 @@ private:
               onion::app_jailbreak::whitelist_reason(
                   tid, settings_.app_jailbreak_allowlist));
     if (!whitelisted) {
-      return;
+      return true;
     }
 
     struct kevent event;
@@ -448,7 +698,7 @@ private:
     if (kevent(kq_, &event, 1, nullptr, 0, nullptr) != 0) {
       LOG_ERROR("[JB] cannot watch exit pid=%d tid=%s: %s",
                 static_cast<int>(pid), tid.c_str(), strerror(errno));
-      return;
+      return false;
     }
 
     TrackedApp &app = active_apps_[tid];
@@ -466,6 +716,7 @@ private:
       ensure_sandbox_root_watch();
       discover_slots(tid);
     }
+    return true;
   }
 
   void remove_app_process(pid_t pid) {
@@ -908,13 +1159,81 @@ private:
 
   int control_read_fd_ = -1;
   int kq_ = -1;
-  pid_t syscore_pid_ = -1;
   onion::Settings settings_ {};
   std::map<int, VnodeWatch> vnode_watches_;
   std::map<std::string, int> path_to_fd_;
   std::map<pid_t, std::string> pid_to_tid_;
   std::map<std::string, TrackedApp> active_apps_;
 };
+
+bool enqueue_app_jailbreak_command(AppJailbreakCommandType type, pid_t pid,
+                                   uint32_t app_id, const char *title_id) {
+  if (pid <= 1 || title_id == nullptr || title_id[0] == '\0' ||
+      g_stack_shutting_down.load(std::memory_order_acquire))
+    return false;
+
+  auto command = std::make_shared<AppJailbreakCommand>();
+  command->type = type;
+  command->pid = pid;
+  command->app_id = app_id;
+  command->title_id = title_id;
+  {
+    std::lock_guard<std::mutex> lock(app_jailbreak_commands_mutex);
+    app_jailbreak_commands.push_back(command);
+  }
+
+  bool queued_wake = false;
+  pthread_mutex_lock(&jb_control_lock);
+  if (jb_control_write_fd >= 0) {
+    const char wake = static_cast<char>(ControlMessage::Lifecycle);
+    const ssize_t count = write(jb_control_write_fd, &wake, sizeof(wake));
+    queued_wake = count == static_cast<ssize_t>(sizeof(wake)) ||
+                  (count < 0 && errno == EAGAIN);
+  }
+  pthread_mutex_unlock(&jb_control_lock);
+
+  if (!queued_wake) {
+    std::lock_guard<std::mutex> lock(app_jailbreak_commands_mutex);
+    for (auto it = app_jailbreak_commands.begin();
+         it != app_jailbreak_commands.end();
+         ++it) {
+      if (*it == command) {
+        app_jailbreak_commands.erase(it);
+        break;
+      }
+    }
+    LOG_WARN("[lifecycle] cannot wake AppJailbreak listener for pid=%d",
+             static_cast<int>(pid));
+    return false;
+  }
+
+  std::unique_lock<std::mutex> lock(command->completion_mutex);
+  if (!command->completion_ready.wait_for(lock, kAppJailbreakCommandTimeout,
+                                          [&command] {
+                                            return command->completed;
+                                          })) {
+    LOG_WARN("[lifecycle] AppJailbreak command timed out type=%u pid=%d",
+             static_cast<unsigned>(type), static_cast<int>(pid));
+    return false;
+  }
+  return command->success;
+}
+
+void cancel_pending_app_jailbreak_commands() {
+  std::deque<std::shared_ptr<AppJailbreakCommand>> pending;
+  {
+    std::lock_guard<std::mutex> lock(app_jailbreak_commands_mutex);
+    pending.swap(app_jailbreak_commands);
+  }
+  for (const auto &command : pending) {
+    {
+      std::lock_guard<std::mutex> lock(command->completion_mutex);
+      command->success = false;
+      command->completed = true;
+    }
+    command->completion_ready.notify_one();
+  }
+}
 
 bool set_nonblocking_close_on_exec(int fd) {
   const int status_flags = fcntl(fd, F_GETFL, 0);
@@ -926,13 +1245,57 @@ bool set_nonblocking_close_on_exec(int fd) {
 
 } // namespace
 
+void app_lifecycle_listener_stop() {
+  pthread_mutex_lock(&lifecycle_control_lock);
+  if (lifecycle_control_write_fd >= 0) {
+    const char wake = static_cast<char>(LifecycleListenerControlMessage::Stop);
+    const ssize_t ignored =
+        write(lifecycle_control_write_fd, &wake, sizeof(wake));
+    (void)ignored;
+  }
+  pthread_mutex_unlock(&lifecycle_control_lock);
+}
+
+void *app_lifecycle_listener_thread(void *args) noexcept {
+  (void)args;
+  int control_pipe[2] = {-1, -1};
+  if (pipe(control_pipe) != 0 ||
+      !set_nonblocking_close_on_exec(control_pipe[0]) ||
+      !set_nonblocking_close_on_exec(control_pipe[1])) {
+    LOG_ERROR("[lifecycle] control pipe setup failed: %s", strerror(errno));
+    if (control_pipe[0] >= 0)
+      close(control_pipe[0]);
+    if (control_pipe[1] >= 0)
+      close(control_pipe[1]);
+    return nullptr;
+  }
+
+  pthread_mutex_lock(&lifecycle_control_lock);
+  lifecycle_control_write_fd = control_pipe[1];
+  pthread_mutex_unlock(&lifecycle_control_lock);
+
+  {
+    SceSysCoreAppLifecycleListener listener(control_pipe[0]);
+    listener.run();
+  }
+
+  pthread_mutex_lock(&lifecycle_control_lock);
+  if (lifecycle_control_write_fd == control_pipe[1])
+    lifecycle_control_write_fd = -1;
+  close(control_pipe[1]);
+  pthread_mutex_unlock(&lifecycle_control_lock);
+  close(control_pipe[0]);
+  LOG_INFO("[lifecycle] SceSysCore listener stopped");
+  return nullptr;
+}
+
 void app_jailbreak_set_enabled(bool enabled) {
   const bool previous =
       jb_listener_enabled.exchange(enabled, std::memory_order_acq_rel);
 
   pthread_mutex_lock(&jb_control_lock);
   if (jb_control_write_fd >= 0) {
-    const char wake = 1;
+    const char wake = static_cast<char>(ControlMessage::Rebuild);
     const ssize_t ignored = write(jb_control_write_fd, &wake, sizeof(wake));
     (void)ignored;
   }
@@ -942,6 +1305,18 @@ void app_jailbreak_set_enabled(bool enabled) {
     LOG_INFO("[JB] app jailbreak listener %s",
              enabled ? "enabled" : "disabled");
   }
+}
+
+bool app_jailbreak_on_big_app_started(pid_t pid, uint32_t app_id,
+                                      const char *title_id) {
+  return enqueue_app_jailbreak_command(
+      AppJailbreakCommandType::BigAppStarted, pid, app_id, title_id);
+}
+
+bool app_jailbreak_on_big_app_exited(pid_t pid, uint32_t app_id,
+                                     const char *title_id) {
+  return enqueue_app_jailbreak_command(
+      AppJailbreakCommandType::BigAppExited, pid, app_id, title_id);
 }
 
 void *fifo_and_dumper_thread(void *args) noexcept {
@@ -957,6 +1332,8 @@ void *fifo_and_dumper_thread(void *args) noexcept {
     if (control_pipe[1] >= 0) {
       close(control_pipe[1]);
     }
+    app_jailbreak_startup.signal(
+        onion::lifecycle::RuntimeStartupStatus::Failed);
     return nullptr;
   }
 
@@ -964,15 +1341,30 @@ void *fifo_and_dumper_thread(void *args) noexcept {
   jb_control_write_fd = control_pipe[1];
   pthread_mutex_unlock(&jb_control_lock);
 
-  LOG_INFO("[JB] worker started (SceSysCore lifecycle + sandbox vnode events)");
+  if (app_jailbreak_start_cancelled.load(std::memory_order_acquire)) {
+    app_jailbreak_startup.signal(
+        onion::lifecycle::RuntimeStartupStatus::Failed);
+  }
+
+  LOG_INFO("[JB] runtime started (PID + sandbox vnode monitoring)");
   LOG_DEBUG("[JB] kernel symbols: ALLPROC=0x%lx ROOTVNODE=0x%lx",
             static_cast<unsigned long>(KERNEL_ADDRESS_ALLPROC),
             static_cast<unsigned long>(KERNEL_ADDRESS_ROOTVNODE));
 
   {
-    JailbreakEventLoop loop(control_pipe[0]);
-    loop.run();
+    AppJailbreakRuntime runtime(control_pipe[0]);
+    const bool initialized = runtime.initialize();
+    if (initialized &&
+        !app_jailbreak_start_cancelled.load(std::memory_order_acquire)) {
+      app_jailbreak_startup.signal(
+          onion::lifecycle::RuntimeStartupStatus::Ready);
+      runtime.run();
+    } else {
+      app_jailbreak_startup.signal(
+          onion::lifecycle::RuntimeStartupStatus::Failed);
+    }
   }
+  cancel_pending_app_jailbreak_commands();
 
   pthread_mutex_lock(&jb_control_lock);
   if (jb_control_write_fd == control_pipe[1]) {
@@ -982,6 +1374,35 @@ void *fifo_and_dumper_thread(void *args) noexcept {
   pthread_mutex_unlock(&jb_control_lock);
   close(control_pipe[0]);
 
-  LOG_INFO("[JB] event listener worker stopped");
+  LOG_INFO("[JB] runtime stopped");
   return nullptr;
+}
+
+bool app_jailbreak_runtime_start(pthread_t *thread) {
+  if (thread == nullptr)
+    return false;
+  app_jailbreak_start_cancelled.store(false, std::memory_order_release);
+  app_jailbreak_startup.reset();
+  if (pthread_create(thread, nullptr, fifo_and_dumper_thread, nullptr) != 0) {
+    LOG_ERROR("[JB] runtime thread creation failed");
+    return false;
+  }
+  const auto startup_status = app_jailbreak_startup.wait_for(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          kAppJailbreakStartupTimeout));
+  if (startup_status != onion::lifecycle::RuntimeStartupStatus::Ready) {
+    if (startup_status == onion::lifecycle::RuntimeStartupStatus::Timeout)
+      LOG_ERROR("[JB] runtime startup timed out");
+    app_jailbreak_start_cancelled.store(true, std::memory_order_release);
+    pthread_mutex_lock(&jb_control_lock);
+    if (jb_control_write_fd >= 0) {
+      const char wake = static_cast<char>(ControlMessage::Rebuild);
+      const ssize_t ignored = write(jb_control_write_fd, &wake, sizeof(wake));
+      (void)ignored;
+    }
+    pthread_mutex_unlock(&jb_control_lock);
+    (void)pthread_join(*thread, nullptr);
+    return false;
+  }
+  return true;
 }

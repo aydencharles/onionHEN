@@ -421,6 +421,8 @@ static int test_filename_compatible_and_compare(void) {
   TEST_ASSERT_EQ_INT(
       1, onion_cheat_filename_compatible(&process_source, "default.elf"));
   TEST_ASSERT_EQ_INT(
+      0, onion_cheat_filename_compatible(&process_source, ""));
+  TEST_ASSERT_EQ_INT(
       0, onion_cheat_filename_compatible(&process_source, "eboot.bin"));
   TEST_ASSERT_EQ_INT(
       0, onion_cheat_filename_compatible(&process_only, "worker.bin"));

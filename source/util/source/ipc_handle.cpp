@@ -4,8 +4,9 @@
  */
 #include <onion/platform.h>
 #include <onion/payload.h>
+#include <onion/proc_query.h>
 #include "ipc.hpp"
-#include "service_facade.hpp"
+#include "util_language.h"
 #include <msg.hpp>
 #include <onion/settings.hpp>
 #include "common_utils.h"
@@ -24,6 +25,8 @@ extern "C" {
 #include "cheats/runtime.h"
 #include "cheats/sync/cheat_sync_service.hpp"
 #include <cstdio>
+#include <cerrno>
+#include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -33,17 +36,29 @@ extern "C" {
 #include <sstream>
 #include <string>
 #include <vector>
+#include <atomic>
 
 extern bool is_handler_enabled;
+extern "C" int sceKernelGetProcessName(int pid, char *name);
 
 void reply(int sender_socket, bool error, std::string out_var = "Nothing");
 extern "C" {
 int launchApp(const char *titleId);
 }
-std::string GetPS5Version(const std::string &jsonpath);
-std::vector<uint8_t> readFile(std::string filename);
-
 namespace {
+
+std::atomic<uint64_t> g_cheat_request_id{1};
+
+bool is_payload_path_identity(const std::string &id) {
+  if (id.size() != ONION_PAYLOAD_IDENTITY_SIZE - 1 || id[0] != 'p')
+    return false;
+  for (size_t i = 1; i < id.size(); ++i) {
+    const char c = id[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+      return false;
+  }
+  return true;
+}
 
 std::string make_state_json(const char *state, uint32_t task_id = 0) {
   cJSON *root = cJSON_CreateObject();
@@ -103,35 +118,15 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false, out_var);
     break;
   }
-  case BREW_UTIL_TOGGLE_FTP: {
-    const cJSON *toggle = cJSON_GetObjectItemCaseSensitive(my_json.get(),
-                                                            "toggle");
-    const bool enabled = toggle && cJSON_IsNumber(toggle) && toggle->valueint;
-    bool ok = true;
-    const onion::Settings settings = g_settings.snapshot();
-    if (enabled)
-      ok = onion::services::ftpService().start(
-          static_cast<uint16_t>(settings.ftp_port));
-    else
-      onion::services::ftpService().stop();
-    reply(sender_app, !ok);
-    break;
-  }
-  case BREW_UTIL_FTP_STATUS: {
-    reply(sender_app, false,
-          onion::services::ftpService().running() ? "1" : "0");
-    break;
-  }
-  case BREW_UTIL_RECOVER_FTP: {
-    reply(sender_app, !onion::services::ftpService().recover());
-    break;
-  }
   case BREW_UTIL_UNUSED_LEGACY_SERVICE_SCAN:
   case BREW_UTIL_UNUSED_LEGACY_SERVICE_TOGGLE:
   case BREW_UTIL_UNUSED_KLOG:
-  case BREW_UTIL_UNUSED_DPI:
   case BREW_UTIL_UNUSED_SHELLUI_ON_STANDBY:
-    /* Removed scan-now / Klog / DPI / rest-standby IPC; ordinals stay stable. */
+  case BREW_UTIL_UNUSED_SHADOWMOUNT_TOGGLE:
+  case BREW_UTIL_UNUSED_SHADOWMOUNT_STATUS:
+  case BREW_UTIL_UNUSED_DPI_TOGGLE:
+  case BREW_UTIL_UNUSED_DPI_STATUS:
+    /* Removed scan-now / Klog / rest-standby IPC; ordinals stay stable. */
     LOG_WARN("Removed-service toggle: unsupported (cmd=%u)", static_cast<unsigned>(command));
     reply(sender_app, true);
     break;
@@ -148,73 +143,17 @@ void handleIPC(clientArgs *client, std::string &inputStr,
       break;
     }
 
-    std::string tmp, game_version;
-    bool is_PS5 = tid.rfind("PPSA", 0) == 0; // Check if tid starts with "PPSA"
-    if (is_PS5) {
-      // Attempt to load JSON files for PS5 games
-      tmp = "/system_data/priv/appmeta/" + tid + "/param.json";
-      if (!if_exists(tmp.c_str())) {
-        LOG_DEBUG("%s: json %s does not exist", tid.c_str(), tmp.c_str());
-        tmp = "/system_data/priv/appmeta/external/" + tid + "/param.json";
-
-        if (!if_exists(tmp.c_str())) {
-          LOG_DEBUG("%s: json %s does not exist", tid.c_str(), tmp.c_str());
-          tmp = "/system_ex/app/" + tid + "/sce_sys/param.json";
-          if (!if_exists(tmp.c_str())) {
-            LOG_DEBUG("%s: json %s does not exist", tid.c_str(), tmp.c_str());
-            onion_notify(true, "notify.game.version_failed");
-            reply(sender_app, true);
-            break;
-          }
-        }
-      }
-
-      game_version = GetPS5Version(tmp);
-      if (game_version.empty()) {
-        onion_notify(true, "notify.game.version_failed");
-        LOG_ERROR("Failed to get game version for PS5 Game");
-        reply(sender_app, true);
-        break;
-      }
-    } else {
-      // Attempt to load SFO files for PS4 games
-      tmp = "/system_data/priv/appmeta/" + tid + "/param.sfo";
-      if (!if_exists(tmp.c_str())) {
-        LOG_DEBUG("%s: sfo %s does not exist", tid.c_str(), tmp.c_str());
-        tmp = "/system_data/priv/appmeta/external/" + tid + "/param.sfo";
-        if (!if_exists(tmp.c_str())) {
-          LOG_DEBUG("%s: sfo %s does not exist", tid.c_str(), tmp.c_str());
-          onion_notify(true, "notify.game.version_failed");
-          reply(sender_app, true);
-          break;
-        }
-      }
-
-      std::vector<uint8_t> sfo_data = readFile(tmp);
-      if (sfo_data.empty()) {
-        onion_notify(true, "notify.game.sfo_failed");
-        reply(sender_app, true);
-        break;
-      }
-
-      SfoReader sfo(sfo_data);
-      // VERSION key holds the original version, it doesn't change if updated
-      try {
-          std::string version_str = sfo.GetValueFor<std::string>("VERSION");
-          std::string app_ver_str = sfo.GetValueFor<std::string>("APP_VER");
-
-          float version_val = std::stof(version_str);
-          float app_ver_val = std::stof(app_ver_str);
-
-          game_version = (version_val > app_ver_val) ? version_str : app_ver_str;
-      }
-      catch (const std::exception& e) {
-          // Fallback to APP_VER if there's an issue
-          game_version = sfo.GetValueFor<std::string>("APP_VER");
-      }
+    char game_version[32] = {0};
+    if (util_resolve_game_version(tid.c_str(), game_version,
+                                  sizeof(game_version)) < 0 ||
+        game_version[0] == '\0') {
+      onion_notify(true, "notify.game.version_failed");
+      LOG_ERROR("Failed to get game version for %s", tid.c_str());
+      reply(sender_app, true);
+      break;
     }
 
-    LOG_DEBUG("Resolved %s version: %s", tid.c_str(), game_version.c_str());
+    LOG_DEBUG("Resolved %s version: %s", tid.c_str(), game_version);
     reply(sender_app, false, game_version);
 
     break;
@@ -226,7 +165,10 @@ void handleIPC(clientArgs *client, std::string &inputStr,
         std::string(onion_cjson::string_item(my_json.get(), "title_id", ""));
     LOG_INFO("Launching payload %s (key: %s)", payload_path.c_str(),
                  title_id.c_str());
-    if (!load_payload(payload_path.c_str())) {
+    const bool has_path_identity = is_payload_path_identity(title_id);
+    if (!(has_path_identity
+              ? load_payload_with_key(payload_path.c_str(), title_id.c_str())
+              : load_payload(payload_path.c_str()))) {
       onion_notify(true, "notify.payload.load_failed",
                    payload_path.c_str(), title_id.c_str());
       reply(sender_app, true);
@@ -241,39 +183,80 @@ void handleIPC(clientArgs *client, std::string &inputStr,
   case BREW_UTIL_GET_GAME_CHEAT: {
     std::string title_id =
         std::string(onion_cjson::string_item(my_json.get(), "tid", ""));
-    std::string version =
-        std::string(onion_cjson::string_item(my_json.get(), "version", ""));
     int pid = onion_cjson::int_item(my_json.get(), "pid");
     int appid = onion_cjson::int_item(my_json.get(), "appid");
-    std::string shm_path = "/user/data/OnionHEN/" + title_id + "_cheats";
+    const char *mode = onion_cjson::string_item(my_json.get(), "mode", "browse");
+    if (std::strcmp(mode, "browse") != 0 && std::strcmp(mode, "runtime") != 0) {
+      LOG_ERROR("[cheats] invalid list mode '%s'", mode);
+      reply(sender_app, true);
+      break;
+    }
+    char resolved_version[32] = {};
+    if (util_resolve_game_version(title_id.c_str(), resolved_version,
+                                  sizeof(resolved_version)) < 0) {
+      reply(sender_app, true);
+      break;
+    }
+    const std::string request_id = std::to_string(
+        static_cast<unsigned long long>(g_cheat_request_id.fetch_add(1)));
+    std::string shm_path = "/user/data/OnionHEN/" + title_id + "_cheats_" +
+                           request_id;
+
+    onion::cheats::CheatRequest request;
+    request.mode = std::strcmp(mode, "runtime") == 0
+                       ? onion::cheats::CheatViewMode::Runtime
+                       : onion::cheats::CheatViewMode::Browse;
+    request.game = {title_id, resolved_version};
+    if (request.mode == onion::cheats::CheatViewMode::Runtime) {
+      onion::cheats::ProcessIdentity process;
+      process.pid = pid;
+      process.appid = appid;
+      process.process_name = onion_cjson::string_item(
+          my_json.get(), "process", "");
+      if (process.process_name.empty() && process.pid > 0) {
+        char name[ONION_PROC_PROCESS_NAME_LEN] = {};
+        if (sceKernelGetProcessName(process.pid, name) == 0) {
+          process.process_name = name;
+        }
+      }
+      const char *generation =
+          onion_cjson::string_item(my_json.get(), "generation", "");
+      if (generation[0] != '\0') {
+        char *end = nullptr;
+        errno = 0;
+        process.session_generation = std::strtoull(generation, &end, 10);
+        if (errno == ERANGE || end == generation || *end != '\0') {
+          process.session_generation = 0;
+        }
+      }
+      if (!process.valid()) {
+        reply(sender_app, true);
+        break;
+      }
+      request.process = process;
+    }
 
     auto &cheats = onion::cheats::CheatService::instance();
     cheats.ensureDir();
-    if (cheats.exportList(title_id, version, pid, appid, shm_path) == 0) {
+    if (cheats.exportList(request, shm_path) == 0) {
       reply(sender_app, false, shm_path);
     } else {
-      onion_notify(true, "notify.cheats.none", title_id.c_str(),
-             version.c_str());
+      onion_notify(true, "notify.cheats.none", title_id.c_str());
       reply(sender_app, true);
     }
     break;
   }
 
   case BREW_UTIL_TOGGLE_CHEAT: {
-    std::string title_id =
-        std::string(onion_cjson::string_item(my_json.get(), "tid", ""));
-    std::string version =
-        std::string(onion_cjson::string_item(my_json.get(), "version", ""));
-    int pid = onion_cjson::int_item(my_json.get(), "pid");
-    int appid = onion_cjson::int_item(my_json.get(), "appid");
-    int cheat_id = onion_cjson::int_item(my_json.get(), "cheat_id");
+    const std::string session_id = onion_cjson::string_item(
+        my_json.get(), "session_id", "");
+    const std::string cheat_key = onion_cjson::string_item(
+        my_json.get(), "cheat_key", "");
+    const bool enabled = onion_cjson::bool_item(my_json.get(), "enabled");
     std::string status;
 
-    LOG_DEBUG("Received toggle command for cheat %d on %s PID %d", cheat_id,
-              title_id.c_str(), pid);
-
     auto &cheats = onion::cheats::CheatService::instance();
-    if (cheats.toggle(pid, appid, title_id, version, cheat_id, status) == 0) {
+    if (cheats.toggle(session_id, cheat_key, enabled, status) == 0) {
       LOG_DEBUG("Cheat toggle reply: %s", status.c_str());
       reply(sender_app, false, status);
     } else {
@@ -365,6 +348,19 @@ void handleIPC(clientArgs *client, std::string &inputStr,
     reply(sender_app, false);
     usleep(50 * 1000);
     exit(1337);
+    break;
+  }
+  case BREW_UTIL_SET_SYSTEM_LANG: {
+    /* Daemon can query the SystemService at runtime; util cannot (PTRACE).
+     * Re-store the raw SCE language so every consumer (notify, webui code,
+     * cheat-mirror, later ui_lang re-applies) follows it. */
+    const cJSON *lang = cJSON_GetObjectItemCaseSensitive(my_json.get(),
+                                                         "lang");
+    if (lang && cJSON_IsNumber(lang)) {
+      util_store_system_language(lang->valueint);
+      util_apply_ui_language(g_settings.snapshot().ui_lang);
+    }
+    reply(sender_app, false);
     break;
   }
   case BREW_RELOAD_SETTINGS: {

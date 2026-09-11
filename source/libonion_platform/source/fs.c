@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -40,6 +41,61 @@ bool touch_file(const char *path) {
     return true;
   }
   return false;
+}
+
+bool write_file_atomic(const char *path, const void *data, size_t size) {
+  char temp_path[1024];
+
+  if (!path || path[0] == '\0' || (size > 0 && !data))
+    return false;
+
+  const int n =
+      snprintf(temp_path, sizeof(temp_path), "%s.tmp.%d", path, (int)getpid());
+  if (n < 0 || (size_t)n >= sizeof(temp_path))
+    return false;
+
+  unlink(temp_path);
+  const int fd = open(temp_path, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  if (fd < 0) {
+    LOG_ERROR("write_file_atomic: open %s failed (%s)", temp_path,
+              strerror(errno));
+    return false;
+  }
+
+  const uint8_t *cursor = (const uint8_t *)data;
+  size_t remaining = size;
+  while (remaining > 0) {
+    const ssize_t written = write(fd, cursor, remaining);
+    if (written < 0 && errno == EINTR)
+      continue;
+    if (written <= 0) {
+      LOG_ERROR("write_file_atomic: write %s failed (%s)", path,
+                written < 0 ? strerror(errno) : "zero-byte write");
+      close(fd);
+      unlink(temp_path);
+      return false;
+    }
+    cursor += (size_t)written;
+    remaining -= (size_t)written;
+  }
+
+  if (fsync(fd) != 0) {
+    LOG_ERROR("write_file_atomic: fsync %s failed (%s)", path, strerror(errno));
+    close(fd);
+    unlink(temp_path);
+    return false;
+  }
+  if (close(fd) != 0) {
+    LOG_ERROR("write_file_atomic: close %s failed (%s)", path, strerror(errno));
+    unlink(temp_path);
+    return false;
+  }
+  if (rename(temp_path, path) != 0) {
+    LOG_ERROR("write_file_atomic: rename %s failed (%s)", path, strerror(errno));
+    unlink(temp_path);
+    return false;
+  }
+  return true;
 }
 
 bool mkdir_tree(const char *path) {

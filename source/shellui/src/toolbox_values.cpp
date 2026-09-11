@@ -9,11 +9,15 @@
 #include "shellui_payload_state.hpp"
 #include "shellui_state.hpp"
 #include "toolbox_i18n.hpp"
+#include "dynamic_ui_runtime.hpp"
+#include "plugin_sprx_pages.hpp"
 
 #include <onion/platform.h>
 #include <onion/ipc_client.hpp>
 
+#include <algorithm>
 #include <cstring>
+#include <ranges>
 #include <string>
 
 namespace {
@@ -42,6 +46,8 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.overlay_fps); }},
     {"id_overlay_ip",
      +[]() -> std::string { return bool_str(g_settings.overlay_ip); }},
+    {"id_overlay_fan",
+     +[]() -> std::string { return bool_str(g_settings.overlay_fan); }},
     {"id_all_cpu_usage",
      +[]() -> std::string { return bool_str(g_settings.all_cpu_usage); }},
     {"id_overlay_cpu",
@@ -50,14 +56,6 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return bool_str(g_settings.overlay_ram); }},
     {"id_plugin_kstuff_autoload",
      +[]() -> std::string { return bool_str(g_settings.kstuff_autoload); }},
-    {"id_plugin_ftpsrv_run",
-     +[]() -> std::string {
-       return bool_str(IPC_Client::getInstance(true).FtpStatus());
-     }},
-    {"id_plugin_ftpsrv_autoload",
-     +[]() -> std::string { return bool_str(g_settings.ftp_autoload); }},
-    {"id_plugin_ftpsrv_port",
-     +[]() -> std::string { return int_str(g_settings.ftp_port); }},
     {"id_disp_titleids",
      +[]() -> std::string { return bool_str(g_settings.display_tids); }},
     {"id_enable_fan_speed",
@@ -89,6 +87,43 @@ const ExactValueEntry kExactValues[] = {
      +[]() -> std::string { return int_str(g_settings.overlay_pos); }},
     {"id_overlay_align",
      +[]() -> std::string { return int_str(g_settings.overlay_align); }},
+    {"id_overlay_font_size",
+     +[]() -> std::string { return int_str(g_settings.overlay_font_size); }},
+    {"id_overlay_fps_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricFps));
+     }},
+    {"id_overlay_cpu_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricCpu));
+     }},
+    {"id_overlay_gpu_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricGpu));
+     }},
+    {"id_overlay_ram_order",
+     +[]() -> std::string {
+       return int_str(onion::overlay_metric_position(
+           g_settings.overlay_order, onion::kOverlayMetricMemory));
+     }},
+    {"id_overlay_ip_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricIp));
+     }},
+    {"id_overlay_fan_order",
+     +[]() -> std::string {
+       return int_str(
+           onion::overlay_metric_position(g_settings.overlay_order,
+                                          onion::kOverlayMetricFan));
+     }},
     /* Exact list id only — not id_toolbox_shortcut_N list_items. */
     {"id_toolbox_shortcut",
      +[]() -> std::string { return int_str(g_settings.toolbox_shortcut_opt); }},
@@ -104,39 +139,92 @@ bool try_exact_value(const std::string &id, std::string &out) {
   return false;
 }
 
-bool try_payload_list_value(const std::string &id, std::string &out) {
-  for (const auto &entry : g_ui.payloads_list) {
-    if (entry.id != id)
-      continue;
-    out = bool_str(shellui_payload_resolve_recorded_pid(entry.tid.c_str(),
-                                                        nullptr, 0) > 1);
-    return true;
+bool try_payload_control_value(const std::string &id, std::string &out) {
+  constexpr std::string_view kRunPrefix = "id_payload_run_";
+  constexpr std::string_view kAutoStartPrefix = "id_payload_autostart_";
+  constexpr std::string_view kPriorityPrefix = "id_payload_priority_";
+  constexpr std::string_view kDelayPrefix = "id_payload_delay_";
+  std::string_view payload_id;
+  bool is_run = false;
+  bool is_priority = false;
+  bool is_delay = false;
+  if (id.starts_with(kRunPrefix)) {
+    payload_id = std::string_view(id).substr(kRunPrefix.size());
+    is_run = true;
+  } else if (id.starts_with(kAutoStartPrefix)) {
+    payload_id = std::string_view(id).substr(kAutoStartPrefix.size());
+  } else if (id.starts_with(kPriorityPrefix)) {
+    payload_id = std::string_view(id).substr(kPriorityPrefix.size());
+    is_priority = true;
+  } else if (id.starts_with(kDelayPrefix)) {
+    payload_id = std::string_view(id).substr(kDelayPrefix.size());
+    is_delay = true;
+  } else {
+    return false;
   }
-  return false;
-}
-
-bool try_auto_payload_value(const std::string &id, std::string &out) {
-  for (const auto &entry : g_ui.auto_payloads_list) {
-    if (entry.id != id)
+  for (const auto &entry : g_ui.payloads_list) {
+    if (entry.id != payload_id)
       continue;
-    const std::string auto_path = entry.shellui_path + ".auto_start";
-    out = bool_str(if_exists(auto_path.c_str()));
+    if (is_priority || is_delay) {
+      OnionPayloadConfig config;
+      onion_payload_config_load(entry.shellui_path.c_str(), &config);
+      out = int_str(is_priority ? config.priority : config.delay_seconds);
+      return true;
+    }
+    out = bool_str(is_run
+                       ? shellui_payload_resolve_recorded_pid(entry.tid.c_str(),
+                                                              nullptr, 0) > 1
+                       : if_exists((entry.shellui_path + ".auto_start").c_str()));
     return true;
   }
   return false;
 }
 
 bool try_cheat_value(const std::string &id, std::string &out) {
-  if (id.find("id_cheat_") == std::string::npos)
+  bool enabled = false;
+  if (!g_ui.cheat_toggle_value(id, &enabled))
     return false;
-  if (!g_ui.is_current_game_open)
-    return false;
-
-  char tid[32] = {};
-  int cheat_id = 0;
-  ParseCheatID(id.c_str(), tid, &cheat_id);
-  out = bool_str(g_ui.get_cheat_enabled(cheat_id));
+  out = bool_str(enabled);
   return true;
+}
+
+bool try_external_plugin_value(const std::string &id, std::string &out) {
+  using onion::shellui::plugin_pages::kPluginAutoStartPrefix;
+  using onion::shellui::plugin_pages::kPluginRunPrefix;
+  using onion::shellui::plugin_pages::split_control_id;
+
+  std::string plugin_id;
+  bool is_run = false;
+  if (split_control_id(id, kPluginRunPrefix, plugin_id, 9, 9)) {
+    is_run = true;
+  } else if (!split_control_id(id, kPluginAutoStartPrefix, plugin_id, 9, 9)) {
+    return false;
+  }
+  const auto it = std::ranges::find(g_ui.external_plugins, plugin_id,
+                                    &PluginInventoryItem::plugin_id);
+  if (it == g_ui.external_plugins.end())
+    return false;
+  out = bool_str(is_run ? it->running : it->auto_start);
+  return true;
+}
+
+bool try_external_sprx_value(const std::string &id, std::string &out) {
+  using onion::shellui::plugin_pages::kSprxEnabledPrefix;
+  using onion::shellui::plugin_pages::split_control_id;
+
+  std::string sprx_id;
+  if (!split_control_id(id, kSprxEnabledPrefix, sprx_id, 1, 31))
+    return false;
+  const auto it =
+      std::ranges::find(g_ui.external_sprx, sprx_id, &SprxInventoryItem::id);
+  if (it == g_ui.external_sprx.end())
+    return false;
+  out = bool_str(it->enabled);
+  return true;
+}
+
+bool try_dynamic_control_value(const std::string &id, std::string &out) {
+  return onion::shellui::dynamic_ui::resolve_control_value(id, out);
 }
 
 } // namespace
@@ -144,13 +232,17 @@ bool try_cheat_value(const std::string &id, std::string &out) {
 std::string resolve_toolbox_control_value(const std::string &id) {
   std::string value;
 
-  if (try_payload_list_value(id, value))
-    return value;
-  if (try_auto_payload_value(id, value))
+  if (try_payload_control_value(id, value))
     return value;
   if (try_exact_value(id, value))
     return value;
   if (try_cheat_value(id, value))
+    return value;
+  if (try_external_plugin_value(id, value))
+    return value;
+  if (try_external_sprx_value(id, value))
+    return value;
+  if (try_dynamic_control_value(id, value))
     return value;
 
   return {};

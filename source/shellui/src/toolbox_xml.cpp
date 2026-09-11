@@ -11,11 +11,16 @@
 #include "ipc.hpp"
 #include "plugins_registry.hpp"
 #include "ps5_settings_ui.hpp"
+#include "settings_page_refresh.hpp"
 #include "toolbox_i18n.hpp"
 #include "toolbox_values.hpp"
+#include "dynamic_ui_runtime.hpp"
+#include "external_plugin_ui.hpp"
+#include "external_sprx_ui.hpp"
 #include "onion_cjson.hpp"
 
 #include <dirent.h>
+#include <algorithm>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -24,12 +29,16 @@
 #include <cstdlib>
 #include <unordered_map>
 #include <unordered_set>
-#include <random>
 #include <vector>
 #include <string>
 
 #include "shellui_state.hpp"
+#include "shellui_payload_state.hpp"
 #include "toolbox_helpers.hpp"
+#include "overlay_metrics.hpp"
+#include "toolbox_route.hpp"
+
+#include <onion/payload_identity.h>
 
 void escapeXML(std::string& input);
 bool Get_Running_App_TID(std::string& title_id, int& BigAppid);
@@ -40,20 +49,38 @@ void escapeXML(std::string& input) {
 
 namespace {
 
+constexpr const char* kIconPlugins =
+    "/user/data/OnionHEN/assets/icon_xml_plugins.png";
+
 /* Defined with the other dynamic control helpers below. */
 std::string toolbox_val(const char* id, const char* fallback);
 
 /** Payload .elf only (OnionHEN no longer supports .plugin packages). */
-template <typename G>
-void append_payload_entry(G& page, const std::string& directory, const char* filename,
-                          bool list_page, int& next_id) {
+std::string payload_list_status(const PayloadEntry& entry) {
+  const bool running = shellui_payload_is_running(entry.tid.c_str());
+  const bool auto_start = if_exists((entry.shellui_path + ".auto_start").c_str());
+  if (running && auto_start)
+    return toolbox_i18n::tr("payload.status.running_autostart");
+  if (running)
+    return toolbox_i18n::tr("payload.status.running");
+  if (auto_start)
+    return toolbox_i18n::tr("payload.status.stopped_autostart");
+  return toolbox_i18n::tr("payload.status.stopped");
+}
+
+void append_payload_entry(const std::string& directory,
+                          const char* filename) {
   if (!toolbox::is_payload_elf_name(filename))
+    return;
+  if (toolbox::display_path_for_ui(directory) == "/data/OnionHEN/payloads" &&
+      toolbox::is_legacy_payload_staging_name(filename))
     return;
 
   const std::string path = directory + "/" + filename;
-  char elf_key[64] = {};
-  if (!toolbox::elf_key_from_name(filename, elf_key, sizeof(elf_key))) {
-    LOG_ERROR("Skipping invalid payload name: %s", filename);
+  char identity[ONION_PAYLOAD_IDENTITY_SIZE] = {};
+  if (!onion_payload_identity_from_path(path.c_str(), identity,
+                                        sizeof(identity))) {
+    LOG_ERROR("Skipping payload with invalid path: %s", path.c_str());
     return;
   }
   /* Confirm file is readable (ELF magic checked at launch). */
@@ -64,61 +91,30 @@ void append_payload_entry(G& page, const std::string& directory, const char* fil
   }
   close(fd);
 
-  LOG_DEBUG("Found payload: %s key=%s", path.c_str(), elf_key);
+  LOG_DEBUG("Found payload: %s key=%s", path.c_str(), identity);
 
-  const std::string shown_path = toolbox::display_path_for_ui(path);
-  const std::string id_prefix = list_page ? "id_payload_" : "id_auto_payload_";
-  const std::string id = id_prefix + std::to_string(next_id++);
-
-  const std::string second =
-      list_page ? toolbox_i18n::format("payload.start_stop_fmt", filename,
-                                      shown_path.c_str(), elf_key)
-                : toolbox_i18n::format("payload.autostart_fmt", filename,
-                                      shown_path.c_str());
-
-  page.toggle(id, filename, /*on=*/false, second);
+  char canonical[ONION_PAYLOAD_PATH_SIZE];
+  if (!onion_payload_canonical_path(path.c_str(), canonical, sizeof(canonical)))
+    return;
 
   PayloadEntry entry;
   entry.shellui_path = path;
-  entry.tid = elf_key;
-  entry.path = shown_path;
+  entry.tid = identity;
+  entry.path = canonical;
   entry.name = filename;
   entry.version = "";
-  entry.id = id;
-  if (list_page)
-    g_ui.payloads_list.push_back(entry);
-  else
-    g_ui.auto_payloads_list.push_back(entry);
-}
-
-template <typename G>
-void append_homebrew_game(G& page, const std::string& game_dir, const char* dir_name,
-                          int random_num) {
-  const std::string elf_path = game_dir + "/eboot.elf";
-  if (access(elf_path.c_str(), F_OK) != 0)
+  entry.id = identity;
+  const auto existing = std::find_if(
+      g_ui.payloads_list.begin(), g_ui.payloads_list.end(),
+      [&](const PayloadEntry& item) { return item.id == entry.id; });
+  if (existing != g_ui.payloads_list.end()) {
+    LOG_ERROR("Skipping Payload with colliding identity: %s", path.c_str());
     return;
+  }
 
-#if SHELL_DEBUG == 1
-  LOG_DEBUG("Found Game: %s", game_dir.c_str());
-#endif
-
-  std::string title_id, title, ver;
-  const std::string shown_path = toolbox::display_path_for_ui(game_dir);
-  const std::string icon_path = game_dir + "/sce_sys/icon0.png";
-
-  GameEntry game;
-  game.tid = title_id;
-  game.title = title;
-  game.version = ver;
-  game.path = shown_path;
-  game.dir_name = dir_name;
-  game.icon_path = icon_path;
-  game.id = "id_onionhen_pl_loader_" + title_id + "_" + std::to_string(random_num);
-  g_ui.games_list.push_back(game);
-
-  page.button(game.id, "(" + title_id + ") " + title,
-              toolbox_i18n::format("plapps.version_fmt", shown_path.c_str(), ver.c_str()),
-              std::nullopt, icon_path);
+  if (!onion_payload_config_load(path.c_str(), &entry.config))
+    LOG_WARN("Invalid payload config, using defaults: %s", path.c_str());
+  g_ui.payloads_list.push_back(std::move(entry));
 }
 
 std::string read_file_to_string(const char* path) {
@@ -167,8 +163,9 @@ std::string join_authors(cJSON* root) {
 }
 
 template <typename G>
-void append_cheat_array(G& page, cJSON* cheats, const std::string& tid,
-                        const std::string& game_name, bool can_toggle) {
+void append_cheat_array(G& page, cJSON* cheats,
+                        const std::string& game_name, bool can_toggle,
+                        const std::string& session_id) {
   if (!cJSON_IsArray(cheats))
     return;
 
@@ -179,29 +176,31 @@ void append_cheat_array(G& page, cJSON* cheats, const std::string& tid,
         onion_cjson::string_item(entry, "description", "");
     if (desc.empty())
       desc = toolbox_i18n::tr("cheats.on_off");
-    const int id = onion_cjson::int_item(entry, "id");
     const bool enabled = onion_cjson::bool_item(entry, "enabled");
-    const std::string id_attr = "id_cheat_" + tid + "_" + std::to_string(id);
-
+    const std::string key = onion_cjson::string_item(entry, "key", "");
     if (can_toggle) {
-      page.toggle(id_attr, name, enabled, std::nullopt, desc, "tex_game_icon");
+      const std::string id_attr = "id_cheat_" + session_id + "|" + key;
+      g_ui.set_cheat_toggle(id_attr, enabled);
+      page.toggle(id_attr, name, enabled, std::nullopt, desc);
     } else {
-      page.button(id_attr, name,
+      /* Browse entries are informational. They must never enter the runtime
+       * toggle route, even if a stale page event arrives after navigation. */
+      page.button("id_cheat_view_" + key, name,
                   toolbox_i18n::format("cheats.enable_fmt", game_name.c_str(),
                             name.c_str()),
-                  desc, "tex_game_icon");
+                  desc);
     }
-    g_ui.set_cheat_enabled(id, enabled);
   }
 }
 
 template <typename G>
-void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
-                          const std::string& game_name, bool can_toggle) {
+void append_cheat_entries(G& page, cJSON* root,
+                          const std::string& game_name, bool can_toggle,
+                          const std::string& session_id) {
   cJSON* groups = onion_cjson::item(root, "groups");
   if (!cJSON_IsArray(groups) || cJSON_GetArraySize(groups) == 0) {
-    append_cheat_array(page, onion_cjson::item(root, "cheats"), tid,
-                       game_name, can_toggle);
+    append_cheat_array(page, onion_cjson::item(root, "cheats"), game_name,
+                       can_toggle, session_id);
     return;
   }
 
@@ -224,8 +223,8 @@ void append_cheat_entries(G& page, cJSON* root, const std::string& tid,
                  ps5ui::Style::Center);
     page.label("id_cheat_group_" + std::to_string(group_index++), heading,
                ps5ui::Style::Center);
-    append_cheat_array(page, onion_cjson::item(group, "cheats"), tid,
-                       game_name, can_toggle);
+    append_cheat_array(page, onion_cjson::item(group, "cheats"), game_name,
+                       can_toggle, session_id);
   }
 }
 
@@ -274,23 +273,25 @@ void generate_account_xml(std::string& xml_buffer) {
   xml_buffer = page.build();
 }
 
-void generate_payload_xml(std::string& xml_buffer, bool list_page) {
+static bool payloads_model(ps5ui::Node& model) {
   static const std::vector<std::string> kPayloadDirs = {
       "/user/data/OnionHEN/payloads",
+      "/user/data/onionhen/payloads",
       "/data/OnionHEN/payloads",
+      "/data/onionhen/payloads",
       "/usb0/OnionHEN/payloads",
+      "/usb0/onionhen/payloads",
       "/usb1/OnionHEN/payloads",
+      "/usb1/onionhen/payloads",
       "/usb2/OnionHEN/payloads",
+      "/usb2/onionhen/payloads",
       "/usb3/OnionHEN/payloads",
+      "/usb3/onionhen/payloads",
   };
 
-  const char* root_id = list_page ? "id_payload" : "id_auto_payloads";
-  const char* root_title =
-      list_page ? toolbox_i18n::tr("payload.title")
-                : toolbox_i18n::tr("payload.auto_title");
-  ps5ui::Page page(root_id, root_title);
+  g_ui.payloads_list.clear();
+  ps5ui::Page page("id_payload", toolbox_i18n::tr("payload.title"));
 
-  int toggle_switch_id = 1;
   for (const auto& directory : kPayloadDirs) {
     DIR* dir = opendir(directory.c_str());
     if (!dir) {
@@ -298,65 +299,199 @@ void generate_payload_xml(std::string& xml_buffer, bool list_page) {
       continue;
     }
     while (struct dirent* entry = readdir(dir))
-      append_payload_entry(page, directory, entry->d_name, list_page,
-                           toggle_switch_id);
+      append_payload_entry(directory, entry->d_name);
     closedir(dir);
   }
 
+  std::sort(g_ui.payloads_list.begin(), g_ui.payloads_list.end(),
+            [](const PayloadEntry& a, const PayloadEntry& b) {
+              return onion_payload_compare(a.config.priority, a.path.c_str(),
+                                           b.config.priority, b.path.c_str()) < 0;
+            });
+  for (const auto& entry : g_ui.payloads_list) {
+    const std::string status = payload_list_status(entry);
+    page.link("id_payload_item_" + entry.id, entry.name,
+              toolbox::payload_config_xml(entry.id),
+              toolbox_i18n::format("payload.status.schedule_fmt", status.c_str(),
+                                   entry.config.priority, entry.config.delay_seconds),
+              kIconPlugins);
+  }
+  model = page.root();
+  return true;
+}
+
+void generate_payload_xml(std::string& xml_buffer) {
+  ps5ui::Node model;
+  payloads_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, payloads_model);
+}
+
+void generate_payload_config_xml(std::string& xml_buffer,
+                                 const std::string& payload_id) {
+  const auto found = std::find_if(
+      g_ui.payloads_list.begin(), g_ui.payloads_list.end(),
+      [&](const PayloadEntry& entry) { return entry.id == payload_id; });
+  if (found == g_ui.payloads_list.end()) {
+    ps5ui::Page page("id_payload_config", toolbox_i18n::tr("payload.title"));
+    page.label("id_payload_missing", toolbox_i18n::tr("payload.missing"));
+    xml_buffer = page.build();
+  } else {
+    const bool running = shellui_payload_is_running(found->tid.c_str());
+    const std::string auto_path = found->shellui_path + ".auto_start";
+    const bool auto_start = if_exists(auto_path.c_str());
+    onion_payload_config_load(found->shellui_path.c_str(), &found->config);
+    ps5ui::Page page("id_payload_config", found->name);
+    page.label("id_payload_path", found->path)
+        .toggle("id_payload_run_" + found->id,
+                toolbox_i18n::tr("payload.current_session"), running,
+                toolbox_i18n::tr("payload.current_session.sub"))
+        .toggle("id_payload_autostart_" + found->id,
+                toolbox_i18n::tr("payload.next_autostart"), auto_start,
+                toolbox_i18n::tr("payload.next_autostart.sub"))
+        .text_field("id_payload_priority_" + found->id,
+                    toolbox_i18n::tr("payload.priority"),
+                    toolbox_i18n::tr("payload.priority.sub"), "number", "1", "3",
+                    std::nullopt, std::nullopt, std::nullopt,
+                    std::to_string(found->config.priority))
+        .text_field("id_payload_delay_" + found->id,
+                    toolbox_i18n::tr("payload.delay"),
+                    toolbox_i18n::tr("payload.delay.sub"), "number", "1", "3",
+                    std::nullopt, std::nullopt, std::nullopt,
+                    std::to_string(found->config.delay_seconds));
+    xml_buffer = page.build();
+  }
+}
+
+void generate_overlay_metric_xml(std::string& xml_buffer,
+                                 const std::string& metric_id) {
+  const auto *row = onion::overlay::metric_ui_by_name(metric_id);
+  if (!row) {
+    ps5ui::Page page("id_overlay_metric", toolbox_i18n::tr("overlay.group"));
+    page.label("id_overlay_metric_missing",
+               toolbox_i18n::tr("overlay.group.sub"));
+    xml_buffer = page.build();
+    return;
+  }
+
+  ps5ui::Page page("id_overlay_metric", toolbox_i18n::tr(row->title_key));
+  page.toggle(row->enable_id, toolbox_i18n::tr(row->title_key),
+              onion::overlay::metric_toggle_on(g_settings, row->metric),
+              toolbox_i18n::tr(row->desc_key))
+      .list(
+          row->order_id, toolbox_i18n::tr("overlay.item.order"),
+          [](ps5ui::ListBuilder& L) {
+            L.item("id_overlay_order_1", "1", "1")
+                .item("id_overlay_order_2", "2", "2")
+                .item("id_overlay_order_3", "3", "3")
+                .item("id_overlay_order_4", "4", "4")
+                .item("id_overlay_order_5", "5", "5")
+                .item("id_overlay_order_6", "6", "6");
+          },
+          toolbox_i18n::tr("overlay.item.order.sub"),
+          std::to_string(onion::overlay_metric_position(
+              g_settings.overlay_order, row->metric)));
+  if (row->metric == onion::kOverlayMetricCpu) {
+    page.toggle("id_all_cpu_usage", toolbox_i18n::tr("overlay.cpu_all"),
+                g_settings.all_cpu_usage,
+                toolbox_i18n::tr("overlay.cpu_all.desc"));
+  }
   xml_buffer = page.build();
 }
 
-void generate_plugins_xml(std::string& xml_buffer) {
+static bool overlay_metrics_model(ps5ui::Node &model) {
+  constexpr const char *kIcon =
+      "/user/data/OnionHEN/assets/icon_xml_overlay.png";
+  ps5ui::Page page("id_overlay_metrics", toolbox_i18n::tr("overlay.items"));
+  auto order = g_settings.overlay_order;
+  onion::overlay_normalize_order(order);
+  for (int metric : order) {
+    const auto *row = onion::overlay::metric_ui_by_metric(metric);
+    if (!row)
+      continue;
+    const int pos =
+        onion::overlay_metric_position(g_settings.overlay_order, metric);
+    const bool on = onion::overlay::metric_toggle_on(g_settings, metric);
+    page.link(std::string("id_overlay_item_") + row->name,
+              toolbox_i18n::tr(row->title_key),
+              toolbox::overlay_metric_xml(row->name),
+              toolbox_i18n::format(on ? "overlay.item.status_on_fmt"
+                                      : "overlay.item.status_off_fmt",
+                                   pos),
+              kIcon);
+  }
+  model = page.root();
+  return true;
+}
+
+void generate_overlay_metrics_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  overlay_metrics_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, overlay_metrics_model);
+}
+
+static bool plugins_model(ps5ui::Node &model) {
   using namespace onion::plugins;
 
   ps5ui::Page page("id_plugins", toolbox_i18n::tr("plugins.title"));
 
-  /* Each built-in plugin is a <link> entry; X navigates natively to that
-   * plugin's own config page (file="<plugin>.xml"). */
-  for (const auto &d : kRegistry)
+  /* The same model supplies initial XML and updates to existing elements. */
+  for (const auto &d : kRegistry) {
+    const char *status = d.sub_key;
+    if (std::string_view(d.key) == "kstuff")
+      status = g_settings.kstuff_autoload ? "plugin.kstuff.status.autoload"
+                                          : "plugin.kstuff.status.manual";
     page.link(d.toggle_id, toolbox_i18n::tr(d.title_key), d.config_xml,
-              toolbox_i18n::tr(d.sub_key));
+              toolbox_i18n::tr(status));
+  }
 
-  xml_buffer = page.build();
+  const auto settings = onion::shellui::dynamic_ui::plugin_settings_links();
+  const auto inventory = onion::shellui::external_plugins::append_inventory(
+      page, settings);
+  onion::shellui::dynamic_ui::append_plugin_links(page, settings, inventory.matched_settings);
+
+  model = page.root();
+  return inventory.available;
 }
 
-void generate_kstuff_config_xml(std::string &xml_buffer) {
+static bool sprx_model(ps5ui::Node &model) {
+  ps5ui::Page page("id_sprx", toolbox_i18n::tr("sprx.title"));
+  const bool available = onion::shellui::external_sprx::append_inventory(page);
+  model = page.root();
+  return available;
+}
+
+void generate_plugins_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  plugins_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, plugins_model);
+}
+
+void generate_sprx_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  sprx_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, sprx_model);
+}
+
+static bool kstuff_model(ps5ui::Node &model) {
   using namespace onion::plugins;
   const Descriptor *d = find_by_key("kstuff");
   ps5ui::Page page("id_plugin_config", toolbox_i18n::tr(d->title_key));
   page.toggle("id_plugin_kstuff_autoload", toolbox_i18n::tr("kstuff.autoload"),
-              /*on=*/false, toolbox_i18n::tr("kstuff.autoload.sub"))
+              g_settings.kstuff_autoload, toolbox_i18n::tr("kstuff.autoload.sub"))
       .button("id_plugin_delete_kstuff", toolbox_i18n::tr("kstuff.delete"),
               std::nullopt, toolbox_i18n::tr("kstuff.delete.desc"));
-  xml_buffer = page.build();
+  model = page.root();
+  return true;
 }
 
-void generate_ftpsrv_config_xml(std::string &xml_buffer) {
-  using namespace onion::plugins;
-  const Descriptor *d = find_by_key("ftpsrv");
-  ps5ui::Page page("id_plugin_config", toolbox_i18n::tr(d->title_key));
-  page.toggle("id_plugin_ftpsrv_run", toolbox_i18n::tr("ftp.run"), /*on=*/false,
-              toolbox_i18n::tr("ftp.run.sub"))
-      .toggle("id_plugin_ftpsrv_autoload", toolbox_i18n::tr("ftp.autoload"),
-              /*on=*/false, toolbox_i18n::tr("ftp.autoload.sub"))
-      .text_field("id_plugin_ftpsrv_port", toolbox_i18n::tr("ftp.port"),
-                  toolbox_i18n::tr("ftp.port.sub"), "number", "1", "5",
-                  std::nullopt, std::nullopt, std::nullopt,
-                  toolbox_val("id_plugin_ftpsrv_port", "1337"));
-  xml_buffer = page.build();
+void generate_kstuff_config_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  kstuff_model(model);
+  xml_buffer = onion::shellui::settings::publish(model, kstuff_model);
 }
 
 void generate_plugin_config_xml(std::string &xml_buffer) {
-  using namespace onion::plugins;
-
-  const Descriptor *d = find_by_key(g_ui.active_plugin);
-  if (!d)
-    d = &kRegistry[0];
-
-  if (std::string_view(d->key) == "kstuff")
-    generate_kstuff_config_xml(xml_buffer);
-  else
-    generate_ftpsrv_config_xml(xml_buffer);
+  generate_kstuff_config_xml(xml_buffer);
 }
 
 void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
@@ -365,10 +500,11 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       running_as_debug_settings ? "id_debug_settings" : "id_cheat_title";
 
   int appid = -1;
-  g_ui.is_game_open = Get_Running_App_TID(g_ui.running_tid, appid);
+  std::string running_tid;
+  g_ui.is_game_open = Get_Running_App_TID(running_tid, appid);
   g_ui.is_current_game_open =
       g_ui.is_game_open &&
-      g_ui.running_tid == (show_while_not_open ? not_open_tid : g_ui.running_tid);
+      running_tid == (show_while_not_open ? not_open_tid : running_tid);
 
   if (!g_ui.is_game_open && !show_while_not_open) {
     ps5ui::Page page(list_id, toolbox_i18n::tr("cheats.none"));
@@ -378,30 +514,53 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
     return;
   }
 
-  g_ui.running_tid = show_while_not_open ? not_open_tid : g_ui.running_tid;
+  const std::string target_tid =
+      show_while_not_open ? not_open_tid : running_tid;
   IPC_Client& client = IPC_Client::getInstance(true);
 
   std::string game_ver;
-  if (!client.GameVerFromTid(g_ui.running_tid, game_ver))
-    game_ver = toolbox_i18n::tr("cheats.ver_unknown");
+  const bool have_version = client.GameVerFromTid(target_tid, game_ver);
+  const std::string display_ver =
+      have_version ? game_ver : toolbox_i18n::tr("cheats.ver_unknown");
 
   ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
-                                      g_ui.running_tid.c_str(),
-                                      game_ver.c_str()));
+                                      target_tid.c_str(),
+                                      display_ver.c_str()));
 
   if (!g_ui.is_game_open && show_while_not_open) {
     page.label("id_cheat_disclaimer",
-               toolbox_i18n::format("cheats.not_running_fmt", g_ui.running_tid.c_str()),
+               toolbox_i18n::format("cheats.not_running_fmt", target_tid.c_str()),
                ps5ui::Style::Center);
   }
 
   std::string cheat_path;
-  const int cheat_pid =
-      g_ui.is_game_open ? onion_find_pid_ex(g_ui.running_tid.c_str(), false,
-                                             true, true)
-                         : 0;
-  if (!client.GetGameCheats(g_ui.running_tid, game_ver, cheat_path, cheat_pid,
-                            appid)) {
+  onion_bigapp_process_t process{};
+  int process_result = -1;
+  if (g_ui.is_current_game_open) {
+    process_result = onion_resolve_running_bigapp(&process);
+    if (process_result == -2 && process.pid > 0) {
+      LOG_WARN("[cheats] runtime process identity is ambiguous result=%d; "
+               "using best match pid=%d process='%s'",
+               process_result, static_cast<int>(process.pid),
+               process.process_name);
+    } else if (process_result != 0) {
+      LOG_WARN("[cheats] runtime process identity unavailable result=%d; "
+               "falling back to read-only browse",
+               process_result);
+    }
+  }
+  const bool have_process = process.pid > 0 &&
+                            process.session_generation != 0 &&
+                            process.process_name[0] != '\0';
+  const bool runtime_request =
+      g_ui.is_game_open && g_ui.is_current_game_open && have_process &&
+      (process_result == 0 || process_result == -2);
+  const std::string mode = runtime_request ? "runtime" : "browse";
+  const int cheat_pid = runtime_request ? process.pid : 0;
+  if (!client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,
+                            runtime_request ? process.appid : 0,
+                            runtime_request ? process.process_name : "",
+                            runtime_request ? process.session_generation : 0)) {
     page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
                ps5ui::Style::Center);
     new_xml = page.build();
@@ -430,56 +589,10 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
   page.label("credits", toolbox_i18n::format("cheats.authors_fmt", authors.c_str()),
              ps5ui::Style::Center);
 
-  append_cheat_entries(page, res_json.get(), g_ui.running_tid, game_name,
-                       g_ui.is_game_open && g_ui.is_current_game_open);
-  new_xml = page.build();
-}
-
-void generate_plapps_xml(std::string& new_xml) {
-  static const std::vector<std::string> kHomebrewDirs = {
-      "/user/data/homebrew/games",
-      "/usb0/homebrew",
-      "/usb1/homebrew/games",
-      "/usb2/homebrew/games",
-      "/usb3/homebrew/games",
-      "/mnt/ext1/homebrew/games",
-      "/mnt/ext2/homebrew/games",
-      "/mnt/ext0/homebrew/games",
-  };
-
-  ps5ui::Page page("id_plapps", toolbox_i18n::tr("plapps.title"));
-
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(1000, 9999);
-
-  for (const auto& directory : kHomebrewDirs) {
-    DIR* dir = opendir(directory.c_str());
-    if (!dir) {
-#if SHELL_DEBUG == 1
-      LOG_ERROR("Failed to open directory: %s", directory.c_str());
-#endif
-      continue;
-    }
-
-    while (struct dirent* entry = readdir(dir)) {
-      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-        continue;
-
-      const std::string game_dir = directory + "/" + entry->d_name;
-      struct stat st {};
-      if (stat(game_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-#if SHELL_DEBUG == 1
-        LOG_WARN("Skipping non-directory: %s", game_dir.c_str());
-#endif
-        continue;
-      }
-
-      append_homebrew_game(page, game_dir, entry->d_name, dist(gen));
-    }
-    closedir(dir);
-  }
-
+  append_cheat_entries(
+      page, res_json.get(), game_name,
+      onion_cjson::bool_item(res_json.get(), "canToggle"),
+      onion_cjson::string_item(res_json.get(), "sessionId", ""));
   new_xml = page.build();
 }
 
@@ -487,8 +600,6 @@ namespace {
 
 constexpr const char* kIconPkg =
     "/user/data/OnionHEN/assets/icon_xml_package.png";
-constexpr const char* kIconPlugins =
-    "/user/data/OnionHEN/assets/icon_xml_plugins.png";
 constexpr const char* kIconGame = "/user/data/OnionHEN/assets/icon_xml_game.png";
 constexpr const char* kIconCheats =
     "/user/data/OnionHEN/assets/icon_xml_cheats.png";
@@ -554,10 +665,10 @@ void append_toolbox_pkg_group(ps5ui::Group& g) {
 void append_toolbox_payloads_group(ps5ui::Group& g) {
   g.link("id_payloads", toolbox_i18n::tr("payloads.link"), "payloads.xml",
          toolbox_i18n::tr("payloads.link.sub"), kIconPlugins)
-      .link("id_auto_payloads", toolbox_i18n::tr("payload.auto.link"),
-            "auto_payloads.xml", toolbox_i18n::tr("payload.auto.sub"), kIconPlugins)
       .link("id_plugins", toolbox_i18n::tr("plugins.link"), "plugins.xml",
-            toolbox_i18n::tr("plugins.link.sub"), kIconPlugins);
+            toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
+      .link("id_sprx", toolbox_i18n::tr("sprx.link"), "sprx.xml",
+            toolbox_i18n::tr("sprx.link.sub"), kIconPlugins);
 }
 
 void append_toolbox_game_group(ps5ui::Group& g) {
@@ -627,24 +738,20 @@ void append_toolbox_display_group(ps5ui::Group& g) {
                    },
                    toolbox_i18n::tr("overlay.align.sub"),
                    toolbox_val("id_overlay_align"))
-             .toggle("id_overlay_gpu", toolbox_i18n::tr("overlay.gpu"),
-                     toolbox_on("id_overlay_gpu"), std::nullopt,
-                     toolbox_i18n::tr("overlay.gpu.desc"))
-             .toggle("id_overlay_fps", toolbox_i18n::tr("overlay.fps"),
-                     toolbox_on("id_overlay_fps"), std::nullopt,
-                     toolbox_i18n::tr("overlay.fps.desc"))
-             .toggle("id_overlay_cpu", toolbox_i18n::tr("overlay.cpu"),
-                     toolbox_on("id_overlay_cpu"), std::nullopt,
-                     toolbox_i18n::tr("overlay.cpu.desc"))
-             .toggle("id_all_cpu_usage", toolbox_i18n::tr("overlay.cpu_all"),
-                     toolbox_on("id_all_cpu_usage"), std::nullopt,
-                     toolbox_i18n::tr("overlay.cpu_all.desc"))
-             .toggle("id_overlay_ram", toolbox_i18n::tr("overlay.ram"),
-                     toolbox_on("id_overlay_ram"), std::nullopt,
-                     toolbox_i18n::tr("overlay.ram.desc"))
-             .toggle("id_overlay_ip", toolbox_i18n::tr("overlay.ip"),
-                     toolbox_on("id_overlay_ip"), std::nullopt,
-                     toolbox_i18n::tr("overlay.ip.desc"));
+             .list("id_overlay_font_size", toolbox_i18n::tr("overlay.font"),
+                   [](ps5ui::ListBuilder& L) {
+                     L.item("id_overlay_font_small",
+                            toolbox_i18n::tr("overlay.font.small"), "0")
+                         .item("id_overlay_font_medium",
+                               toolbox_i18n::tr("overlay.font.medium"), "1")
+                         .item("id_overlay_font_large",
+                               toolbox_i18n::tr("overlay.font.large"), "2");
+                   },
+                   toolbox_i18n::tr("overlay.font.sub"),
+                   toolbox_val("id_overlay_font_size"))
+             .link("id_overlay_items", toolbox_i18n::tr("overlay.items"),
+                   "overlay_metrics.xml",
+                   toolbox_i18n::tr("overlay.items.sub"));
        },
        toolbox_i18n::tr("overlay.group.sub"), kIconOverlay,
        "id_overlay_enabled")
@@ -823,6 +930,8 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                 .label("id_about_lineage_2",
                        toolbox_i18n::tr("about.lineage.goldhen"),
                        ps5ui::Style::Center)
+                .label("id_about_contributor", toolbox_i18n::tr("about.contributor"),
+                       ps5ui::Style::Center)
                 .label("id_about_testers", toolbox_i18n::tr("about.testers"),
                        ps5ui::Style::Center)
                 .label("id_about_testers_intro",
@@ -879,11 +988,7 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                        ps5ui::Style::Center)
                 .label("id_project_9",
                        "miniz / Keystone (cheats engine)",
-                    ps5ui::Style::Center)
-                  .label("id_project_10",
-                    "ftpsrv (drakmor) — "
-                    "https://github.com/drakmor/ftpsrv/tree/nexgen",
-                    ps5ui::Style::Center);
+                       ps5ui::Style::Center);
           },
           toolbox_i18n::tr("about.projects.sub"), kIconProject);
 }

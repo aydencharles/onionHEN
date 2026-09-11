@@ -24,8 +24,6 @@ static int test_defaults_and_serialize_keys(void) {
   onion::Settings s{};
   std::string text = onion::settings_serialize(s);
 
-  TEST_ASSERT_TRUE(!s.ftp_autoload);
-  TEST_ASSERT_EQ_INT(onion::kFtpPortDefault, s.ftp_port);
   TEST_ASSERT_TRUE(text.find("[meta]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("schema_version=1") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[toolbox]") != std::string::npos);
@@ -52,22 +50,18 @@ static int test_defaults_and_serialize_keys(void) {
                                  "enabled=true\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("edge=top") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("align=center") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("font_size=medium") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("order=fps,cpu,gpu,memory,ip,fan") !=
+                   std::string::npos);
   TEST_ASSERT_TRUE(text.find("background=true") != std::string::npos);
   TEST_ASSERT_TRUE(
       text.find("exact_title_ids=ITEM00001,NPXS39041,PKGI13337,PKGI12345,"
                 "TOOL00001") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("title_id_prefixes=LAPY") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("mirror=auto") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("memory_backend") == std::string::npos);
   TEST_ASSERT_TRUE(text.find("[kstuff]\n") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("autoload=true") != std::string::npos);
-  TEST_ASSERT_TRUE(text.find("[ftp]\n") != std::string::npos);
-  TEST_ASSERT_TRUE(text.find("[ftp]\n# autoload starts the built-in FTP server "
-                                 "the next time OnionHEN launches.\n"
-                                 "# Available values: true, false\n"
-                                 "autoload=false\n"
-                                 "# port selects the TCP listen port for the built-in server.\n"
-                                 "# Available values: 1 through 65535\n"
-                                 "port=1337\n") != std::string::npos);
   return 0;
 }
 
@@ -116,7 +110,6 @@ static int test_full_schema_roundtrip(void) {
 
   onion::Settings in{};
   in.startup_open_after_load = onion::kStartupOpenHomeMenu;
-  in.libhijacker_cheats = true;
   in.cheats_mirror = onion::kCheatsMirrorCnb;
   in.app_jailbreak_enabled = false;
   in.debug_app_jb_msg = true;
@@ -131,15 +124,18 @@ static int test_full_schema_roundtrip(void) {
   in.overlay_gpu = false;
   in.overlay_fps = false;
   in.overlay_ip = true;
+  in.overlay_fan = true;
   in.all_cpu_usage = true;
   in.overlay_pos = 2;
   in.overlay_align = onion::kOverlayAlignRight;
+  in.overlay_font_size = onion::kOverlayFontLarge;
+  in.overlay_order = {onion::kOverlayMetricFan, onion::kOverlayMetricFps,
+                      onion::kOverlayMetricCpu, onion::kOverlayMetricGpu,
+                      onion::kOverlayMetricMemory, onion::kOverlayMetricIp};
   in.cheats_shortcut_opt = 4;
   in.toolbox_shortcut_opt = 2;
   in.ui_lang = onion::kUiLanguageZhHans;
   in.kstuff_autoload = false;
-  in.ftp_autoload = true;
-  in.ftp_port = 2121;
   in.app_jailbreak_allowlist.exact_title_ids = {};
   in.app_jailbreak_allowlist.exact_title_ids[0] = "ITEM00001";
   in.app_jailbreak_allowlist.exact_title_ids[1] = "CUSA12345";
@@ -153,7 +149,6 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
 
   TEST_ASSERT_EQ_INT(in.startup_open_after_load, out.startup_open_after_load);
-  TEST_ASSERT_TRUE(out.libhijacker_cheats == in.libhijacker_cheats);
   TEST_ASSERT_TRUE(out.app_jailbreak_enabled == in.app_jailbreak_enabled);
   TEST_ASSERT_TRUE(out.debug_app_jb_msg == in.debug_app_jb_msg);
   TEST_ASSERT_TRUE(out.display_tids == in.display_tids);
@@ -167,16 +162,19 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(out.overlay_gpu == in.overlay_gpu);
   TEST_ASSERT_TRUE(out.overlay_fps == in.overlay_fps);
   TEST_ASSERT_TRUE(out.overlay_ip == in.overlay_ip);
+  TEST_ASSERT_TRUE(out.overlay_fan == in.overlay_fan);
   TEST_ASSERT_TRUE(out.all_cpu_usage == in.all_cpu_usage);
   TEST_ASSERT_EQ_INT(in.overlay_pos, out.overlay_pos);
   TEST_ASSERT_EQ_INT(in.overlay_align, out.overlay_align);
+  TEST_ASSERT_EQ_INT(in.overlay_font_size, out.overlay_font_size);
+  TEST_ASSERT_EQ_INT(in.overlay_order[0], out.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(in.overlay_order[1], out.overlay_order[1]);
+  TEST_ASSERT_EQ_INT(in.overlay_order[5], out.overlay_order[5]);
   TEST_ASSERT_EQ_INT(in.cheats_shortcut_opt, out.cheats_shortcut_opt);
   TEST_ASSERT_EQ_INT(in.toolbox_shortcut_opt, out.toolbox_shortcut_opt);
   TEST_ASSERT_EQ_INT(in.ui_lang, out.ui_lang);
   TEST_ASSERT_EQ_INT(in.cheats_mirror, out.cheats_mirror);
   TEST_ASSERT_TRUE(out.kstuff_autoload == in.kstuff_autoload);
-  TEST_ASSERT_TRUE(out.ftp_autoload == in.ftp_autoload);
-  TEST_ASSERT_EQ_INT(in.ftp_port, out.ftp_port);
   TEST_ASSERT_EQ_U64(
       in.app_jailbreak_allowlist.exact_title_id_count,
       out.app_jailbreak_allowlist.exact_title_id_count);
@@ -213,8 +211,6 @@ static int test_partial_ini_keeps_defaults(void) {
   TEST_ASSERT_TRUE(out.overlay_background);
   TEST_ASSERT_TRUE(out.app_jailbreak_enabled);
   TEST_ASSERT_TRUE(out.kstuff_autoload);
-  TEST_ASSERT_TRUE(!out.ftp_autoload);
-  TEST_ASSERT_EQ_INT(onion::kFtpPortDefault, out.ftp_port);
   TEST_ASSERT_EQ_INT(onion::kCheatsMirrorAuto, out.cheats_mirror);
   TEST_ASSERT_EQ_U64(5, out.app_jailbreak_allowlist.exact_title_id_count);
   TEST_ASSERT_STREQ("ITEM00001",
@@ -273,6 +269,9 @@ static int test_serialize_contains_overlay_keys(void) {
   TEST_ASSERT_TRUE(text.find("show_ip_address=true") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("cpu_usage_mode=per_core") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("edge=bottom") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("font_size=medium") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("order=fps,cpu,gpu,memory,ip,fan") !=
+                   std::string::npos);
   return 0;
 }
 
@@ -483,7 +482,7 @@ static int test_language_new_locales_roundtrip(void) {
   return 0;
 }
 
-static int test_v0_0_10_config_does_not_autoload_plugins(void) {
+static int test_v0_0_10_config_keeps_kstuff_autoload(void) {
   std::string path = temp_ini_path();
   TEST_ASSERT_TRUE(!path.empty());
   FILE *f = fopen(path.c_str(), "w");
@@ -500,8 +499,6 @@ static int test_v0_0_10_config_does_not_autoload_plugins(void) {
   onion::Settings out{};
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
   TEST_ASSERT_TRUE(out.kstuff_autoload);
-  TEST_ASSERT_TRUE(!out.ftp_autoload);
-  TEST_ASSERT_EQ_INT(onion::kFtpPortDefault, out.ftp_port);
 
   unlink(path.c_str());
   return 0;
@@ -579,6 +576,66 @@ static int test_overlay_edge_and_align(void) {
   return 0;
 }
 
+static int test_overlay_font_and_order(void) {
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontPtMedium,
+                     onion::overlay_font_pt(onion::kOverlayFontMedium));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontPtSmall,
+                     onion::overlay_font_pt(onion::kOverlayFontSmall));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontPtLarge,
+                     onion::overlay_font_pt(onion::kOverlayFontLarge));
+  TEST_ASSERT_STREQ("medium", onion::overlay_font_size_name(
+                                  onion::kOverlayFontMedium));
+  TEST_ASSERT_STREQ("fps", onion::overlay_metric_name(onion::kOverlayMetricFps));
+  TEST_ASSERT_STREQ("memory",
+                    onion::overlay_metric_name(onion::kOverlayMetricMemory));
+
+  onion::Settings s{};
+  TEST_ASSERT_EQ_INT(1, onion::overlay_metric_position(s.overlay_order,
+                                                       onion::kOverlayMetricFps));
+  TEST_ASSERT_EQ_INT(6, onion::overlay_metric_position(s.overlay_order,
+                                                       onion::kOverlayMetricFan));
+  onion::overlay_move_metric(s.overlay_order, onion::kOverlayMetricFan, 1);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFan, s.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, s.overlay_order[1]);
+  TEST_ASSERT_EQ_INT(1, onion::overlay_metric_position(s.overlay_order,
+                                                       onion::kOverlayMetricFan));
+  onion::overlay_move_metric(s.overlay_order, onion::kOverlayMetricFps, 6);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, s.overlay_order[5]);
+
+  std::string path = temp_ini_path();
+  TEST_ASSERT_TRUE(!path.empty());
+  FILE *f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[overlay]\n"
+        "font_size=large\norder=fan,ip,ram\n",
+        f);
+  fclose(f);
+  onion::Settings out{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontLarge, out.overlay_font_size);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFan, out.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricIp, out.overlay_order[1]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricMemory, out.overlay_order[2]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, out.overlay_order[3]);
+  TEST_ASSERT_TRUE(onion::settings_serialize(out).find("font_size=large") !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(onion::settings_serialize(out).find(
+                       "order=fan,ip,memory,fps,cpu,gpu") != std::string::npos);
+
+  f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[overlay]\nfont_size=tiny\norder=\n", f);
+  fclose(f);
+  onion::Settings invalid{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &invalid));
+  TEST_ASSERT_EQ_INT(onion::kOverlayFontMedium, invalid.overlay_font_size);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFps, invalid.overlay_order[0]);
+  TEST_ASSERT_EQ_INT(onion::kOverlayMetricFan, invalid.overlay_order[5]);
+
+  unlink(path.c_str());
+  return 0;
+}
+
 extern "C" int test_settings_suite(void) {
   int failures = 0;
   failures += onion_test_run("settings_defaults_serialize", test_defaults_and_serialize_keys);
@@ -591,6 +648,8 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_serialize_overlay_keys", test_serialize_contains_overlay_keys);
   failures += onion_test_run("settings_overlay_edge_and_align",
                              test_overlay_edge_and_align);
+  failures += onion_test_run("settings_overlay_font_and_order",
+                             test_overlay_font_and_order);
   failures += onion_test_run("settings_empty_file_defaults", test_empty_file_loads_defaults);
   failures += onion_test_run("settings_app_jailbreak_allowlist",
                              test_app_jailbreak_allowlist_parse_policy);
@@ -602,8 +661,8 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_language_ar", test_language_ar_roundtrip);
   failures += onion_test_run("settings_language_new_locales",
                              test_language_new_locales_roundtrip);
-  failures += onion_test_run("settings_v0_0_10_no_plugin_autoload",
-                             test_v0_0_10_config_does_not_autoload_plugins);
+  failures += onion_test_run("settings_v0_0_10_kstuff_autoload",
+                             test_v0_0_10_config_keeps_kstuff_autoload);
   failures += onion_test_run("settings_clamp_fan_threshold",
                              test_clamp_fan_threshold);
   return failures;

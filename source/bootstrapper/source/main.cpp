@@ -23,6 +23,7 @@ along with this program; see the file COPYING. If not, see
 #include "launch_pipeline.h"
 #include "payload_autostart.h"
 
+#include <onion/conflict.h>
 #include <onion/log.h>
 
 int main(void) {
@@ -33,6 +34,13 @@ int main(void) {
   if (!bootstrap_runtime_prepare())
     return -1;
   bootstrap_runtime_enable_remote_logging();
+
+  const char *conflict = onion_conflict_detect();
+  if (conflict) {
+    LOG_ERROR("refusing start: %s already running", conflict);
+    bootstrap_notify("notify.boot.conflict", conflict);
+    return 0;
+  }
 
   LOG_DEBUG("============== Spawner (Bootstrapper) Started =================");
   bootstrap_filesystem_create_directories();

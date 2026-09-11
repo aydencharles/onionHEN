@@ -16,13 +16,16 @@ along with this program; see the file COPYING. If not, see
 
 #include "detour.h"
 #include "debug_settings_route_runtime.hpp"
+#include "dynamic_ui_runtime.hpp"
 #include "hooked_funcs.hpp"
 #include "defs.h"
 #include "external_symbols.hpp"
 #include "homeui_top_nav_patch.hpp"
 #include "ipc.hpp"
+#include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
+#include "toolbox_i18n.hpp"
 #include "ucred.h"
 #include "webserver.hpp"
 
@@ -197,6 +200,7 @@ bool resolve_native_symbols(pid_t pid) {
   KERNEL_DLSYM(libkernelsys, sceKernelGetProsperoSystemSwVersion);
   KERNEL_DLSYM(libkernelsys, sceKernelGetAppInfo);
   KERNEL_DLSYM(libkernelsys, sceKernelGetProcessName);
+  KERNEL_DLSYM(libkernelsys, sceKernelGetCurrentFanDuty);
 
   /* libonion_platform must not CALL sceKernelSendNotificationRequest by name —
    * here that symbol is a dlsym'd *function pointer*. Register a trampoline. */
@@ -287,6 +291,7 @@ bool resolve_mono_symbols(pid_t pid) {
   KERNEL_DLSYM(libmono, mono_vtable_get_static_field_data);
   KERNEL_DLSYM(libmono, mono_class_get_method_from_name);
   KERNEL_DLSYM(libmono, mono_class_get_field_from_name);
+  KERNEL_DLSYM(libmono, mono_field_get_value);
   KERNEL_DLSYM(libmono, mono_aot_get_method);
   KERNEL_DLSYM(libmono, mono_field_static_set_value);
   KERNEL_DLSYM(libmono, mono_assembly_setrootdir);
@@ -548,6 +553,12 @@ bool install_hooks(const ShellImages& img) {
       {"SettingPage.OnCreating", img.legacy, UI3_dec.c_str(), "SettingPage",
        "OnCreating", 1, reinterpret_cast<void*>(&OnPreCreate_Hook),
        reinterpret_cast<void**>(&oOnPreCreate), false},
+      {"SettingPage.OnActivated", img.legacy, UI3_dec.c_str(), "SettingPage",
+       "OnActivated", 1, reinterpret_cast<void *>(&SettingPageOnActivated_Hook),
+       reinterpret_cast<void **>(&oSettingPageOnActivated), false},
+      {"SettingList.Cleanup", img.legacy, UI3_dec.c_str(), "SettingList",
+       "Cleanup", 0, reinterpret_cast<void *>(&SettingListCleanup_Hook),
+       reinterpret_cast<void **>(&oSettingListCleanup), false},
       {"UserCustomElementUI.Reset", img.legacy, UI3_dec.c_str(),
        "UserCustomElementUI", "Reset", 1,
        reinterpret_cast<void*>(&UserCustomElementReset_Hook),
@@ -731,6 +742,9 @@ int main(int argc, char const* argv[]) {
   is_3xx = (sw.version < kFw3xxMaxExclusive);
   is_6xx = (sw.version >= kFw6xxMin);
   shellui_configure_debug_settings_route(sw.version);
+  onion::shellui::dynamic_ui::configure(sw.version);
+  if (!onion::shellui::plugin_ui_bridge::start())
+    LOG_ERROR("Failed to start dynamic plugin UI bridge");
   LOG_DEBUG("System Software Version: %s is_3xx: %s debug_settings_old: %s",
               sw.version_str, is_3xx ? "Yes" : "No",
               shellui_debug_settings_uses_old_route() ? "Yes" : "No");
@@ -777,6 +791,9 @@ int main(int argc, char const* argv[]) {
 
   LOG_DEBUG("Performed Magic");
   setup_proc_hooks();
+
+  /* SystemService cannot be queried under PTRACE_AUTHID. */
+  toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
 
   shellui_hooks_publish_ready();
   /*

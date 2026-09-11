@@ -242,20 +242,6 @@ const char *log_level_name(int v) {
   }
 }
 
-bool parse_libhijacker_backend(const char *s, bool def) {
-  if (streq_ci(s, "default")) {
-    return false;
-  }
-  if (streq_ci(s, "libhijacker")) {
-    return true;
-  }
-  return def;
-}
-
-const char *cheat_backend_name(bool libhijacker) {
-  return libhijacker ? "libhijacker" : "default";
-}
-
 int parse_cheats_mirror(const char *s, int def) {
   if (streq_ci(s, "auto")) {
     return kCheatsMirrorAuto;
@@ -464,6 +450,83 @@ const char *cpu_usage_mode_name(bool per_core) {
   return per_core ? "per_core" : "average";
 }
 
+int parse_overlay_font_size(const char *s, int def) {
+  if (streq_ci(s, "small")) {
+    return kOverlayFontSmall;
+  }
+  if (streq_ci(s, "medium")) {
+    return kOverlayFontMedium;
+  }
+  if (streq_ci(s, "large")) {
+    return kOverlayFontLarge;
+  }
+  return def;
+}
+
+int parse_overlay_metric_token(const char *s) {
+  if (streq_ci(s, "fps")) {
+    return kOverlayMetricFps;
+  }
+  if (streq_ci(s, "cpu")) {
+    return kOverlayMetricCpu;
+  }
+  if (streq_ci(s, "gpu")) {
+    return kOverlayMetricGpu;
+  }
+  if (streq_ci(s, "memory") || streq_ci(s, "ram")) {
+    return kOverlayMetricMemory;
+  }
+  if (streq_ci(s, "ip")) {
+    return kOverlayMetricIp;
+  }
+  if (streq_ci(s, "fan")) {
+    return kOverlayMetricFan;
+  }
+  return -1;
+}
+
+void parse_overlay_order(const char *s,
+                         std::array<int, kOverlayMetricCount> *out) {
+  if (!s || !out) {
+    return;
+  }
+  std::array<int, kOverlayMetricCount> parsed{};
+  bool seen[kOverlayMetricCount] = {};
+  int n = 0;
+  const std::string input(s);
+  std::size_t start = 0;
+  while (start <= input.size()) {
+    const std::size_t comma = input.find(',', start);
+    const std::string token = trim_copy(input.substr(
+        start, comma == std::string::npos ? std::string::npos : comma - start));
+    const int metric = parse_overlay_metric_token(token.c_str());
+    if (metric >= 0 && !seen[metric] && n < kOverlayMetricCount) {
+      seen[metric] = true;
+      parsed[n++] = metric;
+    }
+    if (comma == std::string::npos) {
+      break;
+    }
+    start = comma + 1;
+  }
+  overlay_normalize_order(parsed);
+  *out = parsed;
+}
+
+std::string
+serialize_overlay_order(const std::array<int, kOverlayMetricCount> &order) {
+  auto normalized = order;
+  overlay_normalize_order(normalized);
+  std::string out;
+  for (int i = 0; i < kOverlayMetricCount; ++i) {
+    if (i != 0) {
+      out += ',';
+    }
+    out += overlay_metric_name(normalized[i]);
+  }
+  return out;
+}
+
 int parse_cheats_shortcut(const char *s, int def) {
   if (streq_ci(s, "off")) {
     return 0;
@@ -555,8 +618,6 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->onionhen_game_opts =
       parse_bool(ini_get(parser, "game_menu.show_onionhen_options"),
                  out->onionhen_game_opts);
-  out->libhijacker_cheats = parse_libhijacker_backend(
-      ini_get(parser, "cheats.memory_backend"), out->libhijacker_cheats);
   out->cheats_mirror = parse_cheats_mirror(ini_get(parser, "cheats.mirror"),
                                            out->cheats_mirror);
   out->app_jailbreak_enabled =
@@ -606,6 +667,13 @@ bool apply_parser(IniParser *parser, Settings *out) {
       parse_bool(ini_get(parser, "overlay.show_memory"), out->overlay_ram);
   out->overlay_ip = parse_bool(ini_get(parser, "overlay.show_ip_address"),
                                out->overlay_ip);
+  out->overlay_fan = parse_bool(ini_get(parser, "overlay.show_fan_duty"),
+                                out->overlay_fan);
+  out->overlay_font_size = parse_overlay_font_size(
+      ini_get(parser, "overlay.font_size"), out->overlay_font_size);
+  if (const char *order = ini_get(parser, "overlay.order")) {
+    parse_overlay_order(order, &out->overlay_order);
+  }
   out->cheats_shortcut_opt =
       parse_cheats_shortcut(ini_get(parser, "shortcuts.cheats_menu"),
                             out->cheats_shortcut_opt);
@@ -614,10 +682,6 @@ bool apply_parser(IniParser *parser, Settings *out) {
                              out->toolbox_shortcut_opt);
   out->kstuff_autoload =
       parse_bool(ini_get(parser, "kstuff.autoload"), out->kstuff_autoload);
-  out->ftp_autoload =
-      parse_bool(ini_get(parser, "ftp.autoload"), out->ftp_autoload);
-  out->ftp_port = parse_int_range(ini_get(parser, "ftp.port"), out->ftp_port,
-                                  1, 65535);
   return true;
 }
 
@@ -701,10 +765,6 @@ std::string settings_serialize(const Settings &in) {
   b += "show_onionhen_options=" + bool_text(in.onionhen_game_opts) + "\n";
   b += "\n";
   b += "[cheats]\n";
-  b += "# memory_backend selects the cheat memory access implementation.\n";
-  b += "# Available values: default, libhijacker\n";
-  b += "memory_backend=" + std::string(cheat_backend_name(in.libhijacker_cheats)) +
-       "\n";
   b += "# mirror selects the git host for online cheat catalogs.\n";
   b += "# Available values: auto, github, cnb\n";
   b += "# auto uses cnb.cool when the UI/system language is zh-Hans, otherwise GitHub.\n";
@@ -774,6 +834,16 @@ std::string settings_serialize(const Settings &in) {
   b += "# show_ip_address displays the console LAN IP address.\n";
   b += "# Available values: true, false\n";
   b += "show_ip_address=" + bool_text(in.overlay_ip) + "\n";
+  b += "# show_fan_duty displays the current fan duty in percent.\n";
+  b += "# Available values: true, false\n";
+  b += "show_fan_duty=" + bool_text(in.overlay_fan) + "\n";
+  b += "# font_size sets the monitor bar text size.\n";
+  b += "# Available values: small, medium, large\n";
+  b += "font_size=" + std::string(overlay_font_size_name(in.overlay_font_size)) +
+       "\n";
+  b += "# order is the left-to-right metric sequence on the bar.\n";
+  b += "# Available values: comma-separated fps, cpu, gpu, memory, ip, fan\n";
+  b += "order=" + serialize_overlay_order(in.overlay_order) + "\n";
   b += "\n";
   b += "[shortcuts]\n";
   b += "# cheats_menu controls the shortcut that opens the cheats menu.\n";
@@ -789,13 +859,6 @@ std::string settings_serialize(const Settings &in) {
   b += "# autoload loads kstuff when OnionHEN starts.\n";
   b += "# Available values: true, false\n";
   b += "autoload=" + bool_text(in.kstuff_autoload) + "\n";
-  b += "\n[ftp]\n";
-  b += "# autoload starts the built-in FTP server the next time OnionHEN launches.\n";
-  b += "# Available values: true, false\n";
-  b += "autoload=" + bool_text(in.ftp_autoload) + "\n";
-  b += "# port selects the TCP listen port for the built-in server.\n";
-  b += "# Available values: 1 through 65535\n";
-  b += "port=" + std::to_string(in.ftp_port) + "\n";
   return b;
 }
 

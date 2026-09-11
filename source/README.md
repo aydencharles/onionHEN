@@ -12,8 +12,9 @@ features, usage, configuration, and credits.
 | `daemon/` | Main daemon |
 | `util/` | Utility daemon (cheats, IPC, …) |
 | `shellui/` | Toolbox / ShellUI hooks |
+| `i18n/` | Shared Toolbox / notification locale catalogs (see [its README](i18n/README.md)) |
 | `unpacker/` | Payload unpacker |
-| `libhijacker/`, `libNineS/`, `libNidResolver/` | Internal static libs |
+| `libhijacker/`, `libNineS/`, `libNidResolver/`, `libonion_sprx/` | Internal static libs |
 | `include/` | Shared headers |
 | `common/` | Shared low-level implementations |
 | `platform/ps5/stubs/` | PS5 system-library link stubs |

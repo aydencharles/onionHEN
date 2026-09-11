@@ -20,6 +20,9 @@
 
 #define ONION_SYSTEM_TMP_CRIT_SOCKET ONION_SYSTEM_TMP_IPC_ROOT "/crit_service"
 #define ONION_SYSTEM_TMP_UTIL_SOCKET ONION_SYSTEM_TMP_IPC_ROOT "/util_service"
+#define ONION_SYSTEM_TMP_PLUGIN_SOCKET ONION_SYSTEM_TMP_IPC_ROOT "/plugin_service"
+#define ONION_SYSTEM_TMP_SHELLUI_PLUGIN_SOCKET                                  \
+  ONION_SYSTEM_TMP_IPC_ROOT "/shellui_plugin_bridge"
 
 #define ONION_SYSTEM_TMP_ELFLDR_STATE                                      \
   ONION_SYSTEM_TMP_PID_ROOT "/onion_elfldr_9020.PID"

@@ -9,8 +9,10 @@
 #include "ipc.hpp"
 #include "onpress_policy.hpp"
 #include "progress_dialog.hpp"
+#include "plugin_progress.hpp"
 #include "remote_play.hpp"
 #include "toolbox_values.hpp"
+#include "settings_page_refresh.hpp"
 
 #include "shellui_state.hpp"
 #include <onion/platform.h>
@@ -77,6 +79,7 @@ int OnPreCreate_Hook(MonoObject *Instance, MonoObject *element) {
     return call_original(Instance, element);
   }
 
+  onion::shellui::settings::bind(Instance);
   const std::string id = GetPropertyValue(element, "Id");
 
   if (!toolbox::toolbox_owns_settings_page(g_ui.active_page)) {
@@ -85,6 +88,11 @@ int OnPreCreate_Hook(MonoObject *Instance, MonoObject *element) {
 
   if (g_ui.active_page == toolbox::Page::CheatProgress) {
     cheat_progress_bind_page(Instance);
+    return call_original(Instance, element);
+  }
+
+  if (g_ui.active_page == toolbox::Page::PluginProgress) {
+    plugin_progress_bind_page(Instance);
     return call_original(Instance, element);
   }
 

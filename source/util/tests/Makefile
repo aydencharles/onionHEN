@@ -28,11 +28,18 @@ COMMON_FLAGS := -Wall -Wextra -g -O0 $(DEPFLAGS) -DONION_HOST_TEST=1 -DCBC=1 \
 	-I$(REPO_ROOT)/source/libonion_settings/include \
 	-I$(REPO_ROOT)/source/libonion_platform/include \
 	-I$(REPO_ROOT)/source/libonion_payload/include \
+	-I$(REPO_ROOT)/source/libonion_conflict/include \
 	-I$(REPO_ROOT)/source/libonion_proc/include \
 	-I$(REPO_ROOT)/source/libonion_ipc/include \
 	-I$(REPO_ROOT)/source/libonion_detour/include \
 	-I$(REPO_ROOT)/source/libonion_ready \
 	-I$(REPO_ROOT)/source/libonion_fps/include \
+	-I$(REPO_ROOT)/source/libonion_lifecycle/include \
+	-I$(REPO_ROOT)/source/libonion_sprx/include \
+	-I$(REPO_ROOT)/source/libonion_plugin_ui/include \
+	-I$(REPO_ROOT)/source/libonion_plugin_bridge/include \
+	-I$(REPO_ROOT)/source/libonion_plugin_session/include \
+	-I$(REPO_ROOT)/source/libonion_plugin_manager/include \
 	-I$(REPO_ROOT)/source/daemon/include \
 	-I$(THIRD_PARTY_ROOT)/cjson \
 	-I$(THIRD_PARTY_ROOT)/cheat_support \
@@ -48,8 +55,8 @@ NOTIFY_I18N_CATALOG := $(BUILD_DIR)/generated/notify_i18n_catalog.inc
 # ready.h lives under source/include/onion/
 COMMON_FLAGS += -I$(REPO_ROOT)/source/include
 
-CFLAGS := $(COMMON_FLAGS) -std=c11
-CXXFLAGS := $(COMMON_FLAGS) -std=c++20
+CFLAGS := $(COMMON_FLAGS) -std=c11 -D_DEFAULT_SOURCE
+CXXFLAGS := $(COMMON_FLAGS) -std=c++20 -D_DEFAULT_SOURCE
 LDFLAGS := $(KEYSTONE_LDFLAGS) -pthread
 
 # Production sources under test
@@ -64,7 +71,9 @@ PROD_C_SRCS := \
 	$(REPO_ROOT)/source/libonion_platform/source/notify.c \
 	$(REPO_ROOT)/source/libonion_platform/source/notify_i18n.c \
 	$(REPO_ROOT)/source/libonion_ready/source/ready.c \
-	$(REPO_ROOT)/source/libonion_payload/source/payload.c
+	$(REPO_ROOT)/source/libonion_payload/source/payload.c \
+	$(REPO_ROOT)/source/libonion_payload/source/payload_config.c \
+	$(REPO_ROOT)/source/libonion_conflict/source/conflict.c
 
 PROD_CXX_SRCS := \
 	$(UTIL_ROOT)/source/cheats/json_cheat_parser.cpp \
@@ -85,10 +94,18 @@ PROD_CXX_SRCS := \
 	$(THIRD_PARTY_ROOT)/cjson/cJSON.cpp \
 	$(REPO_ROOT)/source/libonion_settings/source/settings.cpp \
 	$(REPO_ROOT)/source/libonion_ipc/source/ipc_server.cpp \
+	$(REPO_ROOT)/source/libonion_plugin_manager/source/plugin_descriptor.cpp \
+	$(REPO_ROOT)/source/libonion_plugin_manager/source/plugin_manager.cpp \
 	$(REPO_ROOT)/source/shellui/src/ps5_settings_ui.cpp \
 	$(REPO_ROOT)/source/shellui/src/toolbox_route.cpp \
 	$(REPO_ROOT)/source/shellui/src/toolbox_i18n.cpp \
-	$(REPO_ROOT)/source/libonion_fps/source/fps_formula.cpp
+	$(REPO_ROOT)/source/shellui/src/dynamic_ui_xml.cpp \
+	$(REPO_ROOT)/source/shellui/src/dynamic_ui_runtime.cpp \
+	$(REPO_ROOT)/source/libonion_fps/source/fps_formula.cpp \
+	$(REPO_ROOT)/source/libonion_lifecycle/source/app_lifecycle.cpp \
+	$(REPO_ROOT)/source/libonion_sprx/source/sprx_loader.cpp \
+	$(REPO_ROOT)/source/libonion_sprx/source/sprx_catalog.cpp \
+	$(REPO_ROOT)/source/libonion_sprx/source/sprx_plugin_manager.cpp
 
 TEST_C_SRCS := \
 	test_harness.c \
@@ -96,6 +113,9 @@ TEST_C_SRCS := \
 	test_cheat_utils.c \
 	test_cheat_flatten.c \
 	test_payload.c \
+	test_payload_config.c \
+	test_payload_autostart.c \
+	test_conflict.c \
 	test_base64.c \
 	test_aes_cbc.c \
 	test_hde64.c \
@@ -124,11 +144,21 @@ TEST_CXX_SRCS := \
 	test_toolbox_route.cpp \
 	test_onpress_policy.cpp \
 	test_toolbox_helpers.cpp \
-	test_toolbox_i18n.cpp \
+  test_toolbox_i18n.cpp \
   test_toolbox_injection.cpp \
   test_overlay_text_metrics.cpp \
   test_overlay_layout.cpp \
-  test_fps_formula.cpp \
+	test_fps_formula.cpp \
+	test_app_lifecycle.cpp \
+	test_sprx_loader.cpp \
+	test_sprx_catalog.cpp \
+	test_sprx_plugin_manager.cpp \
+	test_plugin_ui.cpp \
+	test_plugin_sprx_pages.cpp \
+	test_plugin_progress.cpp \
+	test_progress_auto_return.cpp \
+	test_settings_page_update.cpp \
+	test_plugin_manager.cpp \
 	test_trampoline_arena.cpp \
 	test_hook_lifecycle.cpp \
 	test_hotpatch.cpp \
@@ -143,6 +173,8 @@ PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_ready/ready.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload_config.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_conflict/conflict.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_detour/hde64.o
 
 CHEAT_SUPPORT_SRCS := $(wildcard $(THIRD_PARTY_ROOT)/cheat_support/*.c)
@@ -152,14 +184,31 @@ PROD_CXX_OBJS := $(patsubst $(UTIL_ROOT)/%.cpp,$(BUILD_DIR)/prod/%.o,$(filter $(
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/third_party/cjson.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_settings/settings.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_ipc/ipc_server.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_manager/plugin_descriptor.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_manager/plugin_manager.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/hotpatch.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/trampoline_arena.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/x64_relocator.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/hook_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/settings_page_update.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_lifecycle/app_lifecycle.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_loader.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_catalog.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_plugin_manager.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_ui/plugin_ui.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_bridge/plugin_ui_bridge.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_plugin_session/plugin_session.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_ipc_server.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_ui_bridge_server.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/daemon/plugin_host_services.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/dynamic_ui_xml.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/dynamic_ui_runtime.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/progress_auto_return.o
 
 TEST_C_OBJS := $(patsubst %.c,$(BUILD_DIR)/tests/%.o,$(TEST_C_SRCS))
 TEST_CXX_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_CXX_SRCS))
@@ -208,6 +257,10 @@ $(BUILD_DIR)/prod/libonion_ipc/ipc_server.o: $(REPO_ROOT)/source/libonion_ipc/so
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/prod/libonion_plugin_manager/%.o: $(REPO_ROOT)/source/libonion_plugin_manager/source/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
 $(BUILD_DIR)/prod/libonion_detour/x64_relocator.o: $(REPO_ROOT)/source/libonion_detour/source/x64_relocator.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
@@ -232,6 +285,42 @@ $(BUILD_DIR)/prod/shellui/toolbox_route.o: $(REPO_ROOT)/source/shellui/src/toolb
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/prod/shellui/dynamic_ui_xml.o: $(REPO_ROOT)/source/shellui/src/dynamic_ui_xml.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/dynamic_ui_runtime.o: $(REPO_ROOT)/source/shellui/src/dynamic_ui_runtime.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/progress_auto_return.o: $(REPO_ROOT)/source/shellui/src/progress_auto_return.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_plugin_ui/plugin_ui.o: $(REPO_ROOT)/source/libonion_plugin_ui/source/plugin_ui.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_plugin_bridge/plugin_ui_bridge.o: $(REPO_ROOT)/source/libonion_plugin_bridge/source/plugin_ui_bridge.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_plugin_session/plugin_session.o: $(REPO_ROOT)/source/libonion_plugin_session/source/plugin_session.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/daemon/plugin_ipc_server.o: $(REPO_ROOT)/source/daemon/source/plugin_ipc_server.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/daemon/plugin_ui_bridge_server.o: $(REPO_ROOT)/source/daemon/source/plugin_ui_bridge_server.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/daemon/plugin_host_services.o: $(REPO_ROOT)/source/daemon/source/plugin_host_services.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
 $(I18N_CATALOG): $(I18N_DIR)/generate_catalog.py $(I18N_JSON) | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(PYTHON) $(I18N_DIR)/generate_catalog.py \
@@ -250,7 +339,31 @@ $(BUILD_DIR)/prod/shellui/toolbox_i18n.o: $(REPO_ROOT)/source/shellui/src/toolbo
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o: $(REPO_ROOT)/source/shellui/src/plugin_sprx_pages.cpp $(I18N_CATALOG) | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/settings_page_update.o: $(REPO_ROOT)/source/shellui/src/settings_page_update.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
 $(BUILD_DIR)/prod/libonion_fps/fps_formula.o: $(REPO_ROOT)/source/libonion_fps/source/fps_formula.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_lifecycle/app_lifecycle.o: $(REPO_ROOT)/source/libonion_lifecycle/source/app_lifecycle.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_sprx/sprx_loader.o: $(REPO_ROOT)/source/libonion_sprx/source/sprx_loader.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_sprx/sprx_catalog.o: $(REPO_ROOT)/source/libonion_sprx/source/sprx_catalog.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_sprx/sprx_plugin_manager.o: $(REPO_ROOT)/source/libonion_sprx/source/sprx_plugin_manager.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
@@ -278,7 +391,11 @@ $(BUILD_DIR)/prod/libonion_platform/notify_i18n.o: $(REPO_ROOT)/source/libonion_
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/prod/libonion_payload/payload.o: $(REPO_ROOT)/source/libonion_payload/source/payload.c | $(BUILD_DIR)
+$(BUILD_DIR)/prod/libonion_payload/%.o: $(REPO_ROOT)/source/libonion_payload/source/%.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/libonion_conflict/conflict.o: $(REPO_ROOT)/source/libonion_conflict/source/conflict.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
@@ -289,6 +406,8 @@ $(BUILD_DIR)/prod/libonion_detour/hde64.o: $(REPO_ROOT)/source/libonion_detour/s
 $(BUILD_DIR)/tests/%.o: %.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/tests/test_payload_autostart.o: CFLAGS += -I$(REPO_ROOT)/source/bootstrapper/include
 
 $(BUILD_DIR)/tests/%.o: %.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)

@@ -271,6 +271,102 @@ static int test_notify_rich_localizes_both_text_fields(void) {
   return 0;
 }
 
+static int g_plain_fallback_calls;
+static char g_plain_fallback_message[1024];
+static int g_rich_fail_calls;
+
+static int32_t capture_plain_fallback(int32_t device, void *request, size_t size,
+                                      int32_t blocking) {
+  (void)device;
+  (void)blocking;
+  g_plain_fallback_calls++;
+  memset(g_plain_fallback_message, 0, sizeof(g_plain_fallback_message));
+  if (request && size >= 0x2D + 1) {
+    snprintf(g_plain_fallback_message, sizeof(g_plain_fallback_message), "%s",
+             (const char *)request + 0x2D);
+  }
+  return 0;
+}
+
+static int32_t fail_rich_notify(int32_t user_id, bool is_logged,
+                                const char *payload) {
+  (void)user_id;
+  (void)is_logged;
+  (void)payload;
+  g_rich_fail_calls++;
+  return -1;
+}
+
+static int test_notify_rich_falls_back_when_send_fails(void) {
+  g_plain_fallback_calls = 0;
+  g_rich_fail_calls = 0;
+  g_plain_fallback_message[0] = '\0';
+  onion_notify_set_send(capture_plain_fallback);
+  onion_notify_set_rich_send(fail_rich_notify);
+
+  onion_notify_rich("Title", "Sub", "/icon.png", "download", "44");
+
+  TEST_ASSERT_EQ_INT(1, g_rich_fail_calls);
+  TEST_ASSERT_EQ_INT(1, g_plain_fallback_calls);
+  TEST_ASSERT_STREQ("Sub", g_plain_fallback_message);
+
+  onion_notify_set_send(NULL);
+  onion_notify_set_rich_send(NULL);
+  return 0;
+}
+
+static int test_notify_rich_falls_back_when_unregistered(void) {
+  g_plain_fallback_calls = 0;
+  g_plain_fallback_message[0] = '\0';
+  onion_notify_set_send(capture_plain_fallback);
+  onion_notify_set_rich_send(NULL);
+
+  onion_notify_rich("Title", "", "/icon.png", "download", "45");
+
+  TEST_ASSERT_EQ_INT(1, g_plain_fallback_calls);
+  TEST_ASSERT_STREQ("Title", g_plain_fallback_message);
+
+  onion_notify_set_send(NULL);
+  return 0;
+}
+
+static int test_notify_rich_skips_send_without_icon(void) {
+  g_plain_fallback_calls = 0;
+  g_rich_fail_calls = 0;
+  g_plain_fallback_message[0] = '\0';
+  onion_notify_set_send(capture_plain_fallback);
+  onion_notify_set_rich_send(fail_rich_notify);
+
+  onion_notify_rich("notify.brand", "notify.boot.starting", "", "download",
+                    "46");
+
+  TEST_ASSERT_EQ_INT(0, g_rich_fail_calls);
+  TEST_ASSERT_EQ_INT(1, g_plain_fallback_calls);
+  TEST_ASSERT_STREQ("OnionHEN is starting...", g_plain_fallback_message);
+
+  onion_notify_set_send(NULL);
+  onion_notify_set_rich_send(NULL);
+  return 0;
+}
+
+static int test_notify_try_rich_falls_back_on_empty_payload(void) {
+  g_plain_fallback_calls = 0;
+  g_rich_fail_calls = 0;
+  g_plain_fallback_message[0] = '\0';
+  onion_notify_set_send(capture_plain_fallback);
+  onion_notify_set_rich_send(fail_rich_notify);
+
+  onion_notify_try_rich(NULL, "notify.boot.welcome");
+
+  TEST_ASSERT_EQ_INT(0, g_rich_fail_calls);
+  TEST_ASSERT_EQ_INT(1, g_plain_fallback_calls);
+  TEST_ASSERT_STREQ("Welcome to OnionHEN", g_plain_fallback_message);
+
+  onion_notify_set_send(NULL);
+  onion_notify_set_rich_send(NULL);
+  return 0;
+}
+
 int test_platform_notify_suite(void) {
   int failures = 0;
   failures += onion_test_run("notify_format_prefix", test_notify_format_prefix);
@@ -290,5 +386,13 @@ int test_platform_notify_suite(void) {
       onion_test_run("notify_rich_formats_payload", test_notify_rich_formats_payload);
   failures += onion_test_run("notify_rich_localizes_both_text_fields",
                              test_notify_rich_localizes_both_text_fields);
+  failures += onion_test_run("notify_rich_falls_back_when_send_fails",
+                             test_notify_rich_falls_back_when_send_fails);
+  failures += onion_test_run("notify_rich_falls_back_when_unregistered",
+                             test_notify_rich_falls_back_when_unregistered);
+  failures += onion_test_run("notify_rich_skips_send_without_icon",
+                             test_notify_rich_skips_send_without_icon);
+  failures += onion_test_run("notify_try_rich_falls_back_on_empty_payload",
+                             test_notify_try_rich_falls_back_on_empty_payload);
   return failures;
 }

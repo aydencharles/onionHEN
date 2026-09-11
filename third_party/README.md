@@ -10,7 +10,6 @@ code here makes `source/` exclusively first-party code.
 | [`cheat_support/`](cheat_support/) | Vendored source | AES, base64, miniz and SHA-256 used by cheat parsers |
 | [`keystone/`](keystone/) | Headers + prebuilt archive | ShnExt assembly support |
 | [`kstuff-lite/`](kstuff-lite/) | Git submodule | Produces the optional embedded `kstuff.elf` |
-| [`ftpsrv/`](ftpsrv/) | Vendored source (`nexgen`) | PS5 FTP source module compiled into util |
 
 Third-party file names retain their upstream spelling even when it differs
 from the project's snake_case convention. This keeps upstream updates easy to
@@ -20,10 +19,6 @@ Source-built or downloaded fallback dependency blobs are cached in
 `.cache/dependencies/` and ignored by Git. `scripts/sync_dependencies.sh`
 stages the required bootstrapper input from that cache; generated blobs do not
 belong in `source/`.
-
-`ftpsrv` uses a pinned `nexgen` source revision and is compiled as a module in
-`util.elf`. Its adapter exposes a stop latch so the util facade can restart the
-listener when the user changes the port or disables the service.
 
 ## Runtime-only external dependency
 

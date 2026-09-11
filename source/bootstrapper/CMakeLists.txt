@@ -110,6 +110,7 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 	$<$<COMPILE_LANGUAGE:CXX>:${CXX_DEFS} ${CXX_FLAGS}>
 	$<$<COMPILE_LANGUAGE:ASM>:${ASM_FLAGS}>
 )
+target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--gc-sections" "-Wl,--icf=safe")
 
 # Byepervisor removed from OnionHEN — bootstrapper sources only.
 # pt.c / elfldr.c live in libonion_elfldr (raise_privileges + inject primitives).
@@ -117,8 +118,10 @@ file(GLOB SrcFiles CONFIGURE_DEPENDS ${D_SRC}/*.c ${D_SRC}/*.cpp ${D_SRC}/../inc
 list(FILTER SrcFiles EXCLUDE REGEX ".*/(pt|elfldr)\\.c$")
 
 set(CMAKE_C_FLAGS "${ONION_PS5_TARGET_FLAGS} ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-keyword-macro -fPIC -fPIE -march=znver2 -Wall -Werror -fstack-protector-all -ffunction-sections -fdata-sections")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -gfull -gdwarf-2 -pedantic -pedantic-errors")
+set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
 target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles})
 # .incbin in daemon.c is invisible to the compiler dependency scanner.
@@ -154,16 +157,17 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 	"${PROJECT_ROOT}/libonion_platform/include"
 	"${PROJECT_ROOT}/libonion_settings/include"
 	"${PROJECT_ROOT}/libonion_payload/include"
+	"${PROJECT_ROOT}/libonion_conflict/include"
 	"${PROJECT_ROOT}/libonion_elfldr/include"
 	"${PROJECT_ROOT}/include"
 )
 target_link_directories	(${PROJECT_NAME} PUBLIC "${ONIONHEN_PS5_STUB_DIR}")
 target_sources(${PROJECT_NAME} PRIVATE "${ONIONHEN_COMMON_DIR}/elfldr_remote.c")
-target_link_libraries	(${PROJECT_NAME} PUBLIC onion_proc onion_platform onion_settings onion_payload onion_ready onion_elfldr kernel_sys SceNotification SceSystemService)
+target_link_libraries	(${PROJECT_NAME} PUBLIC onion_proc onion_platform onion_settings onion_payload onion_conflict onion_ready onion_elfldr kernel_sys SceNotification SceSystemService)
 add_custom_target(${PROJECT_NAME}_assets
 	DEPENDS ${_generated_icon_files} "${_icon_asm}" "${_icon_manifest}")
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_assets)
-add_dependencies(${PROJECT_NAME} daemon util shellui onion_elfldr_server onion_proc onion_platform onion_settings onion_payload onion_ready onion_elfldr)
+add_dependencies(${PROJECT_NAME} daemon util shellui onion_elfldr_server onion_proc onion_platform onion_settings onion_payload onion_conflict onion_ready onion_elfldr)
 
 # Copy bootstrapper.elf as test.elf before processing
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -179,14 +183,15 @@ onion_strip_debug(${PROJECT_NAME})
 # a second Ninja invocation.
 set(_bootstrapper_lzma "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootstrapper.elf.lzma")
 set(_bootstrapper_lzma_size "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootstrapper.elf.lzma.size")
+set(_bootstrapper_sha1 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootstrapper.elf.sha1")
 add_custom_command(
-	OUTPUT "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}"
+	OUTPUT "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}" "${_bootstrapper_sha1}"
 	COMMAND ${CMAKE_COMMAND} -E env "TARGET_ELF=$<TARGET_FILE:${PROJECT_NAME}>"
 			${PROJECT_ROOT}/../scripts/pack_bootstrapper.sh
 	DEPENDS ${PROJECT_NAME}
-	COMMENT "Recording size and compressing bootstrapper with lzma"
+	COMMENT "Packing bootstrapper (lzma + size + sha1 of uncompressed ELF)"
 	VERBATIM
 )
 add_custom_target(${PROJECT_NAME}_packed
-	DEPENDS "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}")
+	DEPENDS "${_bootstrapper_lzma}" "${_bootstrapper_lzma_size}" "${_bootstrapper_sha1}")
 add_dependencies(${PROJECT_NAME}_packed ${PROJECT_NAME})

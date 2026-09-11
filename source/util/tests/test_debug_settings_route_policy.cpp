@@ -18,6 +18,7 @@ struct WelcomeFields {
   std::string sub_message;
   std::string action_name;
   std::string action_url;
+  std::string icon_url;
 };
 
 WelcomeFields parse_welcome(const std::string &json) {
@@ -33,11 +34,15 @@ WelcomeFields parse_welcome(const std::string &json) {
                             ? cJSON_GetArrayItem(actions, 0)
                             : nullptr;
   const cJSON *params = action ? onion_cjson::item(action, "parameters") : nullptr;
+  const cJSON *icon = view ? onion_cjson::item(view, "icon") : nullptr;
+  const cJSON *icon_params = icon ? onion_cjson::item(icon, "parameters") : nullptr;
   const char *message_text = onion_cjson::string_item(message, "body");
   const char *sub_message_text = onion_cjson::string_item(sub_message, "body");
   const char *action_name = onion_cjson::string_item(action, "actionName");
   const char *action_url = onion_cjson::string_item(params, "actionUrl");
-  if (!message_text || !sub_message_text || !action_name || !action_url) {
+  const char *icon_url = onion_cjson::string_item(icon_params, "url");
+  if (!message_text || !sub_message_text || !action_name || !action_url ||
+      !icon_url) {
     return fields;
   }
   fields.valid = true;
@@ -45,6 +50,7 @@ WelcomeFields parse_welcome(const std::string &json) {
   fields.sub_message = sub_message_text;
   fields.action_name = action_name;
   fields.action_url = action_url;
+  fields.icon_url = icon_url;
   return fields;
 }
 
@@ -473,6 +479,7 @@ static int test_welcome_toast_replaces_toolbox_uri(void) {
       onion::daemon::make_welcome_toast_json(uri));
   TEST_ASSERT_TRUE(fields.valid);
   TEST_ASSERT_STREQ(uri, fields.action_url.c_str());
+  TEST_ASSERT_STREQ(ONION_NOTIFY_ICON_PATH, fields.icon_url.c_str());
   TEST_ASSERT_STREQ("Welcome to OnionHEN", fields.sub_message.c_str());
   TEST_ASSERT_STREQ(ONIONHEN_VERSION " made by " ONIONHEN_AUTHOR,
                     fields.message.c_str());

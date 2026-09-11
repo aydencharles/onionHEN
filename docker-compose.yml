@@ -21,3 +21,21 @@ services:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-18/bin:/opt/ps5-payload-sdk/bin
     stdin_open: true
     tty: true
+
+  onionhen-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: >
+      /bin/bash -lc "set -euo pipefail; git config --global --add safe.directory /workspace; git -C /workspace submodule update --init --recursive; make -C source/util/tests clean; make -C source/util/tests test"
+    environment:
+      KEYSTONE_PREFIX: /usr/local
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-18/bin:/opt/ps5-payload-sdk/bin
+    stdin_open: true
+    tty: true

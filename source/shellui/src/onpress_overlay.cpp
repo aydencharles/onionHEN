@@ -22,6 +22,8 @@ static void rebuild_overlay_bar() {
     CreateGameWidget(CREATE_RAM_OVERLAY);
   if (g_settings.overlay_ip)
     CreateGameWidget(CREATE_IP_OVERLAY);
+  if (g_settings.overlay_fan)
+    CreateGameWidget(CREATE_FAN_OVERLAY);
 }
 
 static OnPressResult toggle_overlay_flag(OnPressContext &ctx, bool &flag) {
@@ -72,6 +74,10 @@ static OnPressResult id_overlay_ip(OnPressContext &ctx) {
   return toggle_overlay_flag(ctx, g_settings.overlay_ip);
 }
 
+static OnPressResult id_overlay_fan(OnPressContext &ctx) {
+  return toggle_overlay_flag(ctx, g_settings.overlay_fan);
+}
+
 static OnPressResult id_all_cpu_usage(OnPressContext &ctx) {
   if (g_settings.all_cpu_usage == atoi(ctx.value.c_str())) {
     return OnPressResult::EarlyReturn;
@@ -108,6 +114,61 @@ static OnPressResult id_overlay_align(OnPressContext &ctx) {
   return OnPressResult::Handled;
 }
 
+static OnPressResult id_overlay_font_size(OnPressContext &ctx) {
+  const int size = atoi(ctx.value.c_str());
+  if (size == g_settings.overlay_font_size) {
+    return OnPressResult::EarlyReturn;
+  }
+  if (size != onion::kOverlayFontSmall && size != onion::kOverlayFontMedium &&
+      size != onion::kOverlayFontLarge) {
+    return OnPressResult::EarlyReturn;
+  }
+  g_settings.overlay_font_size = size;
+  rebuild_overlay_bar();
+  ctx.reload_main = true;
+  return OnPressResult::Handled;
+}
+
+static OnPressResult overlay_set_order(OnPressContext &ctx, int metric) {
+  const int position = atoi(ctx.value.c_str());
+  const int current =
+      onion::overlay_metric_position(g_settings.overlay_order, metric);
+  if (position == current) {
+    return OnPressResult::EarlyReturn;
+  }
+  if (position < 1 || position > onion::kOverlayMetricCount) {
+    return OnPressResult::EarlyReturn;
+  }
+  onion::overlay_move_metric(g_settings.overlay_order, metric, position);
+  rebuild_overlay_bar();
+  ctx.reload_main = true;
+  return OnPressResult::Handled;
+}
+
+static OnPressResult id_overlay_fps_order(OnPressContext &ctx) {
+  return overlay_set_order(ctx, onion::kOverlayMetricFps);
+}
+
+static OnPressResult id_overlay_cpu_order(OnPressContext &ctx) {
+  return overlay_set_order(ctx, onion::kOverlayMetricCpu);
+}
+
+static OnPressResult id_overlay_gpu_order(OnPressContext &ctx) {
+  return overlay_set_order(ctx, onion::kOverlayMetricGpu);
+}
+
+static OnPressResult id_overlay_ram_order(OnPressContext &ctx) {
+  return overlay_set_order(ctx, onion::kOverlayMetricMemory);
+}
+
+static OnPressResult id_overlay_ip_order(OnPressContext &ctx) {
+  return overlay_set_order(ctx, onion::kOverlayMetricIp);
+}
+
+static OnPressResult id_overlay_fan_order(OnPressContext &ctx) {
+  return overlay_set_order(ctx, onion::kOverlayMetricFan);
+}
+
 static const OnPressExactEntry kExact[] = {
     {"id_overlay_enabled", id_overlay_enabled},
     {"id_overlay_background", id_overlay_background},
@@ -116,9 +177,17 @@ static const OnPressExactEntry kExact[] = {
     {"id_overlay_fps", id_overlay_fps},
     {"id_overlay_ram", id_overlay_ram},
     {"id_overlay_ip", id_overlay_ip},
+    {"id_overlay_fan", id_overlay_fan},
     {"id_all_cpu_usage", id_all_cpu_usage},
     {"id_overlay_change_pos", id_overlay_change_pos},
     {"id_overlay_align", id_overlay_align},
+    {"id_overlay_font_size", id_overlay_font_size},
+    {"id_overlay_fps_order", id_overlay_fps_order},
+    {"id_overlay_cpu_order", id_overlay_cpu_order},
+    {"id_overlay_gpu_order", id_overlay_gpu_order},
+    {"id_overlay_ram_order", id_overlay_ram_order},
+    {"id_overlay_ip_order", id_overlay_ip_order},
+    {"id_overlay_fan_order", id_overlay_fan_order},
 };
 
 const OnPressExactEntry *onpress_overlay_exact(size_t *count) {

@@ -9,6 +9,7 @@
 #include <iostream>
 #include "defs.h"
 #include <onion/settings.hpp>
+#include <onion/payload_config.h>
 
 #define MAX_LINE 256
 #define MAX_PAIRS 100
@@ -41,6 +42,7 @@ enum RemoveWidget {
     REMOVE_CPU_OVERLAY,
     REMOVE_RAM_OVERLAY,
     REMOVE_IP_OVERLAY,
+    REMOVE_FAN_OVERLAY,
     REMOVE_FPS_OVERLAY,
     REMOVE_ALL_OVERLAYS,
 };
@@ -50,6 +52,7 @@ enum CreateWidget {
     CREATE_CPU_OVERLAY,
     CREATE_RAM_OVERLAY,
     CREATE_IP_OVERLAY,
+    CREATE_FAN_OVERLAY,
     CREATE_FPS_OVERLAY,
     CREATE_ALL_OVERLAYS,
 };
@@ -77,34 +80,16 @@ struct LaunchAppParam
 };
 
 /** List entry for a payload .elf in the toolbox. */
-typedef struct {
+typedef struct PayloadEntry {
     std::string path;
     std::string shellui_path;
-    std::string tid;  /* stem key for PID / launch */
-    std::string id;
+    std::string tid;  /* path-derived key for PID / launch */
+    std::string id;   /* stable resource/control suffix */
     std::string name;
     std::string version;
+    OnionPayloadConfig config{};
 } PayloadEntry;
 
-typedef struct {
-    std::string path;
-    std::string shellui_path;
-    std::string id;
-    std::string name;
-    std::string version;
-} Payloads_Apps;
-
-struct GameEntry {
-    std::string tid;
-    std::string title;
-    std::string version;
-    std::string path;
-    std::string dir_name;
-    std::string icon_path;
-    std::string id;
-};
-
-// games_list: see shellui_state.hpp (ToolboxUiState)
 // all_cpu_usage: overlay.cpu_usage_mode=per_core (config.ini)
 enum Cheats_Shortcut{
     CHEATS_SC_OFF = 0,

@@ -301,19 +301,16 @@ IPC_Ret IPC_Client::ToggleSetting(DaemonCommands cmd, bool turn_on) {
   return IPC_Ret::NO_ERROR;
 }
 
-bool IPC_Client::FtpStatus() {
-  std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_FTP_STATUS, ipc_msg)) {
-    LOG_ERROR("Failed to query FTP service status");
+bool IPC_Client::SetSystemLanguage(int language) {
+  if (!require_util("SetSystemLanguage")) {
     return false;
   }
-  return ipc_msg == "1" || ipc_msg == "true";
-}
-
-bool IPC_Client::RecoverFtp() {
+  cJSON *j = cJSON_CreateObject();
+  cJSON_AddNumberToObject(j, "lang", language);
+  const std::string json = json_object_str(j);
   std::string ipc_msg;
-  if (!IPCSendCommand(BREW_UTIL_RECOVER_FTP, ipc_msg)) {
-    LOG_ERROR("Failed to recover FTP service");
+  if (!IPCSendCommand(BREW_UTIL_SET_SYSTEM_LANG, ipc_msg, json)) {
+    LOG_ERROR("Failed to push system language %d", language);
     return false;
   }
   return true;
@@ -400,19 +397,28 @@ bool IPC_Client::Remount(const char *src, const char *dest) {
   return true;
 }
 
-bool IPC_Client::GetGameCheats(const std::string &tid, const std::string &ver,
-                               std::string &cheats, int pid, int appid) {
+bool IPC_Client::GetGameCheats(const std::string &tid, std::string &cheats,
+                               const std::string &mode, int pid, int appid,
+                               const std::string &process,
+                               uint64_t generation) {
   if (!require_util("GetGameCheats")) {
     return false;
   }
   cJSON *request = cJSON_CreateObject();
   cJSON_AddStringToObject(request, "tid", tid.c_str());
-  cJSON_AddStringToObject(request, "version", ver.c_str());
+  cJSON_AddStringToObject(request, "mode", mode.c_str());
   if (pid > 0) {
     cJSON_AddNumberToObject(request, "pid", pid);
   }
   if (appid > 0) {
     cJSON_AddNumberToObject(request, "appid", appid);
+  }
+  if (!process.empty()) {
+    cJSON_AddStringToObject(request, "process", process.c_str());
+  }
+  if (generation != 0) {
+    cJSON_AddStringToObject(request, "generation",
+                            std::to_string(generation).c_str());
   }
   std::string json = json_object_str(request);
   if (!IPCSendCommand(BREW_UTIL_GET_GAME_CHEAT, cheats, json)) {
@@ -422,20 +428,19 @@ bool IPC_Client::GetGameCheats(const std::string &tid, const std::string &ver,
   return true;
 }
 
-bool IPC_Client::ToggleGameCheat(int pid, const std::string &tid,
-                                 int cheat_index, std::string &cheat_enabled,
-                                 const std::string &version) {
+bool IPC_Client::ToggleGameCheat(const std::string &session_id,
+                                 const std::string &cheat_key, bool enabled,
+                                 std::string &cheat_status) {
   if (!require_util("ToggleGameCheat")) {
     return false;
   }
   cJSON *j = cJSON_CreateObject();
-  cJSON_AddStringToObject(j, "tid", tid.c_str());
-  cJSON_AddNumberToObject(j, "cheat_id", cheat_index);
-  cJSON_AddNumberToObject(j, "pid", pid);
-  cJSON_AddStringToObject(j, "version", version.c_str());
+  cJSON_AddStringToObject(j, "session_id", session_id.c_str());
+  cJSON_AddStringToObject(j, "cheat_key", cheat_key.c_str());
+  cJSON_AddBoolToObject(j, "enabled", enabled);
   std::string json = json_object_str(j);
-  if (!IPCSendCommand(BREW_UTIL_TOGGLE_CHEAT, cheat_enabled, json)) {
-    LOG_ERROR("Failed to enable cheats for %s", tid.c_str());
+  if (!IPCSendCommand(BREW_UTIL_TOGGLE_CHEAT, cheat_status, json)) {
+    LOG_ERROR("Failed to toggle cheat key %s", cheat_key.c_str());
     return false;
   }
   return true;
@@ -529,4 +534,121 @@ bool IPC_Client::EnableToolbox() {
     return false;
   }
   return true;
+}
+
+bool IPC_Client::ListPlugins(std::vector<PluginInventoryItem> &plugins) {
+  if (!require_crit("ListPlugins")) return false;
+  plugins.clear();
+  int offset = 0;
+  for (;;) {
+    cJSON *request = cJSON_CreateObject();
+    cJSON_AddNumberToObject(request, "offset", offset);
+    std::string response;
+    if (!IPCSendCommand(BREW_PLUGIN_LIST, response,
+                        json_object_str(request)))
+      return false;
+
+    onion_cjson::Root root(response);
+    cJSON *items = root ? onion_cjson::item(root.get(), "plugins") : nullptr;
+    if (!cJSON_IsArray(items)) return false;
+    cJSON *item = nullptr;
+    cJSON_ArrayForEach(item, items) {
+      const char *plugin_id = onion_cjson::string_item(item, "id");
+      const char *version = onion_cjson::string_item(item, "version");
+      const char *name = onion_cjson::string_item(item, "name");
+      if (!plugin_id || !version || !name) return false;
+      plugins.push_back({plugin_id, version, name,
+                         onion_cjson::bool_item(item, "running"),
+                         onion_cjson::bool_item(item, "auto_start")});
+    }
+
+    const int next = onion_cjson::int_item(root.get(), "next", -1);
+    if (next < 0) return true;
+    if (next <= offset) return false;
+    offset = next;
+  }
+}
+
+bool IPC_Client::PluginOperation(DaemonCommands command,
+                                 const std::string &plugin_id) {
+  if (!require_crit("PluginOperation")) return false;
+  std::string response;
+  return IPCSendCommand(command, response,
+                        json_kv_string("plugin_id", plugin_id.c_str()));
+}
+
+bool IPC_Client::StartPlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_START, plugin_id);
+}
+
+bool IPC_Client::StopPlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_STOP, plugin_id);
+}
+
+bool IPC_Client::ReloadPlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_RELOAD, plugin_id);
+}
+
+bool IPC_Client::DeletePlugin(const std::string &plugin_id) {
+  return PluginOperation(BREW_PLUGIN_DELETE, plugin_id);
+}
+
+bool IPC_Client::SetPluginAutoStart(const std::string &plugin_id, bool enabled) {
+  if (!require_crit("SetPluginAutoStart")) return false;
+  cJSON *request = cJSON_CreateObject();
+  cJSON_AddStringToObject(request, "plugin_id", plugin_id.c_str());
+  cJSON_AddBoolToObject(request, "enabled", enabled);
+  std::string response;
+  return IPCSendCommand(BREW_PLUGIN_SET_AUTO_START, response,
+                        json_object_str(request));
+}
+
+bool IPC_Client::ListSprx(std::vector<SprxInventoryItem> &sprx) {
+  if (!require_crit("ListSprx")) return false;
+  sprx.clear();
+  int offset = 0;
+  for (;;) {
+    cJSON *request = cJSON_CreateObject();
+    cJSON_AddNumberToObject(request, "offset", offset);
+    std::string response;
+    if (!IPCSendCommand(BREW_SPRX_LIST, response, json_object_str(request)))
+      return false;
+    onion_cjson::Root root(response);
+    cJSON *items = root ? onion_cjson::item(root.get(), "sprx") : nullptr;
+    if (!cJSON_IsArray(items)) return false;
+    cJSON *item = nullptr;
+    cJSON_ArrayForEach(item, items) {
+      const char *id = onion_cjson::string_item(item, "id");
+      const char *path = onion_cjson::string_item(item, "path");
+      if (!id || !path) return false;
+      sprx.push_back({id, path, onion_cjson::bool_item(item, "enabled"),
+                      onion_cjson::bool_item(item, "auto_start"),
+                      onion_cjson::int_item(item, "priority", 0),
+                      onion_cjson::bool_item(item, "matches_current_target"),
+                      onion_cjson::bool_item(item, "loaded_for_current_target")});
+    }
+    const int next = onion_cjson::int_item(root.get(), "next", -1);
+    if (next < 0) return true;
+    if (next <= offset) return false;
+    offset = next;
+  }
+}
+
+bool IPC_Client::SprxOperation(DaemonCommands command, const std::string &id,
+                               bool enabled) {
+  if (!require_crit("SprxOperation")) return false;
+  cJSON *request = cJSON_CreateObject();
+  cJSON_AddStringToObject(request, "id", id.c_str());
+  if (command == BREW_SPRX_SET_ENABLED)
+    cJSON_AddBoolToObject(request, "enabled", enabled);
+  std::string response;
+  return IPCSendCommand(command, response, json_object_str(request));
+}
+
+bool IPC_Client::SetSprxEnabled(const std::string &id, bool enabled) {
+  return SprxOperation(BREW_SPRX_SET_ENABLED, id, enabled);
+}
+
+bool IPC_Client::DeleteSprx(const std::string &id) {
+  return SprxOperation(BREW_SPRX_DELETE, id);
 }

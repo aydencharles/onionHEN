@@ -1,7 +1,7 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — P0 split.
  *
  * Horizontal monitor bar:
- *   font_size=18, font_style=1 (Bold), font_weight=900
+ *   font_size from overlay.font_size (14/18/24), font_style=1 (Bold), font_weight=900
  *   per-metric label colors; values white
  *   bg_color=000000B4 (~70% black Panel)
  *   EnableThemedTextShadow, UI2.Panel Background*
@@ -63,7 +63,6 @@ namespace {
 
 constexpr const char *kBgPanelName = "id_onion_overlay_bg";
 
-constexpr int kFontSize = 18;
 constexpr int kFontStyle = 1;    /* 1 = Bold bit */
 constexpr int kFontWeight = 900; /* CSS black */
 
@@ -85,6 +84,8 @@ constexpr float kGpuR = 179.0f / 255.0f, kGpuG = 102.0f / 255.0f, kGpuB = 1.0f;
 constexpr float kMemR = 1.0f, kMemG = 179.0f / 255.0f, kMemB = 77.0f / 255.0f;
 /* color_net  = 80B3FFFF — blue */
 constexpr float kNetR = 128.0f / 255.0f, kNetG = 179.0f / 255.0f, kNetB = 1.0f;
+/* color_fan  = 33E0FFFF — cyan */
+constexpr float kFanR = 51.0f / 255.0f, kFanG = 224.0f / 255.0f, kFanB = 1.0f;
 /* color_perf = FFE600FF — yellow (FPS) */
 constexpr float kFpsR = 1.0f, kFpsG = 230.0f / 255.0f, kFpsB = 0.0f;
 /* color_value = FFFFFFFF */
@@ -154,6 +155,14 @@ void append_ip(std::vector<WidgetConfig> &out) {
   append_sep(out, "id_ip_sep", x + kIpVal + 160.0f, y);
 }
 
+void append_fan(std::vector<WidgetConfig> &out) {
+  const float x = g_overlay_layout.overlay_fan_x;
+  const float y = g_overlay_layout.overlay_fan_y;
+  push_label(out, "id_fan_label", x + kLbl, y, "FAN", kFanR, kFanG, kFanB);
+  push_label(out, "id_fan_value", x + kVal0, y, "--%", kValR, kValG, kValB);
+  append_sep(out, "id_fan_sep", x + kVal0 + 56.0f, y);
+}
+
 const std::vector<const char *> kAllOverlayNames = {
     kBgPanelName,
     "id_fps_label",      "id_fps_value",       "id_fps_sep",
@@ -162,6 +171,7 @@ const std::vector<const char *> kAllOverlayNames = {
     "id_cpu_sep",
     "id_ram_label",      "id_ram_value",       "id_ram_sep",
     "id_ip_label",       "id_ip_value",        "id_ip_sep",
+    "id_fan_label",      "id_fan_value",       "id_fan_sep",
 };
 
 MonoObject *find_root_widget() {
@@ -234,7 +244,8 @@ void ensure_bg_panel(MonoObject *root) {
       g_settings.overlay_enabled && g_settings.overlay_background &&
       (g_settings.overlay_cpu || g_settings.all_cpu_usage ||
        g_settings.overlay_gpu || g_settings.overlay_ram ||
-       g_settings.overlay_ip || g_settings.overlay_fps);
+       g_settings.overlay_ip || g_settings.overlay_fps ||
+       g_settings.overlay_fan);
   if (!any)
     return;
 
@@ -307,6 +318,9 @@ void RemoveGameWidget(RemoveWidget widget) {
   case REMOVE_IP_OVERLAY:
     removeWidgets({"id_ip_label", "id_ip_value", "id_ip_sep"});
     break;
+  case REMOVE_FAN_OVERLAY:
+    removeWidgets({"id_fan_label", "id_fan_value", "id_fan_sep"});
+    break;
   case REMOVE_FPS_OVERLAY:
     removeWidgets({"id_fps_label", "id_fps_value", "id_fps_sep"});
     break;
@@ -327,7 +341,9 @@ bool CreateGameWidget(CreateWidget widget) {
     return false;
 
   apply_overlay_layout(screen_w, screen_h);
-  MonoObject *bar_font = CreateUIFont(kFontSize, kFontStyle, kFontWeight);
+  MonoObject *bar_font = CreateUIFont(
+      onion::overlay_font_pt(g_settings.overlay_font_size), kFontStyle,
+      kFontWeight);
   if (!bar_font)
     return false;
 
@@ -347,6 +363,9 @@ bool CreateGameWidget(CreateWidget widget) {
   case CREATE_IP_OVERLAY:
     append_ip(configs);
     break;
+  case CREATE_FAN_OVERLAY:
+    append_fan(configs);
+    break;
   case CREATE_FPS_OVERLAY:
     append_fps(configs);
     break;
@@ -356,6 +375,7 @@ bool CreateGameWidget(CreateWidget widget) {
     append_gpu(configs);
     append_ram(configs);
     append_ip(configs);
+    append_fan(configs);
     break;
   }
 

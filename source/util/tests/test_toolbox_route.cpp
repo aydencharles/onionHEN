@@ -61,14 +61,10 @@ static int test_cheats_page(void) {
   return 0;
 }
 
-static int test_auto_payloads_and_plapps(void) {
+static int test_auto_payloads(void) {
   RouteResult a = resolve_resource(make_in(kAutoPayloadsXml));
   TEST_ASSERT_TRUE(a.page == Page::AutoPayloads);
   TEST_ASSERT_TRUE(a.flags.is_auto_payload);
-
-  RouteResult p = resolve_resource(make_in(kPlappsXml));
-  TEST_ASSERT_TRUE(p.page == Page::Plapps);
-  TEST_ASSERT_TRUE(p.flags.is_plapps);
   return 0;
 }
 
@@ -80,39 +76,153 @@ static int test_plugins_page(void) {
   return 0;
 }
 
+static int test_sprx_page(void) {
+  RouteResult r = resolve_resource(make_in(kSprxXml));
+  TEST_ASSERT_TRUE(r.page == Page::Sprx);
+  TEST_ASSERT_TRUE(r.flags.is_sprx);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::Sprx);
+  return 0;
+}
+
 static std::string cfg_res(const char *rel) {
   return std::string(onion::plugins::kConfigResourcePrefix) + rel;
 }
 
 static int test_plugin_config_page(void) {
-  RouteResult r = resolve_resource(make_in(cfg_res("ftpsrv.xml")));
+  RouteResult r = resolve_resource(make_in(cfg_res("kstuff.xml")));
   TEST_ASSERT_TRUE(r.page == Page::PluginConfig);
   TEST_ASSERT_TRUE(r.flags.is_plugin_config);
   TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) ==
                    OnPressDomain::PluginConfig);
   TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
 
+  RouteResult ext = resolve_resource(make_in(cfg_res("plugin_FTPS00001.xml")));
+  TEST_ASSERT_TRUE(ext.page == Page::PluginConfig);
+  TEST_ASSERT_TRUE(ext.flags.is_plugin_config);
+  std::string plugin_id;
+  TEST_ASSERT_TRUE(parse_external_plugin_config_resource(
+      cfg_res("plugin_FTPS00001.xml"), &plugin_id));
+  TEST_ASSERT_STREQ("FTPS00001", plugin_id.c_str());
+
   RouteResult unknown = resolve_resource(make_in(cfg_res("nope.xml")));
   TEST_ASSERT_TRUE(unknown.page == Page::None);
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("plugin_.xml"))).page == Page::None);
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("plugin_TOOLONG001.xml"))).page ==
+      Page::None);
+  return 0;
+}
+
+static int test_sprx_config_page(void) {
+  RouteResult list = resolve_resource(make_in(kSprxXml));
+  TEST_ASSERT_TRUE(list.page == Page::Sprx);
+  TEST_ASSERT_TRUE(!list.flags.is_sprx_config);
+
+  RouteResult r = resolve_resource(make_in(cfg_res("sprx_overlay.xml")));
+  TEST_ASSERT_TRUE(r.page == Page::SprxConfig);
+  TEST_ASSERT_TRUE(r.flags.is_sprx_config);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::Sprx);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+
+  std::string id;
+  TEST_ASSERT_TRUE(
+      parse_sprx_config_resource(cfg_res("sprx_fps.overlay.xml"), &id));
+  TEST_ASSERT_STREQ("fps.overlay", id.c_str());
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("sprx_.xml"))).page == Page::None);
+  return 0;
+}
+
+static int test_overlay_metrics_page(void) {
+  RouteResult list = resolve_resource(make_in(kOverlayMetricsXml));
+  TEST_ASSERT_TRUE(list.page == Page::OverlayMetrics);
+  TEST_ASSERT_TRUE(list.flags.is_overlay_metrics);
+  TEST_ASSERT_TRUE(!list.flags.is_overlay_metric);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(list.page) == OnPressDomain::Root);
+  TEST_ASSERT_TRUE(!restores_parent_on_pop(list.page));
+  TEST_ASSERT_TRUE(
+      !parse_overlay_metric_resource(kOverlayMetricsXml, nullptr));
+  return 0;
+}
+
+static int test_overlay_metric_page(void) {
+  RouteResult r = resolve_resource(make_in(cfg_res("overlay_fps.xml")));
+  TEST_ASSERT_TRUE(r.page == Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(r.flags.is_overlay_metric);
+  TEST_ASSERT_TRUE(!r.flags.is_overlay_metrics);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::Root);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+
+  std::string id;
+  TEST_ASSERT_TRUE(parse_overlay_metric_resource(cfg_res("overlay_memory.xml"),
+                                                 &id));
+  TEST_ASSERT_STREQ("memory", id.c_str());
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("overlay_ram.xml"))).page == Page::None);
+  TEST_ASSERT_TRUE(
+      resolve_resource(make_in(cfg_res("overlay_.xml"))).page == Page::None);
+  TEST_ASSERT_STREQ("overlay_cpu.xml",
+                    overlay_metric_xml("cpu").c_str());
+  return 0;
+}
+
+static int test_overlay_metric_restores_parent(void) {
+  ToolboxUiState state;
+  state.set_active_page(Page::OverlayMetrics);
+  state.set_active_page(Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::OverlayMetrics);
+  TEST_ASSERT_TRUE(state.child_page == Page::OverlayMetricConfig);
+
+  state.leave_page(Page::OverlayMetricConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::OverlayMetrics);
+  TEST_ASSERT_TRUE(state.parent_page == Page::None);
+  TEST_ASSERT_TRUE(state.child_page == Page::None);
+  return 0;
+}
+
+static int test_payload_config_page(void) {
+  RouteResult list = resolve_resource(make_in("payloads.xml"));
+  TEST_ASSERT_TRUE(list.page == Page::Payloads);
+  TEST_ASSERT_TRUE(!list.flags.is_payload_config);
+
+  RouteResult r = resolve_resource(
+      make_in(cfg_res("payload_p0123456789abcdef.xml")));
+  TEST_ASSERT_TRUE(r.page == Page::PayloadConfig);
+  TEST_ASSERT_TRUE(r.flags.is_payload_config);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) ==
+                   OnPressDomain::PayloadConfig);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
+
+  std::string id;
+  TEST_ASSERT_TRUE(parse_payload_config_resource(
+      cfg_res("payload_p0123456789abcdef.xml"), &id));
+  TEST_ASSERT_STREQ("p0123456789abcdef", id.c_str());
+  TEST_ASSERT_TRUE(resolve_resource(make_in(cfg_res("payload_p012.xml"))).page ==
+                   Page::None);
+  TEST_ASSERT_TRUE(resolve_resource(
+                       make_in(cfg_res("payload_P0123456789abcdef.xml")))
+                       .page == Page::None);
   return 0;
 }
 
 static int test_plugins_registry(void) {
   using namespace onion::plugins;
 
-  TEST_ASSERT_EQ_INT(2, static_cast<int>(kRegistrySize));
-  TEST_ASSERT_TRUE(find_by_key("ftpsrv") != nullptr);
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(kRegistrySize));
   TEST_ASSERT_TRUE(find_by_key("missing") == nullptr);
   TEST_ASSERT_TRUE(find_by_toggle_id("id_plugin_kstuff") != nullptr);
   TEST_ASSERT_TRUE(find_by_toggle_id("id_nope") == nullptr);
-  TEST_ASSERT_STREQ("ftpsrv", find_by_key("ftpsrv")->key);
-  TEST_ASSERT_STREQ("id_plugin_ftpsrv", find_by_key("ftpsrv")->toggle_id);
-  TEST_ASSERT_STREQ("ftpsrv.xml", find_by_key("ftpsrv")->config_xml);
+  TEST_ASSERT_STREQ("kstuff", find_by_key("kstuff")->key);
+  TEST_ASSERT_STREQ("id_plugin_kstuff", find_by_key("kstuff")->toggle_id);
+  TEST_ASSERT_STREQ("kstuff.xml", find_by_key("kstuff")->config_xml);
   TEST_ASSERT_TRUE(default_key() == std::string_view("kstuff"));
 
-  const Descriptor *by_res = find_by_config_xml_resource(cfg_res("ftpsrv.xml"));
-  TEST_ASSERT_TRUE(by_res != nullptr);
-  TEST_ASSERT_STREQ("ftpsrv", by_res->key);
+  const Descriptor *by_kstuff =
+      find_by_config_xml_resource(cfg_res("kstuff.xml"));
+  TEST_ASSERT_TRUE(by_kstuff != nullptr);
+  TEST_ASSERT_STREQ("kstuff", by_kstuff->key);
   TEST_ASSERT_TRUE(find_by_config_xml_resource(cfg_res("nope.xml")) == nullptr);
   return 0;
 }
@@ -132,6 +242,39 @@ static int test_plugin_config_restores_parent(void) {
   return 0;
 }
 
+static int test_sprx_config_restores_parent(void) {
+  ToolboxUiState state;
+  state.set_active_page(Page::Sprx);
+  state.set_active_page(Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::Sprx);
+  TEST_ASSERT_TRUE(state.child_page == Page::SprxConfig);
+
+  state.set_active_page(Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::Sprx);
+
+  state.leave_page(Page::SprxConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::Sprx);
+  TEST_ASSERT_TRUE(state.parent_page == Page::None);
+  TEST_ASSERT_TRUE(state.child_page == Page::None);
+  return 0;
+}
+
+static int test_payload_config_restores_parent(void) {
+  ToolboxUiState state;
+  state.set_active_page(Page::Payloads);
+  state.set_active_page(Page::PayloadConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::PayloadConfig);
+  TEST_ASSERT_TRUE(state.parent_page == Page::Payloads);
+  TEST_ASSERT_TRUE(state.child_page == Page::PayloadConfig);
+
+  state.leave_page(Page::PayloadConfig);
+  TEST_ASSERT_TRUE(state.active_page == Page::Payloads);
+  TEST_ASSERT_TRUE(state.parent_page == Page::None);
+  TEST_ASSERT_TRUE(state.child_page == Page::None);
+  return 0;
+}
+
 static int test_account_page(void) {
   RouteResult r = resolve_resource(make_in(kAccountXml));
   TEST_ASSERT_TRUE(r.page == Page::Account);
@@ -143,6 +286,14 @@ static int test_cheat_progress_page(void) {
   RouteResult r = resolve_resource(make_in(kCheatProgressXml));
   TEST_ASSERT_TRUE(r.page == Page::CheatProgress);
   TEST_ASSERT_TRUE(r.flags.is_cheat_progress);
+  return 0;
+}
+
+static int test_plugin_progress_page(void) {
+  RouteResult r = resolve_resource(make_in(kPluginProgressXml));
+  TEST_ASSERT_TRUE(r.page == Page::PluginProgress);
+  TEST_ASSERT_TRUE(r.flags.is_plugin_progress);
+  TEST_ASSERT_TRUE(restores_parent_on_pop(r.page));
   return 0;
 }
 
@@ -188,6 +339,26 @@ static int test_matrix(void) {
   TEST_ASSERT_TRUE(resolve_resource(make_in("cheats.xml")).page == Page::Cheats);
   TEST_ASSERT_TRUE(resolve_resource(make_in("debug_settings.xml")).page ==
                    Page::DebugSettings);
+  return 0;
+}
+
+static int test_dynamic_cheat_state(void) {
+  ToolboxUiState state;
+  const std::string id =
+      "id_cheat_cheat-1-123-1|src|/user/data/OnionHEN/cheats/game.json|0";
+  TEST_ASSERT_TRUE(ToolboxUiState::is_cheat_toggle_id(id));
+  TEST_ASSERT_TRUE(!ToolboxUiState::is_cheat_toggle_id("id_cheat_title"));
+  TEST_ASSERT_TRUE(!ToolboxUiState::is_cheat_toggle_id("id_cheat_view_0"));
+  bool enabled = true;
+  TEST_ASSERT_TRUE(!state.cheat_toggle_value(id, &enabled));
+  state.set_cheat_toggle("id_cheat_title", true);
+  TEST_ASSERT_TRUE(!state.cheat_toggle_value("id_cheat_title", &enabled));
+  state.set_cheat_toggle(id, true);
+  TEST_ASSERT_TRUE(state.cheat_toggle_value(id, &enabled));
+  TEST_ASSERT_TRUE(enabled);
+  state.set_cheat_toggle(id, false);
+  TEST_ASSERT_TRUE(state.cheat_toggle_value(id, &enabled));
+  TEST_ASSERT_TRUE(!enabled);
   return 0;
 }
 
@@ -290,30 +461,32 @@ static int test_progress_page_restore_is_reusable(void) {
   return 0;
 }
 
-static int test_dynamic_cheat_state(void) {
-  ToolboxUiState state;
-  state.set_cheat_enabled(511, true);
-  TEST_ASSERT_TRUE(state.get_cheat_enabled(511));
-  TEST_ASSERT_TRUE(!state.get_cheat_enabled(512));
-  TEST_ASSERT_TRUE(state.reset_cheats_if_tid_changed("CUSA00016"));
-  TEST_ASSERT_TRUE(!state.get_cheat_enabled(511));
-  return 0;
-}
-
 extern "C" int test_toolbox_route_suite(void) {
   int fails = 0;
   fails += onion_test_run("route.unknown", test_unknown_passthrough);
   fails += onion_test_run("route.payloads", test_payloads_page);
   fails += onion_test_run("route.debug", test_debug_settings_page);
   fails += onion_test_run("route.cheats", test_cheats_page);
-  fails += onion_test_run("route.auto_plapps", test_auto_payloads_and_plapps);
+  fails += onion_test_run("route.auto_payloads", test_auto_payloads);
   fails += onion_test_run("route.plugins", test_plugins_page);
+  fails += onion_test_run("route.sprx", test_sprx_page);
   fails += onion_test_run("route.plugin_config", test_plugin_config_page);
+  fails += onion_test_run("route.sprx_config", test_sprx_config_page);
+  fails += onion_test_run("route.payload_config", test_payload_config_page);
+  fails += onion_test_run("route.overlay_metrics", test_overlay_metrics_page);
+  fails += onion_test_run("route.overlay_metric", test_overlay_metric_page);
+  fails += onion_test_run("overlay.metric_restores_parent",
+                          test_overlay_metric_restores_parent);
   fails += onion_test_run("plugins.registry", test_plugins_registry);
   fails += onion_test_run("plugins.config_restores_parent",
                           test_plugin_config_restores_parent);
+  fails += onion_test_run("sprx.config_restores_parent",
+                          test_sprx_config_restores_parent);
+  fails += onion_test_run("payload.config_restores_parent",
+                          test_payload_config_restores_parent);
   fails += onion_test_run("route.account", test_account_page);
   fails += onion_test_run("route.cheat_progress", test_cheat_progress_page);
+  fails += onion_test_run("route.plugin_progress", test_plugin_progress_page);
   fails += onion_test_run("route.remote_play", test_remote_play_page);
   fails += onion_test_run("route.superuser", test_superuser_pass_through);
   fails += onion_test_run("route.og_debug", test_og_debug_redirect);

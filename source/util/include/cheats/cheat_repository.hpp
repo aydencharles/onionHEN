@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "cheats/cheat_engine.h"
+#include "cheats/cheat_types.hpp"
 #include "cheats/runtime.h"
-#include "util_platform.h"
 
 namespace onion::cheats {
 
@@ -30,20 +30,24 @@ struct FileSignature {
   bool operator!=(const FileSignature &o) const { return !(*this == o); }
 };
 
+struct CheatSourceDescriptor {
+  std::string path;
+  std::string source_id;
+  std::string process;
+  int extension_rank = -1;
+};
+
 /**
  * Resolves flat cheat paths and loads format-specific files
  * via CheatParserFactory (Strategy: json / shn / mc4 / ShnExt).
  */
 class CheatRepository {
 public:
-  /** Resolve the best compatible source for title/version/process. */
-  static std::string resolvePath(const game_context_t &game);
+  static std::vector<CheatSourceDescriptor>
+  resolveBrowse(const GameKey &game);
 
-  /**
-   * Resolve every compatible physical source. The returned paths are stable
-   * and ordered by process scope, generic scope, extension, then filename.
-   */
-  static std::vector<std::string> resolvePaths(const game_context_t &game);
+  static std::vector<CheatSourceDescriptor>
+  resolveRuntime(const GameKey &game, const ProcessIdentity &process);
 
   static bool fileExists(const std::string &path);
   static bool statSignature(const std::string &path, FileSignature &out);

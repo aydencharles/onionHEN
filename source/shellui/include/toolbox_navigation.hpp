@@ -10,3 +10,10 @@
 
 /** Push @p resource (relative, e.g. "plugin_config.xml") on the page stack. */
 bool toolbox_push_resource(const char *resource);
+
+/** Pop the topmost page from the active Legacy Settings page stack. */
+bool toolbox_pop_page(void);
+
+/** Check if the Legacy Settings page stack is currently transitioning. */
+bool toolbox_is_stack_under_transition(void);
+

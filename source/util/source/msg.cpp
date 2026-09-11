@@ -73,64 +73,6 @@ void reply(int sender_socket, bool error, std::string out_var = "Nothing") {
   onion::ipc_reply(sender_socket, BREW_UTIL_RETURN_VALUE, error, out_var);
 }
 
-std::vector<uint8_t> readFile(std::string filename) {
-  // open the file:
-  std::ifstream file(filename, std::ios::binary);
-  if (!file.is_open()) {
-    LOG_ERROR("Failed to open %s", filename.c_str());
-    return std::vector<uint8_t>();
-  }
-
-  // Stop eating new lines in binary mode!!!
-  file.unsetf(std::ios::skipws);
-
-  // get its size:
-  std::streampos fileSize;
-
-  file.seekg(0, std::ios::end);
-  fileSize = file.tellg();
-  file.seekg(0, std::ios::beg);
-
-  // reserve capacity
-  std::vector<uint8_t> vec;
-
-  vec.reserve(fileSize);
-
-  // read the data:
-  vec.insert(vec.begin(), std::istream_iterator<uint8_t>(file),
-             std::istream_iterator<uint8_t>());
-
-  return vec;
-}
-
-std::string GetPS5Version(const std::string &jsonpath) {
-  try {
-    std::ifstream input_file(jsonpath);
-    if (!input_file.is_open()) {
-      LOG_ERROR("Failed to open file for reading: %s", jsonpath.c_str());
-      return "Error Opening Json";
-    }
-
-    std::stringstream buffer;
-    buffer << input_file.rdbuf();
-    input_file.close();
-
-    onion_cjson::Root j(buffer.str());
-    const char *content_version =
-        j ? onion_cjson::string_item(j.get(), "contentVersion") : nullptr;
-    if (content_version)
-      return std::string(content_version);
-
-  } catch (const std::exception &e) {
-    // Handle exceptions here, you can log the error or perform other error
-    // handling tasks
-    LOG_ERROR("Failed to read game version: %s", e.what());
-    return "Error getting version";
-  }
-
-  return "Error getting version";
-}
-
 // Callback function to write received data
 size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
   FILE *fp = (FILE *)userp;

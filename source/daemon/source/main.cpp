@@ -45,10 +45,15 @@ along with this program; see the file COPYING. If not, see
 #include "globalconf.hpp"
 #include "launcher.hpp"
 #include "ipc.hpp"
+#include "plugin_ipc_server.hpp"
+#include "plugin_manager_runtime.hpp"
+#include "app_lifecycle_runtime.hpp"
+#include "sprx_plugin_manager_runtime.hpp"
 #include "startup_navigation.hpp"
 #include "welcome_toast.hpp"
 #include <onion/debug_settings_route_policy.hpp>
 #include <onion/fault_frame.h>
+#include <onion/notify.h>
 #include <onion/ready.h>
 
 #define MSG_NOSIGNAL 0x20000 /* do not generate SIGPIPE on EOF. */
@@ -144,9 +149,23 @@ void install_crash_handlers() {
     sigaction(i, &action, nullptr);
 }
 
-void start_worker_threads(pthread_t* fifo_thr, pthread_t* msg_thr) {
-  pthread_create(fifo_thr, nullptr, fifo_and_dumper_thread, nullptr);
+void start_worker_threads(pthread_t* app_jailbreak_thr, pthread_t* msg_thr) {
+  if (app_jailbreak_runtime_start(app_jailbreak_thr)) {
+    pthread_t lifecycle_thr = nullptr;
+    if (pthread_create(&lifecycle_thr, nullptr, app_lifecycle_listener_thread,
+                       nullptr) == 0) {
+      pthread_detach(lifecycle_thr);
+    } else {
+      LOG_ERROR("[lifecycle] SceSysCore listener thread creation failed");
+      onion::daemon::app_lifecycle::stop();
+    }
+  } else {
+    LOG_ERROR("[lifecycle] Big App listener disabled: AppJailbreak runtime is "
+              "not ready");
+  }
   pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
+  if (!onion::daemon::plugin_ipc::start())
+    LOG_ERROR("plugin IPC server failed to start");
   pthread_t ctrl_thr = nullptr;
   pthread_create(&ctrl_thr, nullptr, control_tcp_loop, nullptr);
   pthread_detach(ctrl_thr);
@@ -162,6 +181,9 @@ void start_worker_threads(pthread_t* fifo_thr, pthread_t* msg_thr) {
   pthread_t vsync_fps_thr = nullptr;
   pthread_create(&vsync_fps_thr, nullptr, vsync_fps_sampler_thread, nullptr);
   pthread_detach(vsync_fps_thr);
+  pthread_t language_thr = nullptr;
+  pthread_create(&language_thr, nullptr, system_language_poll_thread, nullptr);
+  pthread_detach(language_thr);
   pthread_t resume_thr = nullptr;
   pthread_create(&resume_thr, nullptr, resume_recovery_thread, nullptr);
   pthread_detach(resume_thr);
@@ -237,9 +259,11 @@ int main() {
   /* Real linked kernel export (not a dlsym function-pointer variable). */
   onion_notify_set_send(reinterpret_cast<onion_notify_send_fn>(
       sceKernelSendNotificationRequest));
+  onion_notify_set_rich_send(reinterpret_cast<onion_notify_rich_send_fn>(
+      sceNotificationSend));
 
   char buz[255];
-  pthread_t fifo_thr = nullptr;
+  pthread_t app_jailbreak_thr = nullptr;
   pthread_t msg_thr = nullptr;
 
   sceNetCtlInit();
@@ -280,7 +304,20 @@ int main() {
       []() -> int { return sceSystemServiceGetAppIdOfRunningBigApp(); });
 
   (void)onion_net_get_ip_address(&buz[0], sizeof(buz));
-  start_worker_threads(&fifo_thr, &msg_thr);
+  if (!onion::daemon::app_lifecycle::start())
+    LOG_ERROR("[lifecycle] startup failed; Big App SPRX events disabled");
+  // Load the catalog before the SceSysCore listener can publish an event.
+  // Big App lifecycle events then use reconcile() against this initialized
+  // catalog, rather than racing a second initial start().
+  onion::daemon::sprx_plugins::start();
+  start_worker_threads(&app_jailbreak_thr, &msg_thr);
+  for (int attempt = 0;
+       attempt < 20 && !onion::daemon::plugin_ipc::is_listening(); ++attempt)
+    usleep(50 * 1000);
+  if (onion::daemon::plugin_ipc::is_listening())
+    onion::daemon::plugins::start();
+  else
+    LOG_ERROR("[plugins] startup skipped because plugin IPC is not listening");
   onion_ready_signal_pid(ONION_READY_DAEMON, getpid());
 
   LOG_DEBUG("is toolbox only: %s | ver: %x", toolbox_only ? "Yes" : "No",
@@ -294,7 +331,7 @@ int main() {
   const std::string welcome_toast_json = onion::daemon::make_welcome_toast_json(
       debug_settings_route.toolbox_uri(
           onion::debug_settings_route::UriKind::Simple));
-  sceNotificationSend(0xFE, true, welcome_toast_json.c_str());
+  onion_notify_try_rich(welcome_toast_json.c_str(), "notify.boot.welcome");
   LOG_INFO("StartUp thread created!! - welcome to OnionHEN");
 
   onion::daemon::apply_startup_destination(boot_settings);

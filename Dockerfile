@@ -19,10 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       lld-18 \
       llvm-18 \
       make \
+      nodejs \
+      npm \
       meson \
       ninja-build \
+      passwd \
       pkg-config \
       python3 \
+      python3-pip \
       python3-pyelftools \
       socat \
       unzip \
@@ -48,6 +52,16 @@ RUN find /workspace -type f \( -name "*.sh" -o -name "*.bash" \) -print0 | xargs
     ./libcxx.sh && \
     cd /workspace && \
     rm -rf /tmp/ps5-payload-sdk-src
+
+# Keystone engine for host unit tests. The wheel ships libkeystone.so inside
+# the python package; expose it under /usr/local/lib where the tests Makefile
+# (KEYSTONE_PREFIX=/usr/local) and the runtime loader both find it. Headers
+# come from third_party/keystone/include, already vendored in the repo.
+RUN pip3 install --break-system-packages --no-cache-dir keystone-engine && \
+    KSO=$(python3 -c 'import keystone, os; print(os.path.join(os.path.dirname(keystone.__file__), "libkeystone.so"))') && \
+    ln -sf "$KSO" /usr/local/lib/libkeystone.so && \
+    ln -sf "$KSO" /usr/local/lib/libkeystone.so.0 && \
+    ldconfig
 
 RUN if getent group "${HOST_GID}" >/dev/null; then \
             builder_group="$(getent group "${HOST_GID}" | cut -d: -f1)"; \

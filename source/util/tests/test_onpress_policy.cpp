@@ -36,20 +36,34 @@ static int test_page_domain_matrix(void) {
                    OnPressDomain::Root);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Payloads) ==
                    OnPressDomain::Payloads);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::PayloadConfig) ==
+                   OnPressDomain::PayloadConfig);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::OverlayMetrics) ==
+                   OnPressDomain::Root);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::OverlayMetricConfig) ==
+                   OnPressDomain::Root);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::AutoPayloads) ==
                    OnPressDomain::AutoPayloads);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Cheats) ==
                    OnPressDomain::Cheats);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Account) ==
                    OnPressDomain::Account);
-  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Plapps) ==
-                   OnPressDomain::Plapps);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::CheatProgress) ==
+                   OnPressDomain::Progress);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::PluginProgress) ==
                    OnPressDomain::Progress);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::SuperuserPass) ==
                    OnPressDomain::PassThrough);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::RedirectOgDebug) ==
                    OnPressDomain::PassThrough);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Plugins) ==
+                   OnPressDomain::Plugins);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::PluginConfig) ==
+                   OnPressDomain::PluginConfig);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::Sprx) ==
+                   OnPressDomain::Sprx);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::SprxConfig) ==
+                   OnPressDomain::Sprx);
   return 0;
 }
 

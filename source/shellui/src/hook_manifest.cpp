@@ -7,8 +7,12 @@
 #include "shellui_state.hpp"
 #include "onpress_policy.hpp"
 #include "progress_dialog.hpp"
+#include "plugin_progress.hpp"
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
+#include "dynamic_ui_runtime.hpp"
+#include "external_plugin_ui.hpp"
+#include "external_sprx_ui.hpp"
 #include <onion/platform.h>
 #include <string>
 
@@ -16,11 +20,16 @@ extern MonoClass *MemoryStream_IO;
 extern MonoObject *MemoryStream_Instance;
 extern std::string payloads_xml, debug_settings_xml, cheats_xml;
 extern std::string UI3_dec, legacy_dec;
-void generate_payload_xml(std::string &xml_buffer, bool list_page);
+void generate_payload_xml(std::string &xml_buffer);
+void generate_payload_config_xml(std::string &xml_buffer,
+                                 const std::string &payload_id);
+void generate_overlay_metrics_xml(std::string &xml_buffer);
+void generate_overlay_metric_xml(std::string &xml_buffer,
+                                 const std::string &metric_id);
 void generate_plugins_xml(std::string &xml_buffer);
+void generate_sprx_xml(std::string &xml_buffer);
 void generate_plugin_config_xml(std::string &xml_buffer);
 void generate_account_xml(std::string &xml_buffer);
-void generate_plapps_xml(std::string &new_xml);
 void generate_toolbox_xml(std::string &new_xml);
 void generate_cheats_xml(std::string &new_xml, std::string &not_open_tid,
                          bool running_as_debug_settings,
@@ -39,6 +48,8 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   std::string new_xml_string;
   std::string resourceName = Mono_to_String(FileName);
   MonoDomain *domain = current_mono_domain();
+  const bool dynamic_page =
+      onion::shellui::dynamic_ui::render_resource(resourceName, new_xml_string);
 
 #if SHELL_DEBUG == 1
   LOG_DEBUG("GetManifestResourceStream_Hook: %s domain=%p root=%p",
@@ -48,20 +59,25 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   const bool shortcut = g_ui.any_cheat_shortcut();
   const bool shortcut_not_open = g_ui.cheats_shortcut_activated_not_open;
 
-  toolbox::RouteResult route = toolbox::resolve_resource({
-      .resource = resourceName,
-      .names =
-          {
-              .payloads_xml = payloads_xml,
-              .debug_settings_xml = debug_settings_xml,
-              .cheats_xml = cheats_xml,
-          },
-      .cheats_shortcut = g_ui.cheats_shortcut_activated,
-      .cheats_shortcut_not_open = g_ui.cheats_shortcut_activated_not_open,
-  });
+  toolbox::RouteResult route{};
+  if (dynamic_page) {
+    g_ui.set_active_page(toolbox::Page::DynamicPlugin);
+  } else {
+    route = toolbox::resolve_resource({
+        .resource = resourceName,
+        .names =
+            {
+                .payloads_xml = payloads_xml,
+                .debug_settings_xml = debug_settings_xml,
+                .cheats_xml = cheats_xml,
+            },
+        .cheats_shortcut = g_ui.cheats_shortcut_activated,
+        .cheats_shortcut_not_open = g_ui.cheats_shortcut_activated_not_open,
+    });
 
-  g_ui.set_active_page(toolbox::active_page_after_resource(
-      g_ui.active_page, route.page, resourceName));
+    g_ui.set_active_page(toolbox::active_page_after_resource(
+        g_ui.active_page, route.page, resourceName));
+  }
 
   if (route.page == toolbox::Page::RedirectOgDebug) {
     MonoString *debug_resource =
@@ -72,8 +88,8 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
         inst, debug_resource);
   }
 
-  if (route.page == toolbox::Page::None ||
-      route.page == toolbox::Page::SuperuserPass) {
+  if (!dynamic_page && (route.page == toolbox::Page::None ||
+                        route.page == toolbox::Page::SuperuserPass)) {
     return GetManifestResourceStream_Original(inst, FileName);
   }
 
@@ -102,19 +118,51 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     }
   }
 
-  switch (route.page) {
+  if (!dynamic_page) {
+    switch (route.page) {
   case toolbox::Page::DebugSettings:
     LoadSettings();
     generate_toolbox_xml(new_xml_string);
     break;
   case toolbox::Page::Payloads:
-    g_ui.payloads_list.clear();
-    generate_payload_xml(new_xml_string, true);
+    generate_payload_xml(new_xml_string);
     break;
+  case toolbox::Page::PayloadConfig: {
+    std::string payload_id;
+    toolbox::parse_payload_config_resource(resourceName, &payload_id);
+    generate_payload_config_xml(new_xml_string, payload_id);
+    break;
+  }
+  case toolbox::Page::OverlayMetrics:
+    generate_overlay_metrics_xml(new_xml_string);
+    break;
+  case toolbox::Page::OverlayMetricConfig: {
+    std::string metric_id;
+    toolbox::parse_overlay_metric_resource(resourceName, &metric_id);
+    generate_overlay_metric_xml(new_xml_string, metric_id);
+    break;
+  }
   case toolbox::Page::Plugins:
     generate_plugins_xml(new_xml_string);
     break;
+  case toolbox::Page::Sprx:
+    generate_sprx_xml(new_xml_string);
+    break;
+  case toolbox::Page::SprxConfig: {
+    std::string sprx_id;
+    toolbox::parse_sprx_config_resource(resourceName, &sprx_id);
+    onion::shellui::external_sprx::generate_config_xml(new_xml_string, sprx_id);
+    break;
+  }
   case toolbox::Page::PluginConfig: {
+    std::string plugin_id;
+    if (toolbox::parse_external_plugin_config_resource(resourceName,
+                                                       &plugin_id)) {
+      g_ui.active_plugin = plugin_id;
+      onion::shellui::external_plugins::generate_config_xml(new_xml_string,
+                                                            plugin_id);
+      break;
+    }
     const onion::plugins::Descriptor *d =
         onion::plugins::find_by_config_xml_resource(resourceName);
     g_ui.active_plugin =
@@ -129,24 +177,23 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
       g_ui.clear_cheat_shortcuts();
     break;
   case toolbox::Page::AutoPayloads:
-    g_ui.auto_payloads_list.clear();
-    generate_payload_xml(new_xml_string, false);
+    generate_payload_xml(new_xml_string);
     break;
   case toolbox::Page::Account:
     generate_account_xml(new_xml_string);
     break;
-  case toolbox::Page::Plapps:
-    g_ui.payloads_apps_list.clear();
-    generate_plapps_xml(new_xml_string);
-    break;
   case toolbox::Page::CheatProgress:
     generate_cheat_progress_xml(new_xml_string);
+    break;
+  case toolbox::Page::PluginProgress:
+    generate_plugin_progress_xml(new_xml_string);
     break;
   case toolbox::Page::RemotePlay:
     generate_remote_play_xml(new_xml_string);
     break;
   default:
     return GetManifestResourceStream_Original(inst, FileName);
+    }
   }
 
   MemoryStream_Instance = New_Mono_XML_From_String(new_xml_string, domain);

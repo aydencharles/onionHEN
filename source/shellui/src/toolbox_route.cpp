@@ -18,11 +18,19 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_cheats = (in.resource == in.names.cheats_xml);
   out.flags.is_auto_payload = (in.resource == kAutoPayloadsXml);
   out.flags.is_plugins = (in.resource == kPluginsXml);
+  out.flags.is_sprx = (in.resource == kSprxXml);
+  out.flags.is_sprx_config = parse_sprx_config_resource(in.resource, nullptr);
+  out.flags.is_payload_config =
+      parse_payload_config_resource(in.resource, nullptr);
+  out.flags.is_overlay_metrics = (in.resource == kOverlayMetricsXml);
+  out.flags.is_overlay_metric =
+      parse_overlay_metric_resource(in.resource, nullptr);
   out.flags.is_plugin_config =
-      (onion::plugins::find_by_config_xml_resource(in.resource) != nullptr);
+      (onion::plugins::find_by_config_xml_resource(in.resource) != nullptr) ||
+      parse_external_plugin_config_resource(in.resource, nullptr);
   out.flags.is_account = (in.resource == kAccountXml);
-  out.flags.is_plapps = (in.resource == kPlappsXml);
   out.flags.is_cheat_progress = (in.resource == kCheatProgressXml);
+  out.flags.is_plugin_progress = (in.resource == kPluginProgressXml);
   out.flags.is_remote_play = (in.resource == kRemotePlayXml);
   out.flags.is_su_menu = (in.resource == kSuperuserXml);
 
@@ -36,8 +44,18 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::DebugSettings;
   } else if (out.flags.is_payloads) {
     out.page = Page::Payloads;
+  } else if (out.flags.is_payload_config) {
+    out.page = Page::PayloadConfig;
+  } else if (out.flags.is_overlay_metrics) {
+    out.page = Page::OverlayMetrics;
+  } else if (out.flags.is_overlay_metric) {
+    out.page = Page::OverlayMetricConfig;
   } else if (out.flags.is_plugins) {
     out.page = Page::Plugins;
+  } else if (out.flags.is_sprx) {
+    out.page = Page::Sprx;
+  } else if (out.flags.is_sprx_config) {
+    out.page = Page::SprxConfig;
   } else if (out.flags.is_plugin_config) {
     out.page = Page::PluginConfig;
   } else if (out.flags.is_cheats) {
@@ -47,10 +65,10 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::AutoPayloads;
   } else if (out.flags.is_account) {
     out.page = Page::Account;
-  } else if (out.flags.is_plapps) {
-    out.page = Page::Plapps;
   } else if (out.flags.is_cheat_progress) {
     out.page = Page::CheatProgress;
+  } else if (out.flags.is_plugin_progress) {
+    out.page = Page::PluginProgress;
   } else if (out.flags.is_remote_play) {
     out.page = Page::RemotePlay;
   } else if (out.flags.is_su_menu) {

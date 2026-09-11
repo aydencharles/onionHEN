@@ -21,7 +21,10 @@ void apply_overlay_layout() {
   metrics.show_gpu = g_settings.overlay_gpu;
   metrics.show_ram = g_settings.overlay_ram;
   metrics.show_ip = g_settings.overlay_ip;
+  metrics.show_fan = g_settings.overlay_fan;
   metrics.per_core_cpu = g_settings.all_cpu_usage;
+  metrics.font_size_pt = onion::overlay_font_pt(g_settings.overlay_font_size);
+  metrics.order = g_settings.overlay_order;
   g_overlay_layout = onion::overlay::compute_overlay_layout(
       screen_w, screen_h,
       onion::overlay::bar_edge_from_pos(g_settings.overlay_pos),

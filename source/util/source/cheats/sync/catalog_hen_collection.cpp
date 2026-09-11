@@ -16,7 +16,7 @@ public:
 
   const char *slugFor(CheatMirrorId mirror) const override {
     if (mirror == CheatMirrorId::Cnb) {
-      return "kylin-core/hen-cheats-cnb-mirror";
+      return "PS5-xiexiyu/CN-Cheats-Collection";
     }
     return "TeeKay87/HEN-Cheats-Collection";
   }

@@ -34,6 +34,7 @@ int (*sceAppMessagingReceiveMsg)(const AppMessage* msg) = nullptr;
 
 /* ====================================== Dynamic libkernel_sys Symbols ===================================*/
 int (*sceKernelGetProcessName)(int pid, char* name) = nullptr;
+int (*sceKernelGetCurrentFanDuty)(uint16_t* out_duty, uint64_t* out_chassis_info) = nullptr;
 int (*sceKernelMprotect)(void* addr, size_t len, int prot) = nullptr;
 int (*sceKernelDebugOutText)(int DBG_CHANNEL, const char* text) = nullptr;
 //  int (*close_alt)(int fd) = nullptr;
@@ -76,6 +77,7 @@ MonoThread* (*mono_thread_attach)(MonoDomain* domain) = nullptr;
 MonoMethod* (*mono_class_get_method_from_name)(MonoClass* klass, const char* name, int param_count) = nullptr;//
 void (*mono_runtime_object_init)(MonoObject* obj) = nullptr;
 MonoClassField* (*mono_class_get_field_from_name)(MonoClass* klass, const char* name) = nullptr;
+void (*mono_field_get_value)(MonoObject *, MonoClassField *, void *) = nullptr;
 void (*mono_field_static_set_value)(MonoVTable* vt, MonoClassField* field, void* value) = nullptr;
 MonoVTable* (*mono_class_vtable)(MonoDomain* domain, MonoClass* klass) = nullptr;
 MonoImage* (*mono_image_open_from_data)(char* data, uint32_t data_len, int need_copy, MonoImageOpenStatus* status) = nullptr;

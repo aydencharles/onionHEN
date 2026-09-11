@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 
@@ -16,7 +17,15 @@ inline constexpr float kCpuAllWidth = 420.0f;
 inline constexpr float kGpuWidth = 190.0f;
 inline constexpr float kRamWidth = 170.0f;
 inline constexpr float kIpWidth = 200.0f;
+inline constexpr float kFanWidth = 130.0f;
 inline constexpr float kFpsWidth = 130.0f;
+inline constexpr int kMetricCount = 6;
+inline constexpr int kMetricFps = 0;
+inline constexpr int kMetricCpu = 1;
+inline constexpr int kMetricGpu = 2;
+inline constexpr int kMetricMemory = 3;
+inline constexpr int kMetricIp = 4;
+inline constexpr int kMetricFan = 5;
 
 enum class BarEdge { Top, Bottom };
 enum class BarAlign { Left, Center, Right };
@@ -65,6 +74,8 @@ struct Layout {
   float overlay_ram_y = 12.0f;
   float overlay_ip_x = 740.0f;
   float overlay_ip_y = 12.0f;
+  float overlay_fan_x = 960.0f;
+  float overlay_fan_y = 12.0f;
   float overlay_fps_x = 40.0f;
   float overlay_fps_y = 12.0f;
 };
@@ -76,8 +87,31 @@ struct Metrics {
   bool show_gpu = true;
   bool show_ram = true;
   bool show_ip = false;
+  bool show_fan = false;
   bool per_core_cpu = false;
+  int font_size_pt = static_cast<int>(kFontH);
+  /* Must match onion::kOverlayMetric* / kOverlayOrderDefault. */
+  std::array<int, kMetricCount> order{kMetricFps, kMetricCpu, kMetricGpu,
+                                      kMetricMemory, kMetricIp, kMetricFan};
 };
+
+inline void normalize_metric_order(std::array<int, kMetricCount> &order) {
+  bool seen[kMetricCount] = {};
+  std::array<int, kMetricCount> out{};
+  int n = 0;
+  for (int metric : order) {
+    if (metric < 0 || metric >= kMetricCount || seen[metric])
+      continue;
+    seen[metric] = true;
+    out[n++] = metric;
+  }
+  for (int metric = 0; metric < kMetricCount; ++metric) {
+    if (seen[metric])
+      continue;
+    out[n++] = metric;
+  }
+  order = out;
+}
 
 inline bool valid_screen_dimension(float value) {
   return std::isfinite(value) && value > 1.0f;
@@ -87,12 +121,17 @@ inline Layout compute_overlay_layout(float screen_w, float screen_h,
                                      BarEdge edge, BarAlign align,
                                      const Metrics &metrics) {
   Layout out{};
-  out.bar_h = kFontH + kBarExtra;
+  const int font_pt =
+      metrics.font_size_pt > 0 ? metrics.font_size_pt : static_cast<int>(kFontH);
+  const float scale = static_cast<float>(font_pt) / kFontH;
+  const float gap = kGap * scale;
+  out.bar_h = static_cast<float>(font_pt) + kBarExtra;
   out.label_margin_top = kTextTopInset;
   out.overlay_cpu_x = kOffscreen;
   out.overlay_gpu_x = kOffscreen;
   out.overlay_ram_x = kOffscreen;
   out.overlay_ip_x = kOffscreen;
+  out.overlay_fan_x = kOffscreen;
   out.overlay_fps_x = kOffscreen;
 
   if (!valid_screen_dimension(screen_w) || !valid_screen_dimension(screen_h)) {
@@ -110,8 +149,10 @@ inline Layout compute_overlay_layout(float screen_w, float screen_h,
   const bool show_gpu = metrics.enabled && metrics.show_gpu;
   const bool show_ram = metrics.enabled && metrics.show_ram;
   const bool show_ip = metrics.enabled && metrics.show_ip;
+  const bool show_fan = metrics.enabled && metrics.show_fan;
   const bool show_fps = metrics.enabled && metrics.show_fps;
-  const float cpu_w = metrics.per_core_cpu ? kCpuAllWidth : kCpuAvgWidth;
+  const float cpu_w =
+      (metrics.per_core_cpu ? kCpuAllWidth : kCpuAvgWidth) * scale;
 
   struct Slot {
     bool on;
@@ -119,36 +160,45 @@ inline Layout compute_overlay_layout(float screen_w, float screen_h,
     float *x;
     float *y;
   };
-  Slot slots[] = {
-      {show_fps, kFpsWidth, &out.overlay_fps_x, &out.overlay_fps_y},
+  Slot by_metric[kMetricCount] = {
+      {show_fps, kFpsWidth * scale, &out.overlay_fps_x, &out.overlay_fps_y},
       {show_cpu, cpu_w, &out.overlay_cpu_x, &out.overlay_cpu_y},
-      {show_gpu, kGpuWidth, &out.overlay_gpu_x, &out.overlay_gpu_y},
-      {show_ram, kRamWidth, &out.overlay_ram_x, &out.overlay_ram_y},
-      {show_ip, kIpWidth, &out.overlay_ip_x, &out.overlay_ip_y},
+      {show_gpu, kGpuWidth * scale, &out.overlay_gpu_x, &out.overlay_gpu_y},
+      {show_ram, kRamWidth * scale, &out.overlay_ram_x, &out.overlay_ram_y},
+      {show_ip, kIpWidth * scale, &out.overlay_ip_x, &out.overlay_ip_y},
+      {show_fan, kFanWidth * scale, &out.overlay_fan_x, &out.overlay_fan_y},
   };
+
+  std::array<int, kMetricCount> order = metrics.order;
+  normalize_metric_order(order);
 
   float content_w = 0.0f;
   int visible = 0;
-  for (const Slot &slot : slots) {
+  for (int metric : order) {
+    const Slot &slot = by_metric[metric];
     if (!slot.on) {
       continue;
     }
     if (visible++) {
-      content_w += kGap;
+      content_w += gap;
     }
     content_w += slot.width;
   }
 
   float x = pack_origin(screen_w, content_w, align);
-
-  for (Slot &slot : slots) {
+  for (int metric = 0; metric < kMetricCount; ++metric) {
+    *by_metric[metric].y = out.bar_y;
+    *by_metric[metric].x = kOffscreen;
+  }
+  for (int metric : order) {
+    Slot &slot = by_metric[metric];
     *slot.y = out.bar_y;
     if (!slot.on || content_w <= 0.0f) {
       *slot.x = kOffscreen;
       continue;
     }
     *slot.x = x;
-    x += slot.width + kGap;
+    x += slot.width + gap;
   }
   return out;
 }

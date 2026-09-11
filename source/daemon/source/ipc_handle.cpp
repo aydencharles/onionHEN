@@ -8,6 +8,8 @@
 #include <onion/settings.hpp>
 #include "onion_cjson.hpp"
 #include "globalconf.hpp"
+#include "plugin_manager_runtime.hpp"
+#include "sprx_plugin_manager_runtime.hpp"
 #include <msg.hpp>
 #include <atomic>
 #include <string>
@@ -19,6 +21,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <strings.h>
+#include <algorithm>
 
 
 
@@ -27,6 +30,84 @@ bool copyFile(const char *source, const char *destination);
 void calculateSize(uint64_t size, char *result);
 uint64_t calculateTotalSize(const char *path);
 extern "C" int unmount(const char *path, int flags);
+
+namespace {
+
+std::string plugin_inventory_page(size_t offset) {
+  constexpr size_t kPageSize = 8;
+  const std::vector<onion::plugin::InventoryEntry> inventory =
+      onion::daemon::plugins::inventory();
+  const size_t begin = std::min(offset, inventory.size());
+  const size_t end = std::min(begin + kPageSize, inventory.size());
+
+  cJSON *root = cJSON_CreateObject();
+  cJSON *items = cJSON_CreateArray();
+  cJSON_AddItemToObject(root, "plugins", items);
+  for (size_t index = begin; index < end; ++index) {
+    const onion::plugin::InventoryEntry &entry = inventory[index];
+    cJSON *item = cJSON_CreateObject();
+    cJSON_AddStringToObject(item, "id", entry.descriptor.plugin_id.c_str());
+    cJSON_AddStringToObject(item, "version", entry.descriptor.version.c_str());
+    cJSON_AddStringToObject(item, "name", entry.descriptor.name.c_str());
+    cJSON_AddBoolToObject(item, "running", entry.running());
+    cJSON_AddBoolToObject(item, "auto_start", entry.auto_start());
+    cJSON_AddItemToArray(items, item);
+  }
+  cJSON_AddNumberToObject(root, "next",
+                          end < inventory.size() ? static_cast<double>(end)
+                                                 : -1.0);
+  return onion_cjson::print_owned(root);
+}
+
+std::string sprx_inventory_page(size_t offset) {
+  constexpr size_t kPageSize = 8;
+  const std::vector<onion::sprx::SprxInventoryEntry> inventory =
+      onion::daemon::sprx_plugins::inventory();
+  const size_t begin = std::min(offset, inventory.size());
+  const size_t end = std::min(begin + kPageSize, inventory.size());
+  cJSON *root = cJSON_CreateObject();
+  cJSON *items = cJSON_CreateArray();
+  cJSON_AddItemToObject(root, "sprx", items);
+  for (size_t index = begin; index < end; ++index) {
+    const onion::sprx::SprxInventoryEntry &entry = inventory[index];
+    cJSON *item = cJSON_CreateObject();
+    cJSON_AddStringToObject(item, "id", entry.id.c_str());
+    cJSON_AddStringToObject(item, "path", entry.path.c_str());
+    cJSON_AddBoolToObject(item, "enabled", entry.enabled);
+    cJSON_AddBoolToObject(item, "auto_start", entry.auto_start);
+    cJSON_AddNumberToObject(item, "priority", entry.priority);
+    cJSON_AddBoolToObject(item, "matches_current_target",
+                          entry.matches_current_target);
+    cJSON_AddBoolToObject(item, "loaded_for_current_target",
+                          entry.loaded_for_current_target);
+    cJSON_AddItemToArray(items, item);
+  }
+  cJSON_AddNumberToObject(root, "next",
+                          end < inventory.size() ? static_cast<double>(end)
+                                                 : -1.0);
+  return onion_cjson::print_owned(root);
+}
+
+onion::plugin::OperationResult plugin_operation(DaemonCommands command,
+                                                std::string_view plugin_id,
+                                                bool enabled = false) {
+  switch (command) {
+  case BREW_PLUGIN_START:
+    return onion::daemon::plugins::start_plugin(plugin_id);
+  case BREW_PLUGIN_STOP:
+    return onion::daemon::plugins::stop_plugin(plugin_id);
+  case BREW_PLUGIN_RELOAD:
+    return onion::daemon::plugins::reload_plugin(plugin_id);
+  case BREW_PLUGIN_DELETE:
+    return onion::daemon::plugins::remove_plugin(plugin_id);
+  case BREW_PLUGIN_SET_AUTO_START:
+    return onion::daemon::plugins::set_auto_start(plugin_id, enabled);
+  default:
+    return {false, "unsupported plugin operation"};
+  }
+}
+
+} // namespace
 
 void handleIPC(clientArgs *client, std::string &inputStr,
                DaemonCommands command) {
@@ -53,6 +134,79 @@ void handleIPC(clientArgs *client, std::string &inputStr,
   switch (command) {
   case BREW_TEST_CONNECTION: {
     reply(sender_app, false, out_var);
+    break;
+  }
+  case BREW_PLUGIN_LIST: {
+    const int offset = onion_cjson::int_item(my_json.get(), "offset", 0);
+    if (offset < 0) {
+      reply(sender_app, true, "invalid plugin inventory offset");
+      break;
+    }
+    const std::string page = plugin_inventory_page(static_cast<size_t>(offset));
+    if (page.size() >= DAEMON_BUFF_MAX) {
+      reply(sender_app, true, "plugin inventory page exceeds IPC frame");
+      break;
+    }
+    reply(sender_app, false, page);
+    break;
+  }
+  case BREW_SPRX_LIST: {
+    const int offset = onion_cjson::int_item(my_json.get(), "offset", 0);
+    if (offset < 0) {
+      reply(sender_app, true, "invalid SPRX inventory offset");
+      break;
+    }
+    const std::string page = sprx_inventory_page(static_cast<size_t>(offset));
+    if (page.size() >= DAEMON_BUFF_MAX) {
+      reply(sender_app, true, "SPRX inventory page exceeds IPC frame");
+      break;
+    }
+    reply(sender_app, false, page);
+    break;
+  }
+  case BREW_PLUGIN_START:
+  case BREW_PLUGIN_STOP:
+  case BREW_PLUGIN_RELOAD:
+  case BREW_PLUGIN_DELETE: {
+    const char *plugin_id =
+        onion_cjson::string_item(my_json.get(), "plugin_id");
+    if (!plugin_id || !*plugin_id) {
+      reply(sender_app, true, "missing plugin_id");
+      break;
+    }
+    const onion::plugin::OperationResult result =
+        plugin_operation(command, plugin_id);
+    reply(sender_app, !result.success,
+          result.success ? std::string("ok") : result.error);
+    break;
+  }
+  case BREW_PLUGIN_SET_AUTO_START: {
+    const char *plugin_id =
+        onion_cjson::string_item(my_json.get(), "plugin_id");
+    if (!plugin_id || !*plugin_id) {
+      reply(sender_app, true, "missing plugin_id");
+      break;
+    }
+    const onion::plugin::OperationResult result = plugin_operation(
+        command, plugin_id, onion_cjson::bool_item(my_json.get(), "enabled"));
+    reply(sender_app, !result.success,
+          result.success ? std::string("ok") : result.error);
+    break;
+  }
+  case BREW_SPRX_SET_ENABLED:
+  case BREW_SPRX_DELETE: {
+    const char *id = onion_cjson::string_item(my_json.get(), "id");
+    if (!id || !*id) {
+      reply(sender_app, true, "missing SPRX id");
+      break;
+    }
+    const onion::sprx::SprxOperationResult result =
+        command == BREW_SPRX_SET_ENABLED
+            ? onion::daemon::sprx_plugins::set_enabled(
+                  id, onion_cjson::bool_item(my_json.get(), "enabled"))
+            : onion::daemon::sprx_plugins::remove(id);
+    reply(sender_app, !result.success,
+          result.success ? std::string("ok") : result.error);
     break;
   }
   case BREW_ENABLE_TOOLBOX: {

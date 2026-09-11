@@ -28,6 +28,10 @@
 extern "C" {
 #endif
 
+/* Notification service reads this user-visible path. Config/payload stay
+ * under /data/OnionHEN. */
+#define ONION_NOTIFY_ICON_PATH "/user/data/OnionHEN/onionhen.png"
+
 /** Kernel/userland toast send — matches sceKernelSendNotificationRequest. */
 typedef int32_t (*onion_notify_send_fn)(int32_t device, void *req, size_t size,
                                         int32_t blocking);
@@ -55,6 +59,9 @@ void onion_notify_debug(const char *fmt, ...);
 void onion_notify_rich(const char *message, const char *sub_message,
                        const char *icon_url, const char *preview_icon,
                        const char *notification_id);
+/** Send a prebuilt rich JSON toast. Empty payload or send failure falls back
+ *  to onion_notify(plain_key). Callers do not branch. */
+void onion_notify_try_rich(const char *payload, const char *plain_key);
 
 /**
  * Format a notification body: onion_notify_tr(key) then vsnprintf.

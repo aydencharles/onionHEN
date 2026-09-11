@@ -11,6 +11,7 @@ using onion::overlay::kCpuAllWidth;
 using onion::overlay::kCpuAvgWidth;
 using onion::overlay::kEdgeInset;
 using onion::overlay::kFpsWidth;
+using onion::overlay::kFanWidth;
 using onion::overlay::kGap;
 using onion::overlay::kGpuWidth;
 using onion::overlay::kIpWidth;
@@ -193,6 +194,26 @@ int test_hidden_metric_is_offscreen_between_neighbors() {
   return 0;
 }
 
+int test_fan_slot_packs_after_ip() {
+  Metrics m = all_average();
+  m.show_fan = true;
+  const Layout layout =
+      compute_overlay_layout(kW, kH, BarEdge::Top, BarAlign::Left, m);
+  TEST_ASSERT_TRUE(layout.overlay_fan_x > layout.overlay_ip_x);
+  TEST_ASSERT_EQ_INT(as_int(layout.overlay_ip_x + kIpWidth + kGap),
+                     as_int(layout.overlay_fan_x));
+  TEST_ASSERT_TRUE(layout.overlay_fan_x + kFanWidth <= kW - kEdgeInset + 0.1f);
+  return 0;
+}
+
+int test_fan_hidden_when_disabled() {
+  const Layout layout =
+      compute_overlay_layout(kW, kH, BarEdge::Top, BarAlign::Left,
+                             all_average());
+  TEST_ASSERT_EQ_INT(as_int(kOffscreen), as_int(layout.overlay_fan_x));
+  return 0;
+}
+
 int test_pack_origin_left_center_right() {
   constexpr float content = 200.0f;
   TEST_ASSERT_EQ_INT(as_int(kEdgeInset),
@@ -207,6 +228,39 @@ int test_pack_origin_left_center_right() {
   TEST_ASSERT_EQ_INT(
       as_int(kOffscreen),
       as_int(onion::overlay::pack_origin(kW, 0.0f, BarAlign::Left)));
+  return 0;
+}
+
+int test_custom_order_packs_requested_sequence() {
+  Metrics m = fps_only();
+  m.show_cpu = true;
+  m.show_gpu = true;
+  m.order = {onion::overlay::kMetricGpu, onion::overlay::kMetricFps,
+             onion::overlay::kMetricCpu, onion::overlay::kMetricMemory,
+             onion::overlay::kMetricIp, onion::overlay::kMetricFan};
+  const Layout layout =
+      compute_overlay_layout(kW, kH, BarEdge::Top, BarAlign::Left, m);
+  TEST_ASSERT_EQ_INT(as_int(kEdgeInset), as_int(layout.overlay_gpu_x));
+  TEST_ASSERT_EQ_INT(as_int(kEdgeInset + kGpuWidth + kGap),
+                     as_int(layout.overlay_fps_x));
+  TEST_ASSERT_EQ_INT(
+      as_int(kEdgeInset + kGpuWidth + kGap + kFpsWidth + kGap),
+      as_int(layout.overlay_cpu_x));
+  TEST_ASSERT_EQ_INT(as_int(kOffscreen), as_int(layout.overlay_ram_x));
+  return 0;
+}
+
+int test_large_font_scales_slot_widths() {
+  Metrics m = fps_only();
+  m.font_size_pt = 24;
+  const Layout layout =
+      compute_overlay_layout(kW, kH, BarEdge::Top, BarAlign::Left, m);
+  const float scale = 24.0f / onion::overlay::kFontH;
+  TEST_ASSERT_EQ_INT(as_int(kEdgeInset), as_int(layout.overlay_fps_x));
+  TEST_ASSERT_EQ_INT(as_int(24.0f + onion::overlay::kBarExtra),
+                     as_int(layout.bar_h));
+  TEST_ASSERT_TRUE(layout.overlay_fps_x + kFpsWidth * scale >
+                   layout.overlay_fps_x + kFpsWidth);
   return 0;
 }
 
@@ -251,9 +305,17 @@ extern "C" int test_overlay_layout_suite(void) {
                              test_per_core_cpu_uses_wider_slot);
   failures += onion_test_run("overlay_layout.hidden_gap",
                              test_hidden_metric_is_offscreen_between_neighbors);
+  failures += onion_test_run("overlay_layout.fan_after_ip",
+                             test_fan_slot_packs_after_ip);
+  failures += onion_test_run("overlay_layout.fan_hidden",
+                             test_fan_hidden_when_disabled);
   failures += onion_test_run("overlay_layout.pack_origin",
                              test_pack_origin_left_center_right);
   failures += onion_test_run("overlay_layout.edge_align_mapping",
                              test_edge_and_align_mapping);
+  failures += onion_test_run("overlay_layout.custom_order",
+                             test_custom_order_packs_requested_sequence);
+  failures += onion_test_run("overlay_layout.large_font",
+                             test_large_font_scales_slot_widths);
   return failures;
 }

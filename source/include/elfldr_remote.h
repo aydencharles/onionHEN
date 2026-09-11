@@ -50,6 +50,12 @@ bool elfldr_remote_send_bytes_to(uint16_t port, const uint8_t *elf,
                                  size_t size);
 
 /**
+ * Send a file: URI to @port and close. Does not wait for a PID response.
+ * Use this for 9021 (and any loader that only acknowledges the send).
+ */
+bool elfldr_remote_send_file_to(uint16_t port, const char *abs_path);
+
+/**
  * Stage @elf at @abs_path, launch it exclusively through OnionHEN :9020, and
  * wait for its exact PID. Returns the loader-reported PID (>1), or -1 for any
  * staging, transport, protocol, timeout, spawn, or invalid-PID failure.

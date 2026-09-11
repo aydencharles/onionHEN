@@ -149,7 +149,7 @@ OnionHEN/
 - 9020 在同步加载 Payload 时发布 busy 标记，避免健康检查误杀；超过有界宽限期仍未恢复则按卡死处理
 - Unix socket：`/system_tmp/onionhen/ipc/crit_service`
 - IPC 前缀 `0x9000000`（`BREW_*`）
-- 休息后 Toolbox 恢复：SceSysCore `NOTE_EXEC` 认出新 `NPXS40087`，等 `libSceNpTrophy.sprx` 与 `libSceNpTrophy2.sprx` 再注入（参考 [kstuff-lite](https://github.com/EchoStretch/kstuff-lite)）
+- 休息后 Toolbox 恢复：SceSysCore `NOTE_EXEC` 认出新 `NPXS40087`，等 `libSceNpTrophy.sprx` 与 `libSceNpTrophy2.sprx`，再按 `rest_mode.resume_reinject_delay_seconds` 等待后注入（参考 [kstuff-lite](https://github.com/EchoStretch/kstuff-lite)）
 - Unix IPC 与 TCP **9048** 在 `accept` 失败时关闭并重新 listen（参考 [ps5-payload-manager](https://github.com/itsplk/ps5-payload-manager)）
 
 主要能力：
@@ -228,7 +228,7 @@ RAM 与 IP。采样实现参考 [PHU Games Tools](https://github.com/ArkSama)（
 |------|------|
 | **msg.cpp** | 仅 `IPC_loop` + transport 胶水 |
 | **ipc_handle.cpp** | crit 命令表分发 |
-| **daemon_inject.cpp** | Toolbox 注入：冷启动/IPC 立即注入；休息恢复参考 kstuff-lite（SysCore EXEC + trophy sprx） |
+| **daemon_inject.cpp** | Toolbox 注入：冷启动/IPC 立即注入；休息恢复参考 kstuff-lite（SysCore EXEC + trophy sprx + 可配置延时） |
 | **daemon_settings.cpp** | LoadSettings + mtime 缓存 |
 | **daemon_fs.cpp** | remount / chmod / test_sb / reply / fan / ForceKill / pid 查找 |
 | **daemon_fps.cpp** | render/skip-hook FPS 线程 + 独立 V-sync 采样线程；原始值无效时由 V-sync 线程兜底；仅 render 线程发布 `/system_tmp/onionhen/fps_sample` |
@@ -388,7 +388,7 @@ struct IPCMessage {
 - 阻止系统更新（unmount `/update`）
 - **kstuff**：fself / fpkg 相关内核能力（通常 ≥ 3.00）
 - App jailbreak（按设置启停；SceSysCore 生命周期 + 沙盒 vnode 事件 + 白名单 TID，无常驻轮询）
-- 休息后 Toolbox 恢复（kstuff-lite：新 ShellUI PID + trophy sprx）
+- 休息后 Toolbox 恢复（kstuff-lite：新 ShellUI PID + trophy sprx，再按 `rest_mode.resume_reinject_delay_seconds` 等待）
 - 休息后监听套接字重绑（ps5-payload-manager：IPC / TCP `accept` 失败自愈）
 - 双守护进程架构（util 可被 daemon 拉起）
 

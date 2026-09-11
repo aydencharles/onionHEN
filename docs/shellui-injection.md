@@ -44,8 +44,10 @@ Cold start and util reinjection therefore cannot ptrace the same ShellUI
 process concurrently.
 
 After Rest Mode, daemon observes the new `NPXS40087` process through SceSysCore
-`NOTE_EXEC`, waits for `libSceNpTrophy.sprx` and `libSceNpTrophy2.sprx`, and
-then runs the same serialized injection flow.
+`NOTE_EXEC`, waits for `libSceNpTrophy.sprx` and `libSceNpTrophy2.sprx`, applies
+`rest_mode.resume_reinject_delay_seconds`, and then runs the same serialized
+injection flow. The extra delay is rest-resume only; cold start and retries
+skip it.
 
 ## Injection invariants
 

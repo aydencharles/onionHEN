@@ -37,6 +37,12 @@ show_title_ids=false
 # Available values: true, false
 show_onionhen_options=true
 
+[rest_mode]
+# resume_reinject_delay_seconds waits after trophy SPRX are ready,
+# then re-injects the Toolbox on Rest Mode resume.
+# Available values: 0 through 255 seconds.
+resume_reinject_delay_seconds=10
+
 [cheats]
 # mirror selects the git host for online cheat catalogs.
 # Available values: auto, github, cnb

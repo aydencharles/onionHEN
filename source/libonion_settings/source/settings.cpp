@@ -618,6 +618,10 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->onionhen_game_opts =
       parse_bool(ini_get(parser, "game_menu.show_onionhen_options"),
                  out->onionhen_game_opts);
+  out->rest_mode_delay_seconds = static_cast<uint64_t>(parse_int_range(
+      ini_get(parser, "rest_mode.resume_reinject_delay_seconds"),
+      static_cast<int>(out->rest_mode_delay_seconds), kRestModeDelayMinSeconds,
+      kRestModeDelayMaxSeconds));
   out->cheats_mirror = parse_cheats_mirror(ini_get(parser, "cheats.mirror"),
                                            out->cheats_mirror);
   out->app_jailbreak_enabled =
@@ -763,6 +767,14 @@ std::string settings_serialize(const Settings &in) {
   b += "# show_onionhen_options adds OnionHEN entries to the game options menu.\n";
   b += "# Available values: true, false\n";
   b += "show_onionhen_options=" + bool_text(in.onionhen_game_opts) + "\n";
+  b += "\n";
+  b += "[rest_mode]\n";
+  b += "# resume_reinject_delay_seconds waits after trophy SPRX are ready,\n";
+  b += "# then re-injects the Toolbox on Rest Mode resume.\n";
+  b += "# Available values: 0 through 255 seconds.\n";
+  b += "resume_reinject_delay_seconds=" +
+       std::to_string(static_cast<unsigned long long>(in.rest_mode_delay_seconds)) +
+       "\n";
   b += "\n";
   b += "[cheats]\n";
   b += "# mirror selects the git host for online cheat catalogs.\n";

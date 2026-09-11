@@ -625,6 +625,8 @@ constexpr const char* kIconMenuOption =
     "/user/data/OnionHEN/assets/icon_xml_menu_option.png";
 constexpr const char* kIconFan =
     "/user/data/OnionHEN/assets/icon_xml_fan.png";
+constexpr const char* kIconRestMode =
+    "/user/data/OnionHEN/assets/icon_xml_restmode.png";
 constexpr const char* kIconHardDrive =
     "/user/data/OnionHEN/assets/icon_xml_hardrive.png";
 constexpr const char* kIconDiscLicense =
@@ -781,6 +783,15 @@ void append_toolbox_system_group(ps5ui::Group& g) {
                          toolbox_val("id_fan_speed", ""));
        },
        toolbox_i18n::tr("fan.group.sub"), kIconFan, "id_enable_fan_speed")
+      .group(
+          "id_rest_mode", toolbox_i18n::tr("rest.group"),
+          [](ps5ui::Group& r) {
+            r.text_field("id_rest_1", toolbox_i18n::tr("rest.delay"),
+                         toolbox_i18n::tr("rest.delay.sub"), "number", "1",
+                         "3", std::nullopt, std::nullopt, std::nullopt,
+                         toolbox_val("id_rest_1", ""));
+          },
+          toolbox_i18n::tr("rest.group.sub"), kIconRestMode, "id_rest_1")
       .link("id_external_hdd", toolbox_i18n::tr("hdd.external"),
             "DebugSettings/data/debug_settings_external_hdd.xml",
             toolbox_i18n::tr("hdd.external.sub"), kIconHardDrive)

@@ -63,7 +63,7 @@ main()
 要点：
 
 - **IPC 线程先于主循环启动**；listen `accept` 失败会自愈重绑（参考 [ps5-payload-manager](https://github.com/itsplk/ps5-payload-manager)）。
-- Toolbox 休息恢复在 **daemon** 的 SceSysCore `NOTE_EXEC`（新 `NPXS40087`）上，等 `libSceNpTrophy.sprx` 与 `libSceNpTrophy2.sprx` 后再注入（参考 [kstuff-lite](https://github.com/EchoStretch/kstuff-lite)）。
+- Toolbox 休息恢复在 **daemon** 的 SceSysCore `NOTE_EXEC`（新 `NPXS40087`）上，等 `libSceNpTrophy.sprx` 与 `libSceNpTrophy2.sprx`，再按 `rest_mode.resume_reinject_delay_seconds` 等待后注入（参考 [kstuff-lite](https://github.com/EchoStretch/kstuff-lite)）。
 - 金手指 **service 状态**在冷启动后 `ensureDir` 一次。
 
 ---

@@ -199,6 +199,9 @@ inline void overlay_move_metric(std::array<int, kOverlayMetricCount> &order,
 inline constexpr int kFanThresholdMinCelsius = 0;
 inline constexpr int kFanThresholdMaxCelsius = 100;
 inline constexpr int kFanAutomaticThresholdCelsius = 77;
+inline constexpr int kRestModeDelayMinSeconds = 0;
+inline constexpr int kRestModeDelayMaxSeconds = 255;
+inline constexpr int kRestModeDelayDefaultSeconds = 10;
 inline constexpr int clamp_fan_threshold(int celsius) {
   if (celsius < kFanThresholdMinCelsius)
     return kFanThresholdMinCelsius;
@@ -224,6 +227,10 @@ struct Settings {
   // [startup]
   // Page to open after OnionHEN finishes loading.
   int startup_open_after_load = kStartupOpenNone;
+
+  // [rest_mode]
+  // Extra seconds after Rest Mode trophy SPRX are ready, before Toolbox inject.
+  uint64_t rest_mode_delay_seconds = kRestModeDelayDefaultSeconds;
 
   // [cheats], [app_jailbreak]
   int cheats_mirror = kCheatsMirrorAuto;

@@ -9,12 +9,18 @@
  *      Accepted names:
  *        - etahen_jailbreak
  *        - onionhen_jailbreak
- *   3. SceSysCore NOTE_EXEC/NOTE_EXIT events identify app lifetime. Vnode
- *      events then follow sandbox -> slot -> download0 -> request file.
+ *   3. SceSysCore process events identify app lifetime. NOTE_TRACK does
+ *      deliver the game child's NOTE_EXEC, and GetAppInfo is often already
+ *      filled from SysCore appParam. sceSystemServiceGetAppIdOfRunningBigApp
+ *      is later (after ResArbitrator). A usable EXEC identity publishes
+ *      immediately; otherwise the running Big App query (same path FPS uses)
+ *      reconciles Cdlg EXEC / SysCore FORK, with short oneshot retries and a
+ *      2s fallback. Vnode events then follow sandbox -> slot -> download0 ->
+ *      request file.
  *
- * There is no periodic foreground-app query or sandbox scan. The only scan of
- * the 51 possible slots happens when an allowed app starts, or when the
- * sandbox root reports that one of its direct children changed.
+ * There is no periodic sandbox scan. The only scan of the 51 possible slots
+ * happens when an allowed app is collected, or when the sandbox root reports
+ * that one of its direct children changed.
  */
 
 #include "daemon_ops.hpp"
@@ -23,6 +29,7 @@
 
 #include <onion/app_jailbreak_policy.hpp>
 #include <onion/app_lifecycle.hpp>
+#include <onion/big_app_collect_policy.hpp>
 #include <onion/platform.h>
 #include <onion/proc_query.h>
 #include <onion/settings.hpp>
@@ -131,6 +138,8 @@ constexpr const char *kJailbreakReqNames[] = {
 };
 constexpr const char *kShellUiTitleId = "NPXS40087";
 constexpr const char *kShellUiProcessName = "SceShellUI";
+constexpr uintptr_t kReconcileBurstTimerIdent = 1;
+constexpr uintptr_t kReconcileFallbackTimerIdent = 2;
 
 struct ExecIdentity {
   char process_name[64] {};
@@ -318,25 +327,76 @@ struct TrackedBigApp {
 /** Identifies foreground Big Apps and only publishes lifecycle events. */
 class SceSysCoreAppLifecycleCollector {
 public:
-  bool on_exec(pid_t pid, const ExecIdentity &id) {
-    if (id.app_info_rc != 0 || id.tid.empty() || big_apps_.count(pid) != 0)
-      return false;
+  bool has_tracked() const { return !big_apps_.empty(); }
 
+  bool consider(const char *source, pid_t exec_pid, const ExecIdentity *id) {
     std::string current_title_id;
     int current_app_id = -1;
-    if (!Get_Running_App_TID(current_title_id, current_app_id) ||
-        current_app_id < 0 ||
-        id.info.app_id != static_cast<uint32_t>(current_app_id) ||
-        id.tid != current_title_id || get_game_pid() != pid)
+    const bool query_ok = Get_Running_App_TID(current_title_id, current_app_id);
+    const pid_t running_pid = query_ok ? get_game_pid() : -1;
+
+    onion::lifecycle::ExecSnapshot exec;
+    exec.pid = exec_pid;
+    if (id != nullptr) {
+      exec.app_info_rc = id->app_info_rc;
+      exec.app_id = id->info.app_id;
+      exec.title_id = id->tid;
+      exec.already_tracked = exec_pid > 1 && big_apps_.count(exec_pid) != 0;
+    }
+
+    onion::lifecycle::RunningBigAppSnapshot running;
+    running.query_ok = query_ok;
+    running.pid = running_pid;
+    running.app_id = current_app_id;
+    running.title_id = current_title_id;
+    const bool running_tracked =
+        running_pid > 1 && big_apps_.count(running_pid) != 0;
+
+    const onion::lifecycle::BigAppCollectDecision decision =
+        onion::lifecycle::decide_big_app_started(exec, running,
+                                                 running_tracked);
+    if (decision.action !=
+        onion::lifecycle::BigAppCollectAction::PublishStarted) {
+      const bool quiet =
+          std::strcmp(source, "timer") == 0 &&
+          (decision.reason ==
+               onion::lifecycle::BigAppCollectReason::RunningQueryNotReady ||
+           decision.reason ==
+               onion::lifecycle::BigAppCollectReason::AlreadyTracked);
+      if (quiet) {
+        LOG_TRACE("[lifecycle] collect skip source=%s reason=%s exec_pid=%d "
+                  "running_pid=%d",
+                  source,
+                  onion::lifecycle::big_app_collect_reason_name(
+                      decision.reason),
+                  static_cast<int>(exec_pid), static_cast<int>(running_pid));
+      } else {
+        LOG_DEBUG("[lifecycle] collect skip source=%s reason=%s exec_pid=%d "
+                  "exec_tid=%s running_pid=%d running_tid=%s query_ok=%d",
+                  source,
+                  onion::lifecycle::big_app_collect_reason_name(
+                      decision.reason),
+                  static_cast<int>(exec_pid),
+                  id != nullptr ? id->tid.c_str() : "-",
+                  static_cast<int>(running_pid),
+                  current_title_id.empty() ? "-" : current_title_id.c_str(),
+                  query_ok ? 1 : 0);
+      }
       return false;
+    }
 
     if (!onion::daemon::app_lifecycle::publish_big_app_started(
-            pid, id.info.app_id, id.tid))
+            decision.pid, decision.app_id, decision.title_id))
       return false;
 
-    big_apps_[pid] = {id.info.app_id, id.tid};
-    LOG_INFO("[lifecycle] Big App started pid=%d appid=%u tid=%s",
-             static_cast<int>(pid), id.info.app_id, id.tid.c_str());
+    const std::string started_tid(decision.title_id);
+    big_apps_[decision.pid] = {decision.app_id, started_tid};
+    LOG_INFO("[lifecycle] Big App started pid=%d appid=%u tid=%s via=%s "
+             "source=%s",
+             static_cast<int>(decision.pid), decision.app_id,
+             started_tid.c_str(),
+             onion::lifecycle::big_app_collect_reason_name(decision.reason),
+             source);
     return true;
   }
 
@@ -402,6 +462,10 @@ public:
                     static_cast<long long>(event.data));
           continue;
         }
+        if (event.filter == EVFILT_TIMER) {
+          handle_reconcile_timer(event);
+          continue;
+        }
         if (event.filter == EVFILT_PROC && !handle_process_event(event))
           return;
       }
@@ -441,6 +505,14 @@ private:
 
     LOG_INFO("[lifecycle] SceSysCore listener active pid=%d",
              static_cast<int>(syscore_pid_));
+
+    EV_SET(&event, kReconcileFallbackTimerIdent, EVFILT_TIMER,
+           EV_ADD | EV_ENABLE, 0, onion::lifecycle::kBigAppReconcileFallbackMs,
+           nullptr);
+    if (kevent(kq_, &event, 1, nullptr, 0, nullptr) != 0) {
+      LOG_WARN("[lifecycle] Big App fallback timer failed: %s",
+               strerror(errno));
+    }
     return true;
   }
 
@@ -452,6 +524,12 @@ private:
 
   bool handle_process_event(const struct kevent &event) {
     const pid_t pid = static_cast<pid_t>(event.ident);
+    if (event.fflags & NOTE_TRACKERR) {
+      LOG_WARN("[lifecycle] NOTE_TRACKERR pid=%d child=%lld",
+               static_cast<int>(pid), static_cast<long long>(event.data));
+    }
+
+    bool spawn_activity = false;
     if (event.fflags & NOTE_EXEC) {
       const ExecIdentity id = read_exec_identity(pid);
       if (identity_is_shellui(id)) {
@@ -459,8 +537,15 @@ private:
                   static_cast<int>(pid));
         toolbox_on_new_shellui(pid);
       }
-      (void)collector_.on_exec(pid, id);
+      spawn_activity = true;
+      if (collector_.consider("exec", pid, &id))
+        disarm_burst_timer();
+    } else if (event.fflags & (NOTE_FORK | NOTE_CHILD)) {
+      spawn_activity = true;
+      if (collector_.consider("fork", pid, nullptr))
+        disarm_burst_timer();
     }
+
     if (event.fflags & NOTE_EXIT) {
       if (onion::lifecycle::ProcessExitPolicy::should_stop_listener(
               syscore_pid_, pid)) {
@@ -469,12 +554,54 @@ private:
       }
       (void)collector_.on_exit(pid);
     }
+
+    if (spawn_activity && !collector_.has_tracked())
+      arm_burst_timer(/*restart=*/true);
     return true;
+  }
+
+  void handle_reconcile_timer(const struct kevent &event) {
+    if (collector_.consider("timer", -1, nullptr)) {
+      disarm_burst_timer();
+      return;
+    }
+    if (event.ident == kReconcileBurstTimerIdent)
+      arm_burst_timer(/*restart=*/false);
+  }
+
+  void arm_burst_timer(bool restart) {
+    if (kq_ < 0)
+      return;
+    if (restart)
+      burst_index_ = 0;
+    if (burst_index_ >= onion::lifecycle::kBigAppReconcileBurstCount)
+      return;
+
+    struct kevent event;
+    EV_SET(&event, kReconcileBurstTimerIdent, EVFILT_TIMER,
+           EV_ADD | EV_ENABLE | EV_ONESHOT, 0,
+           onion::lifecycle::kBigAppReconcileBurstMs[burst_index_], nullptr);
+    if (kevent(kq_, &event, 1, nullptr, 0, nullptr) != 0) {
+      LOG_WARN("[lifecycle] Big App burst timer failed: %s", strerror(errno));
+      return;
+    }
+    ++burst_index_;
+  }
+
+  void disarm_burst_timer() {
+    burst_index_ = onion::lifecycle::kBigAppReconcileBurstCount;
+    if (kq_ < 0)
+      return;
+    struct kevent event;
+    EV_SET(&event, kReconcileBurstTimerIdent, EVFILT_TIMER, EV_DELETE, 0, 0,
+           nullptr);
+    (void)kevent(kq_, &event, 1, nullptr, 0, nullptr);
   }
 
   int control_read_fd_ = -1;
   int kq_ = -1;
   pid_t syscore_pid_ = -1;
+  int burst_index_ = onion::lifecycle::kBigAppReconcileBurstCount;
   SceSysCoreAppLifecycleCollector collector_;
 };
 

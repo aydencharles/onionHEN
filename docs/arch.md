@@ -303,7 +303,7 @@ shellui / homebrew
 
 homebrew (app jailbreak)
         └─► sandbox file  …/download0/etahen_jailbreak|onionhen_jailbreak
-             (SceSysCore 进程生命周期事件 + 沙盒目录 vnode 事件 + 白名单 TID)
+             (SceSysCore 进程事件触发 Running Big App 补扫 + 沙盒 vnode + 白名单 TID)
 ```
 
 ### 3.1 消息格式
@@ -387,7 +387,7 @@ struct IPCMessage {
 - 提权与分区 remount
 - 阻止系统更新（unmount `/update`）
 - **kstuff**：fself / fpkg 相关内核能力（通常 ≥ 3.00）
-- App jailbreak（按设置启停；SceSysCore 生命周期 + 沙盒 vnode 事件 + 白名单 TID，无常驻轮询）
+- App jailbreak（按设置启停；SceSysCore 生命周期事件触发 Running Big App 补扫，再跟沙盒 vnode 与白名单 TID。EXEC 身份未就绪或 NOTE_TRACK 跟丢时短重试，无沙盒常驻扫描）
 - 休息后 Toolbox 恢复（kstuff-lite：新 ShellUI PID + trophy sprx，再按 `rest_mode.resume_reinject_delay_seconds` 等待）
 - 休息后监听套接字重绑（ps5-payload-manager：IPC / TCP `accept` 失败自愈）
 - 双守护进程架构（util 可被 daemon 拉起）

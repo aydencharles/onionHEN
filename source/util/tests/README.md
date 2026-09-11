@@ -56,6 +56,7 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_msg_protocol` | IPC paths, magic, command ordinals, `IPC_Ret`, message POD, reply JSON body |
 | `test_util_language` | system-language cache/refresh and notification language selection |
 | `test_app_jailbreak_policy` | configurable app-jailbreak exact/prefix Title ID allowlist, including the Itemzflow compatibility ID `ITEM00001` |
+| `test_big_app_collect_policy` | Big App start collection: EXEC identity can publish before Running Big App is registered; Cdlg EXEC reconciles the homebrew pid |
 | `test_ps5_settings_ui` | fluent XML builder + escaping |
 | `test_toolbox_route` | resource → page routing + dynamic cheat enabled-state and Kstuff descriptors |
 | `test_toolbox_i18n` | locale-key parity for toolbox groups (zh-Hans, en) |

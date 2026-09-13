@@ -545,6 +545,17 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_TRUE(ko.message.find("기린") == std::string::npos);
   TEST_ASSERT_TRUE(ko.message.find("麒麟") == std::string::npos);
 
+  onion_notify_set_language(ONION_NOTIFY_LANG_JA);
+  const WelcomeFields ja = parse_welcome(
+      onion::daemon::make_welcome_toast_json(
+          "pssettings:play?function=debug_settings"));
+  TEST_ASSERT_TRUE(ja.valid);
+  TEST_ASSERT_STREQ("OnionHEN へようこそ", ja.sub_message.c_str());
+  const std::string expected_ja =
+      std::string(ONIONHEN_VERSION) + " · 作者：Kylin/0xp0co & kvnhrt";
+  TEST_ASSERT_STREQ(expected_ja.c_str(), ja.message.c_str());
+  TEST_ASSERT_TRUE(ja.message.find("麒麟") == std::string::npos);
+
   onion_notify_set_language(ONION_NOTIFY_LANG_EN);
   return 0;
 }

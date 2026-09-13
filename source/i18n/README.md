@@ -141,7 +141,7 @@ Checked against call sites (not just the JSON files):
   They are translated but not shown.
 - Welcome toast formats `notify.boot.made_by` with `ONIONHEN_VERSION`. The
   author display name is part of each locale's translation (`麒麟` in
-  Chinese and Japanese, `Kylin` elsewhere).
+  Chinese, `Kylin` elsewhere).
 - External plugins own their dynamic UI and service-specific translations;
   the OnionHEN catalog contains only host-owned strings.
 

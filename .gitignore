@@ -57,3 +57,7 @@ source/webui/npm-debug.log*
 source/webui/yarn-debug.log*
 source/webui/yarn-error.log*
 docs/legacy-settings-refresh.md
+docs/release*.md
+docs/release*.css
+docs/release*.md
+docs/发行说明*.pdf

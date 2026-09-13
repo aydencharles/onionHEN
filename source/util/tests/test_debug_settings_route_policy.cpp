@@ -552,7 +552,7 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_TRUE(ja.valid);
   TEST_ASSERT_STREQ("OnionHEN へようこそ", ja.sub_message.c_str());
   const std::string expected_ja =
-      std::string(ONIONHEN_VERSION) + " · 作者：Kylin/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " · 制作：Kylin/0xp0co & kvnhrt";
   TEST_ASSERT_STREQ(expected_ja.c_str(), ja.message.c_str());
   TEST_ASSERT_TRUE(ja.message.find("麒麟") == std::string::npos);
 

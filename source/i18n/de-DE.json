@@ -322,7 +322,7 @@
     "notify.boot.starting": "OnionHEN wird gestartet...",
     "notify.boot.welcome": "Willkommen bei OnionHEN",
     "notify.boot.goto_toolbox": "Zur OnionHEN-Toolbox",
-    "notify.boot.made_by": " · von ",
+    "notify.boot.made_by": "%s · von Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN wurde aufgeräumt.",
     "notify.boot.conflict": "OnionHEN startet nicht: %s läuft bereits",
     "notify.kstuff.no_elf_header": "Kstuff „%s“ hat keinen gültigen ELF-Header.",

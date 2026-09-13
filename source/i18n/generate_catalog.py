@@ -30,6 +30,7 @@ REQUIRED_TOKENS = {
         "plugins.link.sub": ("Kstuff",),
     },
     "notifications": {
+        "notify.boot.made_by": ("0xp0co", "kvnhrt"),
         "notify.kstuff.loading": ("Kstuff",),
         "notify.kstuff.load_failed": ("Kstuff",),
         "notify.kstuff.load_elfldr_failed": ("Kstuff",),

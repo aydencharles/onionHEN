@@ -322,7 +322,7 @@
     "notify.boot.starting": "OnionHEN 正在啟動...",
     "notify.boot.welcome": "歡迎使用 OnionHEN",
     "notify.boot.goto_toolbox": "前往 OnionHEN 工具箱",
-    "notify.boot.made_by": " · 作者：",
+    "notify.boot.made_by": "%s · 作者：麒麟/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN 已清理完成。",
     "notify.boot.conflict": "OnionHEN 已拒絕啟動：%s 正在執行",
     "notify.kstuff.no_elf_header": "Kstuff「%s」沒有有效的 ELF 檔頭。",

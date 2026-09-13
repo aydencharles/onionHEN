@@ -139,9 +139,9 @@ Checked against call sites (not just the JSON files):
 - Four toolbox keys are unused leftovers from an older menu grouping:
   `group.lang`, `group.lang.sub`, `group.shortcuts`, `group.shortcuts.sub`.
   They are translated but not shown.
-- Welcome toast still concatenates `version + notify.boot.made_by + author`.
-  That word order is correct for current zh and en; the other locales use
-  the same concatenation.
+- Welcome toast formats `notify.boot.made_by` with `ONIONHEN_VERSION`. The
+  author display name is part of each locale's translation (`麒麟` in
+  Chinese and Japanese, `Kylin` elsewhere).
 - External plugins own their dynamic UI and service-specific translations;
   the OnionHEN catalog contains only host-owned strings.
 

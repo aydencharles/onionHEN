@@ -7,14 +7,17 @@
 
 #include "onion_cjson.hpp"
 
+#include <cstdio>
 #include <string>
 #include <string_view>
 
 namespace onion::daemon {
 
 inline std::string make_welcome_toast_json(std::string_view toolbox_uri) {
-  const std::string message = std::string(ONIONHEN_VERSION) +
-                              onion_notify_tr("notify.boot.made_by") + ONIONHEN_AUTHOR;
+  char message_buf[256];
+  std::snprintf(message_buf, sizeof(message_buf),
+                onion_notify_tr("notify.boot.made_by"), ONIONHEN_VERSION);
+  const std::string message = message_buf;
   const char *sub_message = onion_notify_tr("notify.boot.welcome");
   const char *action_name = onion_notify_tr("notify.boot.goto_toolbox");
   const std::string_view action_url =

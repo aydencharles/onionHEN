@@ -55,6 +55,9 @@ static int test_default_zh(void) {
       std::strcmp(onion_notify_tr("notify.cheats.conflict"),
                   "%s 与 %s 冲突（%s）于 0x%s") == 0);
   TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.boot.made_by"),
+                  "%s · 作者：麒麟/0xp0co & kvnhrt") == 0);
+  TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.conflict"),
                   "OnionHEN 已拒绝启动：%s 正在运行") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.game_menu"),
@@ -114,6 +117,9 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.cheats.conflict"),
                   "%s conflicts with %s (%s) at 0x%s") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.boot.made_by"),
+                  "%s made by Kylin/0xp0co & kvnhrt") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.conflict"),
                   "OnionHEN refused to start: %s is already running") == 0);

@@ -322,7 +322,7 @@
     "notify.boot.starting": "OnionHEN กำลังเริ่มทำงาน...",
     "notify.boot.welcome": "ยินดีต้อนรับสู่ OnionHEN",
     "notify.boot.goto_toolbox": "ไปที่ OnionHEN Toolbox",
-    "notify.boot.made_by": " สร้างโดย ",
+    "notify.boot.made_by": "%s สร้างโดย Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN ถูกเคลียร์แล้ว",
     "notify.boot.conflict": "OnionHEN ปฏิเสธการเริ่มต้น: %s กำลังทำงานอยู่แล้ว",
     "notify.kstuff.no_elf_header": "Kstuff '%s' ไม่มีส่วนหัว ELF",

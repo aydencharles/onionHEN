@@ -473,6 +473,7 @@ static int test_settings_bundle_rejects_length_mismatch(void) {
 }
 
 static int test_welcome_toast_replaces_toolbox_uri(void) {
+  onion_notify_set_language(ONION_NOTIFY_LANG_EN);
   const char *uri =
       "pssettings:play?function=debug_settings_old&label=\"quoted\"";
   const WelcomeFields fields = parse_welcome(
@@ -481,8 +482,10 @@ static int test_welcome_toast_replaces_toolbox_uri(void) {
   TEST_ASSERT_STREQ(uri, fields.action_url.c_str());
   TEST_ASSERT_STREQ(ONION_NOTIFY_ICON_PATH, fields.icon_url.c_str());
   TEST_ASSERT_STREQ("Welcome to OnionHEN", fields.sub_message.c_str());
-  TEST_ASSERT_STREQ(ONIONHEN_VERSION " made by " ONIONHEN_AUTHOR,
-                    fields.message.c_str());
+  const std::string expected =
+      std::string(ONIONHEN_VERSION) + " made by Kylin/0xp0co & kvnhrt";
+  TEST_ASSERT_STREQ(expected.c_str(), fields.message.c_str());
+  TEST_ASSERT_TRUE(fields.message.find("麒麟") == std::string::npos);
   return 0;
 }
 
@@ -497,15 +500,51 @@ static int test_welcome_toast_fallback_uri(void) {
 
 static int test_welcome_toast_localizes_text(void) {
   onion_notify_set_language(ONION_NOTIFY_LANG_ZH_HANS);
-  const WelcomeFields fields = parse_welcome(
+  const WelcomeFields zh = parse_welcome(
       onion::daemon::make_welcome_toast_json(
           "pssettings:play?function=debug_settings"));
-  TEST_ASSERT_TRUE(fields.valid);
-  TEST_ASSERT_STREQ("欢迎使用 OnionHEN", fields.sub_message.c_str());
-  TEST_ASSERT_STREQ("前往 OnionHEN 工具箱", fields.action_name.c_str());
-  const std::string expected =
-      std::string(ONIONHEN_VERSION) + " · 作者：" + ONIONHEN_AUTHOR;
-  TEST_ASSERT_STREQ(expected.c_str(), fields.message.c_str());
+  TEST_ASSERT_TRUE(zh.valid);
+  TEST_ASSERT_STREQ("欢迎使用 OnionHEN", zh.sub_message.c_str());
+  TEST_ASSERT_STREQ("前往 OnionHEN 工具箱", zh.action_name.c_str());
+  const std::string expected_zh =
+      std::string(ONIONHEN_VERSION) + " · 作者：麒麟/0xp0co & kvnhrt";
+  TEST_ASSERT_STREQ(expected_zh.c_str(), zh.message.c_str());
+
+  onion_notify_set_language(ONION_NOTIFY_LANG_EN);
+  const WelcomeFields en = parse_welcome(
+      onion::daemon::make_welcome_toast_json(
+          "pssettings:play?function=debug_settings"));
+  TEST_ASSERT_TRUE(en.valid);
+  TEST_ASSERT_STREQ("Welcome to OnionHEN", en.sub_message.c_str());
+  TEST_ASSERT_STREQ("Go to the OnionHEN Toolbox", en.action_name.c_str());
+  const std::string expected_en =
+      std::string(ONIONHEN_VERSION) + " made by Kylin/0xp0co & kvnhrt";
+  TEST_ASSERT_STREQ(expected_en.c_str(), en.message.c_str());
+  TEST_ASSERT_TRUE(en.message.find("麒麟") == std::string::npos);
+
+  onion_notify_set_language(ONION_NOTIFY_LANG_FR);
+  const WelcomeFields fr = parse_welcome(
+      onion::daemon::make_welcome_toast_json(
+          "pssettings:play?function=debug_settings"));
+  TEST_ASSERT_TRUE(fr.valid);
+  TEST_ASSERT_STREQ("Bienvenue dans OnionHEN", fr.sub_message.c_str());
+  const std::string expected_fr =
+      std::string(ONIONHEN_VERSION) + " · par Kylin/0xp0co & kvnhrt";
+  TEST_ASSERT_STREQ(expected_fr.c_str(), fr.message.c_str());
+  TEST_ASSERT_TRUE(fr.message.find("麒麟") == std::string::npos);
+
+  onion_notify_set_language(ONION_NOTIFY_LANG_KO);
+  const WelcomeFields ko = parse_welcome(
+      onion::daemon::make_welcome_toast_json(
+          "pssettings:play?function=debug_settings"));
+  TEST_ASSERT_TRUE(ko.valid);
+  TEST_ASSERT_STREQ("OnionHEN에 오신 것을 환영합니다", ko.sub_message.c_str());
+  const std::string expected_ko =
+      std::string(ONIONHEN_VERSION) + " · 제작: Kylin/0xp0co & kvnhrt";
+  TEST_ASSERT_STREQ(expected_ko.c_str(), ko.message.c_str());
+  TEST_ASSERT_TRUE(ko.message.find("기린") == std::string::npos);
+  TEST_ASSERT_TRUE(ko.message.find("麒麟") == std::string::npos);
+
   onion_notify_set_language(ONION_NOTIFY_LANG_EN);
   return 0;
 }

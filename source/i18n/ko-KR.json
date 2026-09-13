@@ -322,7 +322,7 @@
     "notify.boot.starting": "OnionHEN을 시작하는 중...",
     "notify.boot.welcome": "OnionHEN에 오신 것을 환영합니다",
     "notify.boot.goto_toolbox": "OnionHEN 툴박스로 이동",
-    "notify.boot.made_by": " · 제작: ",
+    "notify.boot.made_by": "%s · 제작: Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN 정리가 끝났습니다.",
     "notify.boot.conflict": "OnionHEN 시작이 거부되었습니다: %s이(가) 이미 실행 중입니다",
     "notify.kstuff.no_elf_header": "Kstuff '%s'에 유효한 ELF 헤더가 없습니다.",

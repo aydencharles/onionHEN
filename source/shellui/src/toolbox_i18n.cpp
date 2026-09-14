@@ -56,6 +56,34 @@ Lang lang_from_notify(onion_notify_language_t language) {
     return Lang::Pl;
   case ONION_NOTIFY_LANG_TH:
     return Lang::Th;
+  case ONION_NOTIFY_LANG_NL:
+    return Lang::Nl;
+  case ONION_NOTIFY_LANG_FI:
+    return Lang::Fi;
+  case ONION_NOTIFY_LANG_SV:
+    return Lang::Sv;
+  case ONION_NOTIFY_LANG_DA:
+    return Lang::Da;
+  case ONION_NOTIFY_LANG_NO:
+    return Lang::No;
+  case ONION_NOTIFY_LANG_TR:
+    return Lang::Tr;
+  case ONION_NOTIFY_LANG_CS:
+    return Lang::Cs;
+  case ONION_NOTIFY_LANG_HU:
+    return Lang::Hu;
+  case ONION_NOTIFY_LANG_EL:
+    return Lang::El;
+  case ONION_NOTIFY_LANG_RO:
+    return Lang::Ro;
+  case ONION_NOTIFY_LANG_VI:
+    return Lang::Vi;
+  case ONION_NOTIFY_LANG_ID:
+    return Lang::Id;
+  case ONION_NOTIFY_LANG_UK:
+    return Lang::Uk;
+  case ONION_NOTIFY_LANG_PT_PT:
+    return Lang::PtPt;
   case ONION_NOTIFY_LANG_EN:
   default:
     return Lang::En;
@@ -90,6 +118,34 @@ onion_notify_language_t notify_from_lang(Lang lang) {
     return ONION_NOTIFY_LANG_PL;
   case Lang::Th:
     return ONION_NOTIFY_LANG_TH;
+  case Lang::Nl:
+    return ONION_NOTIFY_LANG_NL;
+  case Lang::Fi:
+    return ONION_NOTIFY_LANG_FI;
+  case Lang::Sv:
+    return ONION_NOTIFY_LANG_SV;
+  case Lang::Da:
+    return ONION_NOTIFY_LANG_DA;
+  case Lang::No:
+    return ONION_NOTIFY_LANG_NO;
+  case Lang::Tr:
+    return ONION_NOTIFY_LANG_TR;
+  case Lang::Cs:
+    return ONION_NOTIFY_LANG_CS;
+  case Lang::Hu:
+    return ONION_NOTIFY_LANG_HU;
+  case Lang::El:
+    return ONION_NOTIFY_LANG_EL;
+  case Lang::Ro:
+    return ONION_NOTIFY_LANG_RO;
+  case Lang::Vi:
+    return ONION_NOTIFY_LANG_VI;
+  case Lang::Id:
+    return ONION_NOTIFY_LANG_ID;
+  case Lang::Uk:
+    return ONION_NOTIFY_LANG_UK;
+  case Lang::PtPt:
+    return ONION_NOTIFY_LANG_PT_PT;
   case Lang::En:
   default:
     return ONION_NOTIFY_LANG_EN;
@@ -124,6 +180,34 @@ Lang lang_from_ui_value(int ui_lang) {
     return Lang::Pl;
   case 14:
     return Lang::Th;
+  case 15:
+    return Lang::Nl;
+  case 16:
+    return Lang::Fi;
+  case 17:
+    return Lang::Sv;
+  case 18:
+    return Lang::Da;
+  case 19:
+    return Lang::No;
+  case 20:
+    return Lang::Tr;
+  case 21:
+    return Lang::Cs;
+  case 22:
+    return Lang::Hu;
+  case 23:
+    return Lang::El;
+  case 24:
+    return Lang::Ro;
+  case 25:
+    return Lang::Vi;
+  case 26:
+    return Lang::Id;
+  case 27:
+    return Lang::Uk;
+  case 28:
+    return Lang::PtPt;
   case 1:
   default:
     return Lang::ZhHans;
@@ -158,6 +242,34 @@ const char *locale_id_for_lang(Lang lang) {
     return "pl";
   case Lang::Th:
     return "th";
+  case Lang::Nl:
+    return "nl";
+  case Lang::Fi:
+    return "fi";
+  case Lang::Sv:
+    return "sv";
+  case Lang::Da:
+    return "da";
+  case Lang::No:
+    return "no";
+  case Lang::Tr:
+    return "tr";
+  case Lang::Cs:
+    return "cs";
+  case Lang::Hu:
+    return "hu";
+  case Lang::El:
+    return "el";
+  case Lang::Ro:
+    return "ro";
+  case Lang::Vi:
+    return "vi";
+  case Lang::Id:
+    return "id";
+  case Lang::Uk:
+    return "uk";
+  case Lang::PtPt:
+    return "pt-PT";
   case Lang::En:
   default:
     return "en";
@@ -223,6 +335,34 @@ int active_ui_lang_value() {
     return 13;
   case Lang::Th:
     return 14;
+  case Lang::Nl:
+    return 15;
+  case Lang::Fi:
+    return 16;
+  case Lang::Sv:
+    return 17;
+  case Lang::Da:
+    return 18;
+  case Lang::No:
+    return 19;
+  case Lang::Tr:
+    return 20;
+  case Lang::Cs:
+    return 21;
+  case Lang::Hu:
+    return 22;
+  case Lang::El:
+    return 23;
+  case Lang::Ro:
+    return 24;
+  case Lang::Vi:
+    return 25;
+  case Lang::Id:
+    return 26;
+  case Lang::Uk:
+    return 27;
+  case Lang::PtPt:
+    return 28;
   case Lang::ZhHans:
   default:
     return 1;
@@ -231,7 +371,7 @@ int active_ui_lang_value() {
 
 void set_lang(Lang lang) {
   if (static_cast<int>(lang) < static_cast<int>(Lang::ZhHans) ||
-      lang > Lang::Th)
+      lang > Lang::PtPt)
     lang = Lang::ZhHans;
   onion_notify_set_language(notify_from_lang(lang));
 }

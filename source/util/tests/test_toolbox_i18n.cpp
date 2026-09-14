@@ -315,6 +315,21 @@ static int test_apply_ui_lang(void) {
   apply_ui_lang(14);
   TEST_ASSERT_TRUE(active_lang() == Lang::Th);
   TEST_ASSERT_EQ_INT(14, active_ui_lang_value());
+  apply_ui_lang(15);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Nl);
+  TEST_ASSERT_EQ_INT(15, active_ui_lang_value());
+  apply_ui_lang(20);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Tr);
+  TEST_ASSERT_EQ_INT(20, active_ui_lang_value());
+  apply_ui_lang(25);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Vi);
+  TEST_ASSERT_EQ_INT(25, active_ui_lang_value());
+  apply_ui_lang(27);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Uk);
+  TEST_ASSERT_EQ_INT(27, active_ui_lang_value());
+  apply_ui_lang(28);
+  TEST_ASSERT_TRUE(active_lang() == Lang::PtPt);
+  TEST_ASSERT_EQ_INT(28, active_ui_lang_value());
   apply_ui_lang(99); /* invalid → zh */
   TEST_ASSERT_TRUE(active_lang() == Lang::ZhHans);
   return 0;
@@ -328,6 +343,18 @@ static int test_system_lang_follows_query(void) {
   onion_test_system_language_configure(0, 1);
   apply_system_or_ui_lang(0);
   TEST_ASSERT_TRUE(active_lang() == Lang::En);
+
+  onion_test_system_language_configure(0, 6);
+  apply_system_or_ui_lang(0);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Nl);
+
+  onion_test_system_language_configure(0, 7);
+  apply_system_or_ui_lang(0);
+  TEST_ASSERT_TRUE(active_lang() == Lang::PtPt);
+
+  onion_test_system_language_configure(0, 30);
+  apply_system_or_ui_lang(0);
+  TEST_ASSERT_TRUE(active_lang() == Lang::Uk);
 
   apply_system_or_ui_lang(2);
   TEST_ASSERT_TRUE(active_lang() == Lang::En);
@@ -404,6 +431,60 @@ static int test_format(void) {
   set_lang(Lang::Th);
   TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
                    "เปิด/ปิด Game สำหรับ God");
+  set_lang(Lang::Nl);
+  TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
+                   "Game voor God in-/uitschakelen");
+  set_lang(Lang::Tr);
+  TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
+                   "Game öğesini God için aç/kapat");
+  set_lang(Lang::Vi);
+  TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
+                   "Bật/tắt Game cho God");
+  set_lang(Lang::Uk);
+  TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
+                   "Увімкнути/вимкнути Game для God");
+  set_lang(Lang::PtPt);
+  TEST_ASSERT_TRUE(format("cheats.enable_fmt", "Game", "God") ==
+                   "Para Game, ativar/desativar God");
+  return 0;
+}
+
+static int test_nl(void) {
+  set_lang(Lang::Nl);
+  TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★OnionHEN-toolbox") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("lang.nl"), "Nederlands") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("cheats.enable_fmt"),
+                               "%s voor %s in-/uitschakelen") == 0);
+  return 0;
+}
+
+static int test_tr(void) {
+  set_lang(Lang::Tr);
+  TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★OnionHEN Araç Kutusu") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("lang.tr"), "Türkçe") == 0);
+  return 0;
+}
+
+static int test_vi(void) {
+  set_lang(Lang::Vi);
+  TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★Hộp công cụ OnionHEN") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("lang.vi"), "Tiếng Việt") == 0);
+  return 0;
+}
+
+static int test_uk(void) {
+  set_lang(Lang::Uk);
+  TEST_ASSERT_TRUE(std::strcmp(tr("root.title"), "★Інструменти OnionHEN") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("lang.uk"), "Українська") == 0);
+  return 0;
+}
+
+static int test_pt_pt(void) {
+  set_lang(Lang::PtPt);
+  TEST_ASSERT_TRUE(
+      std::strcmp(tr("root.title"), "★Caixa de ferramentas OnionHEN") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("lang.pt"), "Português (Portugal)") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("account.user_fmt"), "Utilizador: %s") == 0);
   return 0;
 }
 
@@ -423,6 +504,11 @@ extern "C" int test_toolbox_i18n_suite(void) {
   fails += onion_test_run("i18n.ru", test_ru);
   fails += onion_test_run("i18n.pl", test_pl);
   fails += onion_test_run("i18n.th", test_th);
+  fails += onion_test_run("i18n.nl", test_nl);
+  fails += onion_test_run("i18n.tr", test_tr);
+  fails += onion_test_run("i18n.vi", test_vi);
+  fails += onion_test_run("i18n.uk", test_uk);
+  fails += onion_test_run("i18n.pt_pt", test_pt_pt);
   fails += onion_test_run("i18n.apply_ui_lang", test_apply_ui_lang);
   fails += onion_test_run("i18n.system_lang_follows_query",
                           test_system_lang_follows_query);

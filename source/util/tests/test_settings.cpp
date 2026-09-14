@@ -496,6 +496,20 @@ static int test_language_new_locales_roundtrip(void) {
       {onion::kUiLanguageRu, "ru", "ru-RU"},
       {onion::kUiLanguagePl, "pl", "polski"},
       {onion::kUiLanguageTh, "th", "thai"},
+      {onion::kUiLanguageNl, "nl", "nederlands"},
+      {onion::kUiLanguageFi, "fi", "finnish"},
+      {onion::kUiLanguageSv, "sv", "swedish"},
+      {onion::kUiLanguageDa, "da", "danish"},
+      {onion::kUiLanguageNo, "no", "norsk"},
+      {onion::kUiLanguageTr, "tr", "turkish"},
+      {onion::kUiLanguageCs, "cs", "czech"},
+      {onion::kUiLanguageHu, "hu", "magyar"},
+      {onion::kUiLanguageEl, "el", "greek"},
+      {onion::kUiLanguageRo, "ro", "romanian"},
+      {onion::kUiLanguageVi, "vi", "vietnamese"},
+      {onion::kUiLanguageId, "id", "indonesia"},
+      {onion::kUiLanguageUk, "uk", "ukrainian"},
+      {onion::kUiLanguagePtPt, "pt-PT", "pt-pt"},
   };
 
   for (const auto &c : cases) {

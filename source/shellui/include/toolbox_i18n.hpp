@@ -26,6 +26,20 @@ enum class Lang : int {
   Ru = 11,
   Pl = 12,
   Th = 13,
+  Nl = 14,
+  Fi = 15,
+  Sv = 16,
+  Da = 17,
+  No = 18,
+  Tr = 19,
+  Cs = 20,
+  Hu = 21,
+  El = 22,
+  Ro = 23,
+  Vi = 24,
+  Id = 25,
+  Uk = 26,
+  PtPt = 27,
 };
 
 /** Active language for tr() (from settings or explicit set). */
@@ -37,14 +51,18 @@ int active_ui_lang_value();
 /**
  * Apply an explicit UI language setting value.
  * 1=zh-Hans, 2=en, 3=ar, 4=zh-Hant, 5=ja, 6=fr, 7=de, 8=ko, 9=es,
- * 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th. Invalid values fall back to zh-Hans.
+ * 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th, 15=nl, 16=fi, 17=sv, 18=da,
+ * 19=no, 20=tr, 21=cs, 22=hu, 23=el, 24=ro, 25=vi, 26=id, 27=uk,
+ * 28=pt-PT. Invalid values fall back to zh-Hans.
  */
 void apply_ui_lang(int ui_lang);
 
 /**
  * Apply the stored UI language setting.
  * 0=system, 1=zh-Hans, 2=en, 3=ar, 4=zh-Hant, 5=ja, 6=fr, 7=de, 8=ko,
- * 9=es, 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th.
+ * 9=es, 10=pt-BR, 11=it, 12=ru, 13=pl, 14=th, 15=nl, 16=fi, 17=sv,
+ * 18=da, 19=no, 20=tr, 21=cs, 22=hu, 23=el, 24=ro, 25=vi, 26=id,
+ * 27=uk, 28=pt-PT.
  * 0 queries SCE_SYSTEM_SERVICE_PARAM_ID_LANG. Call this only when
  * SystemService can answer (not under PTRACE_AUTHID). A failed query
  * leaves the current language unchanged; XML and notifications then

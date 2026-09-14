@@ -3,12 +3,22 @@
 User-facing text lives in one JSON file per locale and is compiled into the
 ELF. The console does not load locale files at runtime.
 
-Current locales: `zh-CN.json` (简体中文), `zh-TW.json` (繁體中文),
-`en-US.json` (English), `ja-JP.json` (日本語), `ko-KR.json` (한국어),
-`fr-FR.json` (Français), `de-DE.json` (Deutsch), `it-IT.json` (Italiano),
-`es-ES.json` (Español), `pt-BR.json` (Português do Brasil),
-`pl-PL.json` (Polski), `ru-RU.json` (Русский), `ar-SA.json`
-(العربية, trial), and `th-TH.json` (ไทย).
+Current locales match the PS5 console languages (`SCE_SYSTEM_SERVICE_PARAM_ID_LANG`
+0–30): `zh-CN.json` (简体中文), `zh-TW.json` (繁體中文), `en-US.json`
+(English; also used for English UK), `ja-JP.json` (日本語), `ko-KR.json`
+(한국어), `fr-FR.json` (Français; also French Canada), `de-DE.json`
+(Deutsch), `it-IT.json` (Italiano), `es-ES.json` (Español; also Latin
+American Spanish), `pt-BR.json` (Português do Brasil), `pt-PT.json`
+(Português de Portugal), `nl-NL.json` (Nederlands), `fi-FI.json`
+(Suomi), `sv-SE.json` (Svenska), `da-DK.json` (Dansk), `no-NO.json`
+(Norsk), `pl-PL.json` (Polski), `ru-RU.json` (Русский), `tr-TR.json`
+(Türkçe), `cs-CZ.json` (Čeština), `hu-HU.json` (Magyar), `el-GR.json`
+(Ελληνικά), `ro-RO.json` (Română), `ar-SA.json` (العربية, trial),
+`th-TH.json` (ไทย), `vi-VN.json` (Tiếng Việt), `id-ID.json`
+(Indonesia), and `uk-UA.json` (Українська).
+English UK (18), Spanish LatAm (20), and French Canada (22) reuse the
+matching existing catalog. Hebrew / Hindi / Malay / Slovak are not PS5
+console languages and have no system language ID.
 The generator scans every `*.json` in this directory. Each locale is
 selectable in Toolbox and via `toolbox.language`. The Settings XML is
 still LTR, so Arabic glyphs render but the page layout is not mirrored.
@@ -99,14 +109,16 @@ the runtime mapping:
 5. If the PS5 system language should pick it when Toolbox language is
    `system`, add that id in `onion_notify_resolve_language`
    (`0` → `ja`, `2`/`22` → `fr`, `3`/`20` → `es`, `4` → `de`, `5` → `it`,
-   `7`/`17` → `pt-BR`, `8` → `ru`, `9` → `ko`, `10` → `zh-Hant`,
-    `11` → `zh-Hans`, `16` → `pl`, `21` → `ar`, `27` → `th`;
-    everything else is `en`).
+    `6` → `nl`, `7` → `pt-PT`, `8` → `ru`, `9` → `ko`, `10` → `zh-Hant`,
+    `11` → `zh-Hans`, `12` → `fi`, `13` → `sv`, `14` → `da`, `15` → `no`,
+    `16` → `pl`, `17` → `pt-BR`, `19` → `tr`, `21` → `ar`, `23` → `cs`,
+    `24` → `hu`, `25` → `el`, `26` → `ro`, `27` → `th`, `28` → `vi`,
+    `29` → `id`, `30` → `uk`; everything else is `en`).
 
 ## Web UI
 
 The browser pkg-installer UI in [`../webui/`](../webui/) keeps its own
-dictionaries in `src/i18n.js` — the same 14-locale set as the Toolbox, but
+dictionaries in `src/i18n.js` — the same locale set as the Toolbox, but
 bundled into the pkg-server's single-file page. Its language resolves the
 same way as the Toolbox (`toolbox.language`, else the console system
 language) and updates live when the daemon's system-language poll pushes

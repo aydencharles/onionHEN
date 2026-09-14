@@ -827,7 +827,21 @@ void append_toolbox_preferences_group(ps5ui::Group& g) {
                .item("id_ui_lang_pl", toolbox_i18n::tr("lang.pl"), "13")
                .item("id_ui_lang_ru", toolbox_i18n::tr("lang.ru"), "12")
                .item("id_ui_lang_ar", toolbox_i18n::tr("lang.ar"), "3")
-               .item("id_ui_lang_th", toolbox_i18n::tr("lang.th"), "14");
+               .item("id_ui_lang_th", toolbox_i18n::tr("lang.th"), "14")
+               .item("id_ui_lang_nl", toolbox_i18n::tr("lang.nl"), "15")
+               .item("id_ui_lang_fi", toolbox_i18n::tr("lang.fi"), "16")
+               .item("id_ui_lang_sv", toolbox_i18n::tr("lang.sv"), "17")
+               .item("id_ui_lang_da", toolbox_i18n::tr("lang.da"), "18")
+               .item("id_ui_lang_no", toolbox_i18n::tr("lang.no"), "19")
+               .item("id_ui_lang_tr", toolbox_i18n::tr("lang.tr"), "20")
+               .item("id_ui_lang_cs", toolbox_i18n::tr("lang.cs"), "21")
+               .item("id_ui_lang_hu", toolbox_i18n::tr("lang.hu"), "22")
+               .item("id_ui_lang_el", toolbox_i18n::tr("lang.el"), "23")
+               .item("id_ui_lang_ro", toolbox_i18n::tr("lang.ro"), "24")
+               .item("id_ui_lang_vi", toolbox_i18n::tr("lang.vi"), "25")
+               .item("id_ui_lang_id", toolbox_i18n::tr("lang.id"), "26")
+               .item("id_ui_lang_uk", toolbox_i18n::tr("lang.uk"), "27")
+               .item("id_ui_lang_pt", toolbox_i18n::tr("lang.pt"), "28");
          },
          toolbox_i18n::tr("lang.list.sub"), toolbox_val("id_ui_lang", "0"))
       .list("id_toolbox_shortcut", toolbox_i18n::tr("sc.toolbox"),

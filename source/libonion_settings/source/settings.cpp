@@ -133,10 +133,13 @@ int parse_language(const char *s, int def) {
       streq_ci(s, "es-419") || streq_ci(s, "es_419")) {
     return kUiLanguageEs;
   }
+  if (streq_ci(s, "pt-PT") || streq_ci(s, "pt_pt") ||
+      streq_ci(s, "pt-pt")) {
+    return kUiLanguagePtPt;
+  }
   if (streq_ci(s, "pt-BR") || streq_ci(s, "pt_br") ||
       streq_ci(s, "pt-br") || streq_ci(s, "pt") ||
-      streq_ci(s, "portuguese") || streq_ci(s, "pt-PT") ||
-      streq_ci(s, "pt_pt")) {
+      streq_ci(s, "portuguese")) {
     return kUiLanguagePtBr;
   }
   if (streq_ci(s, "it") || streq_ci(s, "italian") ||
@@ -156,6 +159,65 @@ int parse_language(const char *s, int def) {
   if (streq_ci(s, "th") || streq_ci(s, "thai") ||
       streq_ci(s, "th-TH") || streq_ci(s, "th_th")) {
     return kUiLanguageTh;
+  }
+  if (streq_ci(s, "nl") || streq_ci(s, "dutch") ||
+      streq_ci(s, "nl-NL") || streq_ci(s, "nl_nl") ||
+      streq_ci(s, "nederlands")) {
+    return kUiLanguageNl;
+  }
+  if (streq_ci(s, "fi") || streq_ci(s, "finnish") ||
+      streq_ci(s, "fi-FI") || streq_ci(s, "fi_fi") ||
+      streq_ci(s, "suomi")) {
+    return kUiLanguageFi;
+  }
+  if (streq_ci(s, "sv") || streq_ci(s, "swedish") ||
+      streq_ci(s, "sv-SE") || streq_ci(s, "sv_se") ||
+      streq_ci(s, "svenska")) {
+    return kUiLanguageSv;
+  }
+  if (streq_ci(s, "da") || streq_ci(s, "danish") ||
+      streq_ci(s, "da-DK") || streq_ci(s, "da_dk") ||
+      streq_ci(s, "dansk")) {
+    return kUiLanguageDa;
+  }
+  if (streq_ci(s, "no") || streq_ci(s, "nb") || streq_ci(s, "norwegian") ||
+      streq_ci(s, "no-NO") || streq_ci(s, "no_no") ||
+      streq_ci(s, "norsk")) {
+    return kUiLanguageNo;
+  }
+  if (streq_ci(s, "tr") || streq_ci(s, "turkish") ||
+      streq_ci(s, "tr-TR") || streq_ci(s, "tr_tr")) {
+    return kUiLanguageTr;
+  }
+  if (streq_ci(s, "cs") || streq_ci(s, "czech") ||
+      streq_ci(s, "cs-CZ") || streq_ci(s, "cs_cz")) {
+    return kUiLanguageCs;
+  }
+  if (streq_ci(s, "hu") || streq_ci(s, "hungarian") ||
+      streq_ci(s, "hu-HU") || streq_ci(s, "hu_hu") ||
+      streq_ci(s, "magyar")) {
+    return kUiLanguageHu;
+  }
+  if (streq_ci(s, "el") || streq_ci(s, "greek") ||
+      streq_ci(s, "el-GR") || streq_ci(s, "el_gr")) {
+    return kUiLanguageEl;
+  }
+  if (streq_ci(s, "ro") || streq_ci(s, "romanian") ||
+      streq_ci(s, "ro-RO") || streq_ci(s, "ro_ro")) {
+    return kUiLanguageRo;
+  }
+  if (streq_ci(s, "vi") || streq_ci(s, "vietnamese") ||
+      streq_ci(s, "vi-VN") || streq_ci(s, "vi_vn")) {
+    return kUiLanguageVi;
+  }
+  if (streq_ci(s, "id") || streq_ci(s, "in") || streq_ci(s, "indonesian") ||
+      streq_ci(s, "id-ID") || streq_ci(s, "id_id") ||
+      streq_ci(s, "indonesia")) {
+    return kUiLanguageId;
+  }
+  if (streq_ci(s, "uk") || streq_ci(s, "ukrainian") ||
+      streq_ci(s, "uk-UA") || streq_ci(s, "uk_ua")) {
+    return kUiLanguageUk;
   }
   return def;
 }
@@ -192,6 +254,34 @@ const char *language_name(int v) {
     return "pl";
   case kUiLanguageTh:
     return "th";
+  case kUiLanguageNl:
+    return "nl";
+  case kUiLanguageFi:
+    return "fi";
+  case kUiLanguageSv:
+    return "sv";
+  case kUiLanguageDa:
+    return "da";
+  case kUiLanguageNo:
+    return "no";
+  case kUiLanguageTr:
+    return "tr";
+  case kUiLanguageCs:
+    return "cs";
+  case kUiLanguageHu:
+    return "hu";
+  case kUiLanguageEl:
+    return "el";
+  case kUiLanguageRo:
+    return "ro";
+  case kUiLanguageVi:
+    return "vi";
+  case kUiLanguageId:
+    return "id";
+  case kUiLanguageUk:
+    return "uk";
+  case kUiLanguagePtPt:
+    return "pt-PT";
   case kUiLanguageSystem:
   default:
     return "system";

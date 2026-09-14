@@ -11,7 +11,8 @@ schema_version=1
 
 [toolbox]
 # language controls the Toolbox UI and notification language.
-# Available values: system, zh-Hans, zh-Hant, en, ja, ko, fr, de, it, es, pt-BR, pl, ru, ar, th
+# Available values: system, zh-Hans, zh-Hant, en, ja, ko, fr, de, it, es,
+# pt-BR, pt-PT, pl, ru, ar, th, nl, fi, sv, da, no, tr, cs, hu, el, ro, vi, id, uk
 # system follows the PS5 system language when it can be detected.
 language=system
 

@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · készítette: Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "Az OnionHEN ki lett takarítva.",
     "notify.boot.conflict": "Az OnionHEN nem indult el: %s már fut",
+    "notify.boot.decompress_nomem": "Nem sikerült memóriát foglalni a kicsomagolt OnionHEN payloadhoz!",
+    "notify.boot.decompress_failed": "Nem sikerült kicsomagolni az OnionHEN payloadot!",
     "notify.kstuff.no_elf_header": "A(z) '%s' Kstuffnak nincs érvényes ELF-fejlécje.",
     "notify.kstuff.loading": "Kstuff betöltése innen: %s",
     "notify.net.socket_create": "A socket létrehozása sikertelen: %s",

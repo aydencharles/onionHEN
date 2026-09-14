@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · автор: Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN очищено.",
     "notify.boot.conflict": "OnionHEN відмовився запускатися: %s уже працює",
+    "notify.boot.decompress_nomem": "Не вдалося виділити пам’ять для розпакованого payload OnionHEN!",
+    "notify.boot.decompress_failed": "Не вдалося розпакувати payload OnionHEN!",
     "notify.kstuff.no_elf_header": "Kstuff «%s» не має дійсного заголовка ELF.",
     "notify.kstuff.loading": "Завантаження Kstuff з: %s",
     "notify.net.socket_create": "Не вдалося створити сокет: %s",

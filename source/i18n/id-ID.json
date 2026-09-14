@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · oleh Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN telah dibersihkan.",
     "notify.boot.conflict": "OnionHEN menolak mulai: %s sudah berjalan",
+    "notify.boot.decompress_nomem": "Gagal mengalokasikan memori untuk payload OnionHEN yang didekompresi!",
+    "notify.boot.decompress_failed": "Gagal mendekompresi payload OnionHEN!",
     "notify.kstuff.no_elf_header": "Kstuff '%s' tidak memiliki header ELF yang valid.",
     "notify.kstuff.loading": "Memuat Kstuff dari: %s",
     "notify.net.socket_create": "Gagal membuat soket: %s",

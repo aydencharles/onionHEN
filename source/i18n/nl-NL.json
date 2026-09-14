@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s gemaakt door Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN is opgeschoond.",
     "notify.boot.conflict": "OnionHEN weigert te starten: %s is al actief",
+    "notify.boot.decompress_nomem": "Kon geen geheugen toewijzen voor gedecomprimeerde OnionHEN-payload!",
+    "notify.boot.decompress_failed": "Kon OnionHEN-payload niet decomprimeren!",
     "notify.kstuff.no_elf_header": "Kstuff '%s' heeft geen geldige ELF-header.",
     "notify.kstuff.loading": "Kstuff laden vanaf: %s",
     "notify.net.socket_create": "Socket maken mislukt: %s",

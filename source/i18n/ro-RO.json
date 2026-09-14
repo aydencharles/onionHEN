@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · de Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN a fost curățat.",
     "notify.boot.conflict": "OnionHEN a refuzat să pornească: %s rulează deja",
+    "notify.boot.decompress_nomem": "Alocarea memoriei pentru payload-ul OnionHEN decomprimat a eșuat!",
+    "notify.boot.decompress_failed": "Decomprimarea payload-ului OnionHEN a eșuat!",
     "notify.kstuff.no_elf_header": "Kstuff „%s” nu are un antet ELF valid.",
     "notify.kstuff.loading": "Se încarcă Kstuff de la: %s",
     "notify.net.socket_create": "Crearea socketului a eșuat: %s",

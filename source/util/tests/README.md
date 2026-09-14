@@ -50,7 +50,8 @@ Binary: `source/util/build/host-tests/onion-host-tests`
 | `test_fps_formula` | broad PS4 BC classification: PPSA/PPSB/CUSA/PCAS/PCJS/PCKS/CUHJ prefix detection |
 | `test_ready` | ready markers, PID-bound process instances, path builder, name rejection, **fps_overlay / util_booted** flags, toolbox runtime-root marker |
 | `test_toolbox_injection` | same-PID skip, new-PID reinject, failure cleanup, concurrent request serialization |
-| `test_platform_fs` | `if_exists` / `touch_file` / `rmtree` (libonion_platform) |
+| `test_platform_fs` | `if_exists` / `touch_file` / `write_file_atomic` / `read_file_alloc` (+ `_str`) / `mkdir_tree` / `rmtree` / `rmtree_with_progress` (libonion_platform fs + tree) |
+| `test_bootstrap_cache` | unpacker bootstrapper cache: verified load (size + SHA-1), missing / truncated / tampered / non-file rejection, commit round-trip, boot-path wrappers (`try_load` miss = NULL, `store_if_valid` size gate) |
 | `test_platform_log` | `onion_log_configure` + file sink |
 | `test_platform_notify` | `onion_notify_format` prefix/truncate + send stub |
 | `test_msg_protocol` | IPC paths, magic, command ordinals, `IPC_Ret`, message POD, reply JSON body |

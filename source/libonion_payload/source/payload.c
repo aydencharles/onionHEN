@@ -7,6 +7,7 @@
 #include <onion/elf_name.h>
 
 #include <elfldr_remote.h>
+#include <onion/fs.h>
 #include <onion/log.h>
 #include <onion/notify.h>
 #include <onion/proc_query.h>
@@ -152,43 +153,18 @@ pid_t onion_payload_launch_elfldr(const char *title_id, const char *path) {
 }
 
 uint8_t *onion_payload_read_file(const char *path, size_t *out_size) {
+  uint8_t *buf = NULL;
+  size_t size = 0;
+
   if (!path || !out_size)
     return NULL;
 
-  const int fd = open(path, O_RDONLY);
-  if (fd < 0) {
-    LOG_ERROR("Failed to open file %s (%s)", path, strerror(errno));
-    return NULL;
-  }
-
-  struct stat st;
-  if (fstat(fd, &st) != 0) {
-    LOG_ERROR("Failed to stat file %s", path);
-    close(fd);
-    return NULL;
-  }
-  if (st.st_size <= 0) {
-    LOG_WARN("Empty payload file %s", path);
-    close(fd);
-    return NULL;
-  }
-
-  uint8_t *buf = (uint8_t *)malloc((size_t)st.st_size);
-  if (!buf) {
-    LOG_ERROR("Failed to allocate %lld bytes for payload",
-                 (long long)st.st_size);
-    close(fd);
-    return NULL;
-  }
-
-  if (read(fd, buf, (size_t)st.st_size) != st.st_size) {
+  if (!read_file_alloc(path, 0, &buf, &size)) {
     LOG_ERROR("Failed to read payload file %s", path);
-    free(buf);
-    close(fd);
     return NULL;
   }
-  close(fd);
-  *out_size = (size_t)st.st_size;
+
+  *out_size = size;
   return buf;
 }
 

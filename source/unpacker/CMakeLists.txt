@@ -30,9 +30,11 @@ set(LZMA_LIB ${LZMA_ROOT}/LzmaLib.c ${LZMA_ROOT}/Alloc.c
 				${LZMA_ROOT}/Threads.c
 				${LZMA_ROOT}/LzFindOpt.c)
 
-# Unpacker: embedded LZMA payload, disk cache, 9021 via elfldr_remote.
+# Unpacker: embedded LZMA payload, disk cache, acquire use case, 9021 via
+# elfldr_remote.
 set(SrcFiles
 	${D_SRC}/main.c
+	${D_SRC}/bootstrap_acquire.c
 	${D_SRC}/bootstrap_payload.c
 	${D_SRC}/bootstrap_cache.c
 	${D_SRC}/sha1.c

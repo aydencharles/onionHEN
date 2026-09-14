@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · tekijä: Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN on siivottu.",
     "notify.boot.conflict": "OnionHEN kieltäytyi käynnistymästä: %s on jo käynnissä",
+    "notify.boot.decompress_nomem": "Muistin varaaminen puretulle OnionHEN-payloadille epäonnistui!",
+    "notify.boot.decompress_failed": "OnionHEN-payloadin purkaminen epäonnistui!",
     "notify.kstuff.no_elf_header": "Kstuff '%s' ei sisällä kelvollista ELF-otsikkoa.",
     "notify.kstuff.loading": "Ladataan Kstuff kohteesta: %s",
     "notify.net.socket_create": "Soketin luonti epäonnistui: %s",

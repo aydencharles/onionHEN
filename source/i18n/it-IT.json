@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · di Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN è stato ripulito.",
     "notify.boot.conflict": "OnionHEN non si avvia: %s è già in esecuzione",
+    "notify.boot.decompress_nomem": "Allocazione di memoria per il payload OnionHEN decompresso non riuscita.",
+    "notify.boot.decompress_failed": "Decompressione del payload OnionHEN non riuscita.",
     "notify.kstuff.no_elf_header": "Kstuff «%s» non ha un’intestazione ELF valida.",
     "notify.kstuff.loading": "Caricamento di Kstuff da: %s",
     "notify.net.socket_create": "Creazione del socket non riuscita: %s",

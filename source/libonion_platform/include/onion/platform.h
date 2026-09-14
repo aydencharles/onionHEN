@@ -7,3 +7,4 @@
 #include <onion/fs.h>
 #include <onion/log.h>
 #include <onion/notify.h>
+#include <onion/tree.h>

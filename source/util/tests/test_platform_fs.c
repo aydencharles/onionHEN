@@ -2,8 +2,10 @@
 #include "test_harness.h"
 
 #include <onion/fs.h>
+#include <onion/tree.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -168,11 +170,102 @@ static int test_rmtree_progress(void) {
   return 0;
 }
 
+static int test_read_file_alloc(void) {
+  char dir[64];
+  char path[128];
+  const char payload[] = "read-me-back";
+  const size_t payload_len = sizeof(payload) - 1;
+  uint8_t *buf = (uint8_t *)0x1;
+  size_t size = 42;
+
+  TEST_ASSERT_TRUE(!read_file_alloc(NULL, 0, &buf, &size));
+  TEST_ASSERT_TRUE(!read_file_alloc("", 0, &buf, &size));
+  TEST_ASSERT_TRUE(!read_file_alloc("/tmp/x", 0, NULL, &size));
+  TEST_ASSERT_TRUE(!read_file_alloc("/tmp/x", 0, &buf, NULL));
+  /* Every rejection must leave the caller's out-params untouched. */
+  TEST_ASSERT_TRUE(buf == (uint8_t *)0x1);
+  TEST_ASSERT_EQ_U64(42, size);
+
+  TEST_ASSERT_EQ_INT(0, make_temp_dir(dir, sizeof(dir)));
+  snprintf(path, sizeof(path), "%s/blob", dir);
+
+  /* A missing file and a directory are both failures, not empty reads. */
+  TEST_ASSERT_TRUE(!read_file_alloc(path, 0, &buf, &size));
+  TEST_ASSERT_TRUE(!read_file_alloc(dir, 0, &buf, &size));
+  TEST_ASSERT_TRUE(buf == (uint8_t *)0x1);
+
+  /* Round trip against the symmetric writer. */
+  TEST_ASSERT_TRUE(write_file_atomic(path, payload, payload_len));
+  buf = NULL;
+  size = 0;
+  TEST_ASSERT_TRUE(read_file_alloc(path, 0, &buf, &size));
+  TEST_ASSERT_TRUE(buf != NULL);
+  TEST_ASSERT_EQ_U64(payload_len, size);
+  TEST_ASSERT_MEMEQ(payload, buf, payload_len);
+  /* The spare byte is NUL-terminated so text callers can reuse this buffer.
+   * Contract check, not a regression guard: this platform's allocator zeroes
+   * recycled blocks, so a missing terminator would read back as 0 anyway. */
+  TEST_ASSERT_EQ_INT(0, buf[size]);
+  free(buf);
+  buf = NULL;
+
+  /* The cap is inclusive; 0 means no cap. */
+  TEST_ASSERT_TRUE(!read_file_alloc(path, payload_len - 1, &buf, &size));
+  TEST_ASSERT_TRUE(buf == NULL);
+  TEST_ASSERT_TRUE(read_file_alloc(path, payload_len, &buf, &size));
+  free(buf);
+
+  /* An empty file is not a readable payload. */
+  TEST_ASSERT_TRUE(write_file_atomic(path, NULL, 0));
+  buf = (uint8_t *)0x1;
+  TEST_ASSERT_TRUE(!read_file_alloc(path, 0, &buf, &size));
+  TEST_ASSERT_TRUE(buf == (uint8_t *)0x1);
+
+  TEST_ASSERT_TRUE(rmtree(dir));
+  return 0;
+}
+
+static int test_read_file_alloc_str(void) {
+  char dir[64];
+  char path[128];
+  const char payload[] = "text-payload";
+  const size_t payload_len = sizeof(payload) - 1;
+  char *text = (char *)0x1;
+  size_t size = 42;
+
+  TEST_ASSERT_TRUE(!read_file_alloc_str(NULL, 0, &text, &size));
+  TEST_ASSERT_TRUE(!read_file_alloc_str("/tmp/x", 0, NULL, &size));
+  /* Rejections leave the caller's out-params untouched. */
+  TEST_ASSERT_TRUE(text == (char *)0x1);
+  TEST_ASSERT_EQ_U64(42, size);
+
+  TEST_ASSERT_EQ_INT(0, make_temp_dir(dir, sizeof(dir)));
+  snprintf(path, sizeof(path), "%s/text", dir);
+  TEST_ASSERT_TRUE(write_file_atomic(path, payload, payload_len));
+
+  TEST_ASSERT_TRUE(read_file_alloc_str(path, 0, &text, &size));
+  TEST_ASSERT_EQ_U64(payload_len, size);
+  /* The point of this variant: a C string with no cast and no extra copy. */
+  TEST_ASSERT_EQ_INT(0, strcmp(payload, text));
+  TEST_ASSERT_EQ_U64(payload_len, strlen(text));
+  free(text);
+
+  /* The cap is the same one read_file_alloc() applies. */
+  text = NULL;
+  TEST_ASSERT_TRUE(!read_file_alloc_str(path, payload_len - 1, &text, &size));
+  TEST_ASSERT_TRUE(text == NULL);
+
+  TEST_ASSERT_TRUE(rmtree(dir));
+  return 0;
+}
+
 int test_platform_fs_suite(void) {
   int failures = 0;
   failures += onion_test_run("fs_if_exists_null_missing", test_if_exists_null_and_missing);
   failures += onion_test_run("fs_touch_and_exists", test_touch_and_exists);
   failures += onion_test_run("fs_write_file_atomic", test_write_file_atomic);
+  failures += onion_test_run("fs_read_file_alloc", test_read_file_alloc);
+  failures += onion_test_run("fs_read_file_alloc_str", test_read_file_alloc_str);
   failures += onion_test_run("fs_mkdir_tree", test_mkdir_tree);
   failures += onion_test_run("fs_rmtree_nested", test_rmtree_nested);
   failures += onion_test_run("fs_rmtree_progress", test_rmtree_progress);

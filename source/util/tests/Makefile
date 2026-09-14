@@ -28,6 +28,7 @@ COMMON_FLAGS := -Wall -Wextra -g -O0 $(DEPFLAGS) -DONION_HOST_TEST=1 -DCBC=1 \
 	-I$(REPO_ROOT)/source/libonion_settings/include \
 	-I$(REPO_ROOT)/source/libonion_platform/include \
 	-I$(REPO_ROOT)/source/libonion_payload/include \
+	-I$(REPO_ROOT)/source/unpacker/include \
 	-I$(REPO_ROOT)/source/libonion_conflict/include \
 	-I$(REPO_ROOT)/source/libonion_proc/include \
 	-I$(REPO_ROOT)/source/libonion_ipc/include \
@@ -66,6 +67,7 @@ PROD_C_SRCS := \
 	$(UTIL_ROOT)/source/cheats/cheat_engine_parser_shnext.c \
 	$(UTIL_ROOT)/source/cheats/cheat_flatten.c \
 	$(REPO_ROOT)/source/libonion_platform/source/fs.c \
+	$(REPO_ROOT)/source/libonion_platform/source/tree.c \
 	$(REPO_ROOT)/source/libonion_platform/source/log.c \
 	$(REPO_ROOT)/source/libonion_platform/source/net.c \
 	$(REPO_ROOT)/source/libonion_platform/source/notify.c \
@@ -73,7 +75,9 @@ PROD_C_SRCS := \
 	$(REPO_ROOT)/source/libonion_ready/source/ready.c \
 	$(REPO_ROOT)/source/libonion_payload/source/payload.c \
 	$(REPO_ROOT)/source/libonion_payload/source/payload_config.c \
-	$(REPO_ROOT)/source/libonion_conflict/source/conflict.c
+	$(REPO_ROOT)/source/libonion_conflict/source/conflict.c \
+	$(REPO_ROOT)/source/unpacker/source/bootstrap_cache.c \
+	$(REPO_ROOT)/source/unpacker/source/sha1.c
 
 PROD_CXX_SRCS := \
 	$(UTIL_ROOT)/source/cheats/json_cheat_parser.cpp \
@@ -122,6 +126,7 @@ TEST_C_SRCS := \
 	test_reg_entity.c \
 	test_ready.c \
 	test_platform_fs.c \
+	test_bootstrap_cache.c \
 	test_platform_log.c \
 	test_platform_net.c \
 	test_platform_notify.c \
@@ -168,6 +173,7 @@ TEST_CXX_SRCS := \
 
 PROD_C_OBJS := $(patsubst $(UTIL_ROOT)/%.c,$(BUILD_DIR)/prod/%.o,$(filter $(UTIL_ROOT)/%,$(PROD_C_SRCS)))
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/fs.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/tree.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/log.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/net.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_platform/notify.o
@@ -176,6 +182,8 @@ PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_ready/ready.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_payload/payload_config.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_conflict/conflict.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/unpacker/bootstrap_cache.o
+PROD_C_OBJS += $(BUILD_DIR)/prod/unpacker/sha1.o
 PROD_C_OBJS += $(BUILD_DIR)/prod/libonion_detour/hde64.o
 
 CHEAT_SUPPORT_SRCS := $(wildcard $(THIRD_PARTY_ROOT)/cheat_support/*.c)
@@ -376,6 +384,10 @@ $(BUILD_DIR)/prod/libonion_platform/fs.o: $(REPO_ROOT)/source/libonion_platform/
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/prod/libonion_platform/tree.o: $(REPO_ROOT)/source/libonion_platform/source/tree.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD_DIR)/prod/libonion_platform/log.o: $(REPO_ROOT)/source/libonion_platform/source/log.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
@@ -397,6 +409,10 @@ $(BUILD_DIR)/prod/libonion_payload/%.o: $(REPO_ROOT)/source/libonion_payload/sou
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/libonion_conflict/conflict.o: $(REPO_ROOT)/source/libonion_conflict/source/conflict.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/unpacker/%.o: $(REPO_ROOT)/source/unpacker/source/%.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(CFLAGS) -c -o $@ $<
 

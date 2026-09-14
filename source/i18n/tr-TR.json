@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · yapan: Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN temizlendi.",
     "notify.boot.conflict": "OnionHEN başlamayı reddetti: %s zaten çalışıyor",
+    "notify.boot.decompress_nomem": "Açılmış OnionHEN payload’ı için bellek ayrılamadı!",
+    "notify.boot.decompress_failed": "OnionHEN payload’ı açılamadı!",
     "notify.kstuff.no_elf_header": "Kstuff '%s' geçerli bir ELF başlığına sahip değil.",
     "notify.kstuff.loading": "Kstuff şuradan yükleniyor: %s",
     "notify.net.socket_create": "Soket oluşturulamadı: %s",

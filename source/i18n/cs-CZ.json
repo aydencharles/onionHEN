@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · autor: Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN bylo vyčištěno.",
     "notify.boot.conflict": "OnionHEN odmítl spustit: %s už běží",
+    "notify.boot.decompress_nomem": "Nepodařilo se alokovat paměť pro dekomprimovaný payload OnionHEN!",
+    "notify.boot.decompress_failed": "Nepodařilo se dekomprimovat payload OnionHEN!",
     "notify.kstuff.no_elf_header": "Kstuff „%s“ nemá platnou hlavičku ELF.",
     "notify.kstuff.loading": "Načítání Kstuff z: %s",
     "notify.net.socket_create": "Vytvoření soketu selhalo: %s",

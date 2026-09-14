@@ -58,6 +58,5 @@ void startMessageReceiver();
 bool notifyHandlers(const uint32_t prefix, const pid_t pid, const bool isHomebrew) noexcept;
 bool hasPrefixHandler(const uint32_t prefix) noexcept;
 void* messageThread(void*);
-bool GetFileContents(const char *path, char **buffer);
 // touch_file: libonion_platform (onion/fs.h)
 void *IPC_loop(void *args);

@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · από Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "Το OnionHEN καθαρίστηκε.",
     "notify.boot.conflict": "Το OnionHEN αρνήθηκε να ξεκινήσει: το %s εκτελείται ήδη",
+    "notify.boot.decompress_nomem": "Αποτυχία δέσμευσης μνήμης για το αποσυμπιεσμένο payload του OnionHEN!",
+    "notify.boot.decompress_failed": "Αποτυχία αποσυμπίεσης του payload του OnionHEN!",
     "notify.kstuff.no_elf_header": "Το Kstuff «%s» δεν έχει έγκυρη κεφαλίδα ELF.",
     "notify.kstuff.loading": "Φόρτωση Kstuff από: %s",
     "notify.net.socket_create": "Αποτυχία δημιουργίας υποδοχής: %s",

@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s · af Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "OnionHEN er blevet ryddet op.",
     "notify.boot.conflict": "OnionHEN nægter at starte: %s kører allerede",
+    "notify.boot.decompress_nomem": "Kunne ikke allokere hukommelse til dekomprimeret OnionHEN-payload!",
+    "notify.boot.decompress_failed": "Kunne ikke dekomprimere OnionHEN-payload!",
     "notify.kstuff.no_elf_header": "Kstuff '%s' har ikke en gyldig ELF-header.",
     "notify.kstuff.loading": "Indlæser Kstuff fra: %s",
     "notify.net.socket_create": "Kunne ikke oprette socket: %s",

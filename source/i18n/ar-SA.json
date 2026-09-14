@@ -339,6 +339,8 @@
     "notify.boot.made_by": "%s من عمل Kylin/0xp0co & kvnhrt",
     "notify.boot.cleaned_up": "تم تنظيف OnionHEN.",
     "notify.boot.conflict": "رفض OnionHEN البدء: %s قيد التشغيل بالفعل",
+    "notify.boot.decompress_nomem": "فشل تخصيص الذاكرة لحمولة OnionHEN بعد فك الضغط!",
+    "notify.boot.decompress_failed": "فشل فك ضغط حمولة OnionHEN!",
     "notify.kstuff.no_elf_header": "Kstuff '%s' لا يحتوي على ترويسة ELF.",
     "notify.kstuff.loading": "جاري تحميل Kstuff من: %s",
     "notify.net.socket_create": "فشل إنشاء المقبس: %s",

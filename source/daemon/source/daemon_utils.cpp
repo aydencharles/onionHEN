@@ -21,41 +21,6 @@ extern "C" {
   int sceSystemServiceGetAppTitleId(int app_id, char *title_id);
 }
 
-bool GetFileContents(const char *path, char **buffer) {
-  FILE *fp = fopen(path, "rb");
-  if (fp == NULL) {
-    LOG_ERROR("failed to open %s", path);
-    return false;
-  }
-
-  fseek(fp, 0, SEEK_END);
-  long size = ftell(fp);
-  fseek(fp, 0, SEEK_SET);
-
-  if (size == 0) {
-    fclose(fp);
-    LOG_ERROR("file is empty: %s", path);
-    return false;
-  }
-
-  *buffer = (char *)malloc(size + 1);
-  if (*buffer == NULL) {
-    LOG_ERROR("failed to allocate memory (OOM)");
-    fclose(fp);
-    return false;
-  }
-
-  if (fread(*buffer, size, 1, fp) != 1) {
-    fclose(fp);
-    free(*buffer);
-    return false;
-  }
-
-  fclose(fp);
-  (*buffer)[size] = '\0';
-  return true;
-}
-
 bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
   char tid[255];
   BigAppid = sceSystemServiceGetAppIdOfRunningBigApp();

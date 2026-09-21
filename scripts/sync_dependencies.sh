@@ -17,7 +17,8 @@ STUB_MISSING=0
 INIT_SUBMODULES=0
 FORCE_DOWNLOAD=0
 
-KSTUFF_URL="https://github.com/EchoStretch/kstuff-lite/releases/download/v1.10/kstuff.elf"
+KSTUFF_VERSION="v1.11"
+KSTUFF_URL="https://github.com/EchoStretch/kstuff-lite/releases/download/${KSTUFF_VERSION}/kstuff.elf"
 KSTUFF_SOURCE_DIR="${TP}/kstuff-lite"
 # Real release blob is hundreds of KB+; stubs are tiny markers.
 KSTUFF_MIN_BYTES=65536
@@ -138,20 +139,36 @@ kstuff_looks_cached() {
   return 0
 }
 
+kstuff_stamp_path() {
+  printf '%s.version' "$1"
+}
+
+kstuff_write_stamp() {
+  printf '%s\n' "${KSTUFF_VERSION}" > "$(kstuff_stamp_path "$1")"
+}
+
+kstuff_matches_pinned_version() {
+  local path="$1" stamp
+  stamp="$(kstuff_stamp_path "${path}")"
+  [[ -f "${stamp}" ]] || return 1
+  [[ "$(tr -d '[:space:]' < "${stamp}")" == "${KSTUFF_VERSION}" ]]
+}
+
 sync_kstuff() {
   local dest="${CACHE}/kstuff.elf"
 
   # Default path: reuse local blob so every build.sh does not re-hit GitHub.
   if [[ "${FORCE_DOWNLOAD}" -eq 0 && "${FROM_SOURCE}" -eq 0 ]] &&
-      kstuff_looks_cached "${dest}"; then
-    ok "kstuff.elf already present ($(wc -c < "${dest}" | tr -d ' ') bytes) — skip download"
+      kstuff_looks_cached "${dest}" && kstuff_matches_pinned_version "${dest}"; then
+    ok "kstuff.elf ${KSTUFF_VERSION} already present ($(wc -c < "${dest}" | tr -d ' ') bytes) — skip download"
     return 0
   fi
 
   if [[ "${FROM_SOURCE}" -eq 0 ]]; then
-    log "kstuff: download kstuff-lite release"
+    log "kstuff: download kstuff-lite ${KSTUFF_VERSION}"
     if download "${KSTUFF_URL}" "${dest}"; then
-      ok "kstuff.elf (kstuff-lite v1.10)"
+      kstuff_write_stamp "${dest}"
+      ok "kstuff.elf (kstuff-lite ${KSTUFF_VERSION})"
       return 0
     fi
     warn "download failed, trying submodule build"
@@ -169,6 +186,7 @@ sync_kstuff() {
     found="$(find "${KSTUFF_SOURCE_DIR}" -name 'kstuff.elf' 2>/dev/null | head -1 || true)"
     if [[ -n "${found}" ]]; then
       place "${found}" "${dest}"
+      kstuff_write_stamp "${dest}"
       return 0
     fi
   fi

@@ -42,7 +42,7 @@ typedef struct {
 } onion_patch_t;
 
 typedef struct {
-  char name[128];
+  char name[256];
   char description[256];
   char module_name[128];
   bool enabled;
@@ -52,7 +52,7 @@ typedef struct {
 } onion_cheat_entry_t;
 
 typedef struct {
-  char name[128];
+  char name[256];
   char process[128];
   size_t author_count;
   char authors[ONION_MAX_AUTHORS][ONION_AUTHOR_NAME_LEN];

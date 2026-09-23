@@ -49,6 +49,64 @@ int onion_cheat_hex_decode(const char *hex, uint8_t *out, size_t max_len,
   return i == len ? 0 : -1;
 }
 
+static size_t onion_cheat_utf8_sequence_length(const unsigned char *s,
+                                               size_t remaining) {
+  const unsigned char c = s[0];
+  size_t length;
+
+  if (c <= 0x7f) {
+    return 1;
+  }
+  if (c >= 0xc2 && c <= 0xdf) {
+    length = 2;
+  } else if (c >= 0xe0 && c <= 0xef) {
+    length = 3;
+  } else if (c >= 0xf0 && c <= 0xf4) {
+    length = 4;
+  } else {
+    return 0;
+  }
+  if (remaining < length) {
+    return 0;
+  }
+  for (size_t i = 1; i < length; ++i) {
+    if ((s[i] & 0xc0) != 0x80) {
+      return 0;
+    }
+  }
+  /* Reject overlong encodings and UTF-16 surrogate code points. */
+  if ((length == 3 && ((c == 0xe0 && s[1] < 0xa0) ||
+                       (c == 0xed && s[1] >= 0xa0))) ||
+      (length == 4 && ((c == 0xf0 && s[1] < 0x90) ||
+                       (c == 0xf4 && s[1] > 0x8f)))) {
+    return 0;
+  }
+  return length;
+}
+
+size_t onion_cheat_copy_utf8(char *out, size_t out_size, const char *value) {
+  const unsigned char *src = (const unsigned char *)(value ? value : "");
+  const size_t source_len = strlen((const char *)src);
+  size_t copied = 0;
+
+  if (out == NULL || out_size == 0) {
+    return 0;
+  }
+  while (copied < source_len && copied + 1 < out_size) {
+    const size_t length = onion_cheat_utf8_sequence_length(
+        src + copied, source_len - copied);
+    if (length == 0 || copied + length >= out_size) {
+      break;
+    }
+    copied += length;
+  }
+  if (out != value) {
+    memcpy(out, src, copied);
+  }
+  out[copied] = '\0';
+  return copied;
+}
+
 /**
  * 从文件系统加载文件内容到缓冲区。
  * 文件大小限制为 long 类型正数范围内。
@@ -206,7 +264,8 @@ int onion_cheat_file_add_author(onion_cheat_file_t *f, const char *author) {
   if (f->author_count >= ONION_MAX_AUTHORS) {
     return -1;
   }
-  snprintf(f->authors[f->author_count], ONION_AUTHOR_NAME_LEN, "%s", author);
+  onion_cheat_copy_utf8(f->authors[f->author_count], ONION_AUTHOR_NAME_LEN,
+                        author);
   ++f->author_count;
   return 0;
 }

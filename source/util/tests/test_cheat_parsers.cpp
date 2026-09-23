@@ -222,6 +222,31 @@ int test_parse_xml_ignores_out_of_range_section() {
   return 0;
 }
 
+int test_parse_xml_long_strings_keep_utf8_boundaries() {
+  const std::string long_name(254, 'N');
+  const std::string long_game(254, 'G');
+  const std::string long_description(254, 'D');
+  const std::string xml =
+      "<Trainer Process=\"eboot.bin\" Game=\"" + long_game + "氧\">"
+      "<Cheat Text=\"" + long_name + "氧\" Description=\"" +
+      long_description + "氧\">"
+      "<Cheatline><Offset>10</Offset><ValueOn>AA</ValueOn>"
+      "<ValueOff>BB</ValueOff></Cheatline></Cheat></Trainer>";
+  static onion_cheat_file_t file;
+
+  TEST_ASSERT_EQ_INT(0, load_buf("shn", xml.c_str(), file));
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(file.cheat_count));
+  TEST_ASSERT_EQ_INT(254, static_cast<int>(std::strlen(file.name)));
+  TEST_ASSERT_EQ_INT(254, static_cast<int>(std::strlen(file.cheats[0].name)));
+  TEST_ASSERT_EQ_INT(254,
+                     static_cast<int>(std::strlen(file.cheats[0].description)));
+  TEST_ASSERT_TRUE(std::strchr(file.name, '\xE6') == nullptr);
+  TEST_ASSERT_TRUE(std::strchr(file.cheats[0].name, '\xE6') == nullptr);
+  TEST_ASSERT_TRUE(std::strchr(file.cheats[0].description, '\xE6') == nullptr);
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
 int test_load_file_mc4_success() {
   const char *xml =
       "<Trainer Process=\"eboot.bin\" Game=\"Demo\">"
@@ -386,6 +411,8 @@ extern "C" int test_cheat_parsers_suite(void) {
                              test_parse_xml_unescapes_ampersand);
   failures += onion_test_run("cheat xml ignores out-of-range section",
                              test_parse_xml_ignores_out_of_range_section);
+  failures += onion_test_run("cheat xml long strings keep utf8 boundaries",
+                             test_parse_xml_long_strings_keep_utf8_boundaries);
   failures +=
       onion_test_run("cheat mc4 load success", test_load_file_mc4_success);
   failures +=

@@ -16,7 +16,7 @@ bool copyStringItem(const cJSON *object, const char *key, char *out,
   if (!value || out_size == 0) {
     return false;
   }
-  std::snprintf(out, out_size, "%s", value);
+  onion_cheat_copy_utf8(out, out_size, value);
   return true;
 }
 
@@ -60,8 +60,8 @@ bool parseModObject(const cJSON *object, const char *process_name,
     return false;
   }
   const char *description = onion_cjson::string_item(object, "description", "");
-  std::snprintf(entry->description, sizeof(entry->description), "%s",
-                description);
+  onion_cheat_copy_utf8(entry->description, sizeof(entry->description),
+                        description);
   std::snprintf(entry->module_name, sizeof(entry->module_name), "%s",
                 process_name);
 

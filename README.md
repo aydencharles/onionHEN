@@ -57,6 +57,17 @@
 
 <br>
 
+## Fork / Modifications
+
+This repository is a modified fork of OnionHEN, originally developed by
+the upstream OnionHEN contributors.
+
+Changes in this fork were made by Chzy in 2026.
+
+The original copyright notices and license information are retained.
+This project remains licensed under the GNU General Public License,
+version 3 or later.
+
 # Features
 
 OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.

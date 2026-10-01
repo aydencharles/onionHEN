@@ -225,7 +225,7 @@ class StringView {
 		}
 };
 
-constexpr StringView operator""_sv(const char *str, unsigned long len) { return {str, len}; }
+constexpr StringView operator"" _sv(const char *str, unsigned long len) { return {str, len}; }
 
 // NOLINTBEGIN(cppcoreguidelines-owning-memory, cppcoreguidelines-pro-type-member-init)
 

@@ -17,7 +17,7 @@ STUB_MISSING=0
 INIT_SUBMODULES=0
 FORCE_DOWNLOAD=0
 
-KSTUFF_URL="https://github.com/EchoStretch/kstuff-lite/releases/download/v1.10/kstuff.elf"
+KSTUFF_URL="https://github.com/EchoStretch/kstuff-lite/releases/download/v1.11/kstuff.elf"
 KSTUFF_SOURCE_DIR="${TP}/kstuff-lite"
 # Real release blob is hundreds of KB+; stubs are tiny markers.
 KSTUFF_MIN_BYTES=65536

@@ -74,6 +74,11 @@ static constexpr uint32_t V1220 = 0x12200000;
 static constexpr uint32_t V1240 = 0x12400000;
 static constexpr uint32_t V1260 = 0x12600000;
 static constexpr uint32_t V1270 = 0x12700000;
+static constexpr uint32_t V1300 = 0x13000000;
+static constexpr uint32_t V1320 = 0x13200000;
+static constexpr uint32_t V1340 = 0x13400000;
+static constexpr uint32_t V1342 = 0x13420000;
+static constexpr uint32_t V1360 = 0x13600000;
 
 
 
@@ -138,6 +143,15 @@ namespace offsets {
             case V1270:
                 allprocOffset = 0x2885E00; /* kstuff 12_00..12_70 */
                 break;
+            case V1300: case V1320: 
+                allprocOffset = 0x03575E00;
+                break;
+            case V1340: case V1342:
+                allprocOffset = 0x03579E80;
+                break;
+            case V1360:
+                allprocOffset = 0x03589E80;
+                break;
             default:
                 LOG_WARN("Unsupported firmware version: 0x%x", getSystemSwVersion() & VERSION_MASK);
                 allprocOffset = -1;
@@ -175,6 +189,10 @@ namespace offsets {
                 return 0x0D73064;
             case V1000: case V1001: case V1020: case V1040: case V1060:
                 return 0x0D79064;
+            case V1300: case V1320: case V1340: case V1342:
+                return 0x01A49064;
+            case V1360:
+                return 0x01A5C064;
             default:
                 LOG_WARN("Unsupported firmware version: 0x%x", getSystemSwVersion() & VERSION_MASK);
                 return -1;
@@ -205,6 +223,10 @@ namespace offsets {
                 return 0x0D73064 + 0x24;
             case V1000: case V1001: case V1020: case V1040: case V1060:
                 return 0x0D79064 + 0x24;
+            case V1300: case V1320: case V1340: case V1342:
+                return 0x01A49064 + 0x24;
+            case V1360:
+                return 0x01A5C088;
             default:
                 LOG_WARN("Unsupported firmware version: 0x%x", getSystemSwVersion() & VERSION_MASK);
                 return -1;
@@ -235,6 +257,10 @@ namespace offsets {
                 return 0x0D73064 + 0x8C;
             case V1000: case V1001: case V1020: case V1040: case V1060:
                 return 0x0D79064 + 0x8C;
+            case V1300: case V1320: case V1340: case V1342:
+                return 0x01A49064 + 0x8C;
+            case V1360:
+                return 0x01A5C0F0;
             default:
                 LOG_WARN("Unsupported firmware version: 0x%x", getSystemSwVersion() & VERSION_MASK);
                 return -1;
@@ -269,6 +295,12 @@ namespace offsets {
                 return 0x2FDB510;
             case V1000: case V1001: case V1020: case V1040: case V1060:
                 return 0x2FA3510;
+            case V1300: case V1320:
+                return 0x03DE3510;
+            case V1340: case V1342:
+                return 0x03DE7510;
+            case V1360:
+                return 0x03E0B510;
             default:
                 LOG_WARN("Unsupported firmware version: 0x%x", getSystemSwVersion() & VERSION_MASK);
                 return -1;

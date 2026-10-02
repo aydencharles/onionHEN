@@ -284,6 +284,56 @@ static int test_1220_uses_old_route(void) {
   return 0;
 }
 
+static int test_1360_uses_old_route(void) {
+  const DebugSettingsRoutePolicy policy =
+      DebugSettingsRoutePolicy::for_system_version(0x13600000);
+
+  TEST_ASSERT_TRUE(policy.uses_old_route());
+  TEST_ASSERT_STREQ("pssettings:play?function=debug_settings_old",
+                    policy.toolbox_uri(UriKind::Simple));
+  return 0;
+}
+
+static int test_1320_uses_old_route(void) {
+  const DebugSettingsRoutePolicy policy =
+      DebugSettingsRoutePolicy::for_system_version(0x13200000);
+
+  TEST_ASSERT_TRUE(policy.uses_old_route());
+  TEST_ASSERT_STREQ("pssettings:play?function=debug_settings_old",
+                    policy.toolbox_uri(UriKind::Simple));
+  return 0;
+}
+
+static int test_1340_uses_old_route(void) {
+  const DebugSettingsRoutePolicy policy =
+      DebugSettingsRoutePolicy::for_system_version(0x13400000);
+
+  TEST_ASSERT_TRUE(policy.uses_old_route());
+  TEST_ASSERT_STREQ("pssettings:play?function=debug_settings_old",
+                    policy.toolbox_uri(UriKind::Simple));
+  return 0;
+}
+
+static int test_1342_uses_old_route(void) {
+  const DebugSettingsRoutePolicy policy =
+      DebugSettingsRoutePolicy::for_system_version(0x13420000);
+
+  TEST_ASSERT_TRUE(policy.uses_old_route());
+  TEST_ASSERT_STREQ("pssettings:play?function=debug_settings_old",
+                    policy.toolbox_uri(UriKind::Simple));
+  return 0;
+}
+
+static int test_1300_uses_old_route(void) {
+  const DebugSettingsRoutePolicy policy =
+      DebugSettingsRoutePolicy::for_system_version(0x13000000);
+
+  TEST_ASSERT_TRUE(policy.uses_old_route());
+  TEST_ASSERT_STREQ("pssettings:play?function=debug_settings_old",
+                    policy.toolbox_uri(UriKind::Simple));
+  return 0;
+}
+
 static int test_standard_route_does_not_rewrite(void) {
   const DebugSettingsRoutePolicy policy =
       DebugSettingsRoutePolicy::for_system_version(0x10010000);
@@ -456,6 +506,34 @@ static int test_settings_bundle_accepts_known_1220_hash(void) {
   return 0;
 }
 
+static int test_settings_bundle_accepts_known_1360_hash(void) {
+  static const uint8_t hash[] = {
+      0xa4, 0x00, 0xa5, 0xca, 0x93, 0x2e, 0xfc, 0x80, 0xcb, 0x65,
+      0x12, 0x61, 0x09, 0x03, 0x10, 0x0f, 0xa0, 0x3a, 0x87, 0x17};
+  TEST_ASSERT_TRUE(onion::debug_settings_route::settings_bundle_is_supported(
+      0x4ebc8c, hash));
+  return 0;
+}
+
+static int test_settings_bundle_accepts_known_1342_hash(void) {
+  /* 13.2, 13.4 and 13.42 NPXS40008 dumps are byte-identical. */
+  static const uint8_t hash[] = {
+      0xfb, 0x05, 0x75, 0x14, 0x64, 0x29, 0x17, 0x61, 0xde, 0x1f,
+      0xdc, 0xd9, 0x57, 0x6f, 0xc2, 0x6a, 0x02, 0x93, 0x0e, 0x10};
+  TEST_ASSERT_TRUE(onion::debug_settings_route::settings_bundle_is_supported(
+      0x4ebe08, hash));
+  return 0;
+}
+
+static int test_settings_bundle_accepts_known_1300_hash(void) {
+  static const uint8_t hash[] = {
+      0x5f, 0xb0, 0x07, 0xc0, 0x0f, 0x7b, 0xa3, 0x45, 0x41, 0x03,
+      0x2b, 0x29, 0x97, 0xbd, 0xab, 0xd1, 0x9d, 0x53, 0x4e, 0x78};
+  TEST_ASSERT_TRUE(onion::debug_settings_route::settings_bundle_is_supported(
+      0x4eb9b4, hash));
+  return 0;
+}
+
 static int test_settings_bundle_rejects_hash_mismatch(void) {
   uint8_t hash[onion::debug_settings_route::kSourceHashLength]{};
   TEST_ASSERT_TRUE(!onion::debug_settings_route::settings_bundle_is_supported(
@@ -483,7 +561,7 @@ static int test_welcome_toast_replaces_toolbox_uri(void) {
   TEST_ASSERT_STREQ(ONION_NOTIFY_ICON_PATH, fields.icon_url.c_str());
   TEST_ASSERT_STREQ("Welcome to OnionHEN", fields.sub_message.c_str());
   const std::string expected =
-      std::string(ONIONHEN_VERSION) + " made by Kylin/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " made by Kylin/0xp0co";
   TEST_ASSERT_STREQ(expected.c_str(), fields.message.c_str());
   TEST_ASSERT_TRUE(fields.message.find("麒麟") == std::string::npos);
   return 0;
@@ -507,7 +585,7 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_STREQ("欢迎使用 OnionHEN", zh.sub_message.c_str());
   TEST_ASSERT_STREQ("前往 OnionHEN 工具箱", zh.action_name.c_str());
   const std::string expected_zh =
-      std::string(ONIONHEN_VERSION) + " · 作者：麒麟/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " · 作者：麒麟/0xp0co";
   TEST_ASSERT_STREQ(expected_zh.c_str(), zh.message.c_str());
 
   onion_notify_set_language(ONION_NOTIFY_LANG_EN);
@@ -518,7 +596,7 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_STREQ("Welcome to OnionHEN", en.sub_message.c_str());
   TEST_ASSERT_STREQ("Go to the OnionHEN Toolbox", en.action_name.c_str());
   const std::string expected_en =
-      std::string(ONIONHEN_VERSION) + " made by Kylin/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " made by Kylin/0xp0co";
   TEST_ASSERT_STREQ(expected_en.c_str(), en.message.c_str());
   TEST_ASSERT_TRUE(en.message.find("麒麟") == std::string::npos);
 
@@ -529,7 +607,7 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_TRUE(fr.valid);
   TEST_ASSERT_STREQ("Bienvenue dans OnionHEN", fr.sub_message.c_str());
   const std::string expected_fr =
-      std::string(ONIONHEN_VERSION) + " · par Kylin/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " · par Kylin/0xp0co";
   TEST_ASSERT_STREQ(expected_fr.c_str(), fr.message.c_str());
   TEST_ASSERT_TRUE(fr.message.find("麒麟") == std::string::npos);
 
@@ -540,7 +618,7 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_TRUE(ko.valid);
   TEST_ASSERT_STREQ("OnionHEN에 오신 것을 환영합니다", ko.sub_message.c_str());
   const std::string expected_ko =
-      std::string(ONIONHEN_VERSION) + " · 제작: Kylin/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " · 제작: Kylin/0xp0co";
   TEST_ASSERT_STREQ(expected_ko.c_str(), ko.message.c_str());
   TEST_ASSERT_TRUE(ko.message.find("기린") == std::string::npos);
   TEST_ASSERT_TRUE(ko.message.find("麒麟") == std::string::npos);
@@ -552,7 +630,7 @@ static int test_welcome_toast_localizes_text(void) {
   TEST_ASSERT_TRUE(ja.valid);
   TEST_ASSERT_STREQ("OnionHEN へようこそ", ja.sub_message.c_str());
   const std::string expected_ja =
-      std::string(ONIONHEN_VERSION) + " · 制作：Kylin/0xp0co & kvnhrt";
+      std::string(ONIONHEN_VERSION) + " · 制作：Kylin/0xp0co";
   TEST_ASSERT_STREQ(expected_ja.c_str(), ja.message.c_str());
   TEST_ASSERT_TRUE(ja.message.find("麒麟") == std::string::npos);
 
@@ -597,6 +675,11 @@ extern "C" int test_debug_settings_route_policy_suite(void) {
   fails += onion_test_run("debug_route.1260_old", test_1260_uses_old_route);
   fails += onion_test_run("debug_route.1270_old", test_1270_uses_old_route);
   fails += onion_test_run("debug_route.1220_old", test_1220_uses_old_route);
+  fails += onion_test_run("debug_route.1360_old", test_1360_uses_old_route);
+  fails += onion_test_run("debug_route.1320_old", test_1320_uses_old_route);
+  fails += onion_test_run("debug_route.1340_old", test_1340_uses_old_route);
+  fails += onion_test_run("debug_route.1342_old", test_1342_uses_old_route);
+  fails += onion_test_run("debug_route.1300_old", test_1300_uses_old_route);
   fails += onion_test_run("debug_route.standard_no_rewrite",
                           test_standard_route_does_not_rewrite);
   fails += onion_test_run("debug_route.old_rewrite",
@@ -633,6 +716,12 @@ extern "C" int test_debug_settings_route_policy_suite(void) {
                           test_settings_bundle_accepts_known_1270_hash);
   fails += onion_test_run("debug_route.bundle_1220",
                           test_settings_bundle_accepts_known_1220_hash);
+  fails += onion_test_run("debug_route.bundle_1360",
+                          test_settings_bundle_accepts_known_1360_hash);
+  fails += onion_test_run("debug_route.bundle_1342",
+                          test_settings_bundle_accepts_known_1342_hash);
+  fails += onion_test_run("debug_route.bundle_1300",
+                          test_settings_bundle_accepts_known_1300_hash);
   fails += onion_test_run("debug_route.bundle_hash_reject",
                           test_settings_bundle_rejects_hash_mismatch);
   fails += onion_test_run("debug_route.bundle_length_reject",

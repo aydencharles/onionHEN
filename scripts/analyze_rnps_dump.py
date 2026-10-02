@@ -77,6 +77,21 @@ KNOWN_HOMEUI_PROFILES = [
         "file_length": 0x1B70E4,
         "source_hash": "d9aa3ec2fcf7cc0bb0a7fe6362079c494948cf5e",
     },
+    {
+        # Every known 13.x NPXS40002 dump (13.0, 13.2, 13.4, 13.42, 13.6)
+        # is byte-identical.
+        "name": "13.0/13.2/13.4/13.42/13.6 NPXS40002 HomeUI",
+        "hbc_version": 89,
+        "file_length": 0x1B6584,
+        "source_hash": "80837fe66ccb00ba923f279c90b78c7c4813e543",
+    },
+    {
+        # 13.600.007 ShellUI loads the OTA bundle, not the /system_ex file above.
+        "name": "13.600.007 OTA NPXS40002 HomeUI",
+        "hbc_version": 89,
+        "file_length": 0x1B6594,
+        "source_hash": "f73c3e0102be92a4558baa510bd00c17f6fe5f96",
+    },
 ]
 
 
@@ -366,6 +381,25 @@ KNOWN_SETTINGS_PROFILES = [
         "route": "old",
         "file_length": 0x4E8E54,
         "source_hash": "5d4461858b0a38fc6e7b086dbdfdab619515908e",
+    },
+    {
+        "name": "13.0 NPXS40008 Settings",
+        "route": "old",
+        "file_length": 0x4EB9B4,
+        "source_hash": "5fb007c00f7ba34541032b2997bdabd19d534e78",
+    },
+    {
+        # 13.2, 13.4 and 13.42 NPXS40008 dumps are byte-identical.
+        "name": "13.2/13.4/13.42 NPXS40008 Settings",
+        "route": "old",
+        "file_length": 0x4EBE08,
+        "source_hash": "fb05751464291761de1fdcd9576fc26a02930e10",
+    },
+    {
+        "name": "13.6 NPXS40008 Settings",
+        "route": "old",
+        "file_length": 0x4EBC8C,
+        "source_hash": "a400a5ca932efc80cb6512610903100fa03a8717",
     },
 ]
 

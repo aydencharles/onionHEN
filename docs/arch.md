@@ -197,7 +197,7 @@ OnionHEN 只负责配对和设备注册。配对信息可从网络页面保存�
 
 注入路径详见 [shellui-injection.md](shellui-injection.md)。
 
-HomeUI 顶部导航和 Settings Debug Settings 入口按固件 profile 覆盖 2.30–12.70；11.00 起 Settings 走 `debug_settings_old`。
+HomeUI 顶部导航和 Settings Debug Settings 入口按固件 profile 覆盖 2.30–13.60；11.00 起 Settings 走 `debug_settings_old`。
 
 监控条 FPS 由 daemon skip-hook 采样：`libonion_fps` 通过 `/dev/dce` ioctl
 和 DMAP 读取游戏加载的 `libSceAgcDriver`，ShellUI 负责显示 FPS、CPU、GPU、

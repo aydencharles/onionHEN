@@ -128,8 +128,8 @@ bool resource_matches(std::string_view resource, std::string_view relative) {
 } // namespace
 
 FirmwareProfile FirmwareProfile::for_system_version(uint32_t system_version) {
-  if (system_version >= 0x02300000u && system_version <= 0x12ffffffu)
-    return {"legacy-settings-2.x-12.x", true, true, true};
+  if (system_version >= 0x02300000u && system_version <= 0x13ffffffu)
+    return {"legacy-settings-2.x-13.x", true, true, true};
   return {};
 }
 

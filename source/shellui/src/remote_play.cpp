@@ -87,7 +87,7 @@ void *confirm_registration_loop(void *) {
     if (!sceRemoteplayConfirmDeviceRegist) {
       if (remote_play::try_finish_pairing(
               g_pairing_state, remote_play::PairingState::Failed)) {
-        onion_notify_debug("notify.remote_play.unavailable");
+        onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.unavailable");
         invalidate_pin_registration("service_unavailable");
       }
       break;
@@ -103,7 +103,7 @@ void *confirm_registration_loop(void *) {
     if (error) {
       if (remote_play::try_finish_pairing(
               g_pairing_state, remote_play::PairingState::Failed)) {
-        onion_notify_debug("notify.remote_play.pairing_failed_fmt", error);
+        onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.pairing_failed_fmt", error);
         invalidate_pin_registration("confirmation_failed");
       }
       break;
@@ -111,7 +111,7 @@ void *confirm_registration_loop(void *) {
     if (pair_status == 2) {
       if (remote_play::try_finish_pairing(
               g_pairing_state, remote_play::PairingState::Paired)) {
-        onion_notify_debug("notify.remote_play.paired");
+        onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.paired");
         invalidate_pin_registration("pairing_succeeded");
       }
       break;
@@ -147,29 +147,29 @@ uint32_t generate_pin_code() {
                      nullptr) != 0) {
     g_pairing_state.store(remote_play::PairingState::Failed,
                           std::memory_order_release);
-    onion_notify_debug("notify.remote_play.pairing_start_failed");
+    onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.pairing_start_failed");
     invalidate_pin_registration("thread_create_failed");
     return 0;
   }
   g_confirm_thread_created = true;
-  onion_notify_debug("notify.remote_play.waiting");
+  onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.waiting");
   return pin;
 }
 
 void initialize_remote_play() {
   if (!sceRemoteplayInitialize) {
-    onion_notify_debug("notify.remote_play.unavailable");
+    onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.unavailable");
     return;
   }
 
   int enabled = 0;
   const int read_error = sceRegMgrGetInt_hook(kRemotePlayEnableRegistry, &enabled);
   if (read_error != 0) {
-    onion_notify_debug("notify.remote_play.read_failed_fmt", read_error);
+    onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.read_failed_fmt", read_error);
   } else if (enabled != 1) {
     const int write_error = sceRegMgrSetInt(kRemotePlayEnableRegistry, 1);
     if (write_error != 0)
-      onion_notify_debug("notify.remote_play.enable_failed_fmt", write_error);
+      onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.enable_failed_fmt", write_error);
   }
 
   const int error = sceRemoteplayInitialize(nullptr, 0);
@@ -207,7 +207,7 @@ bool remote_play_handle_popping(MonoObject *outgoing) {
   const bool cancelled = remote_play::try_finish_pairing(
       g_pairing_state, remote_play::PairingState::Cancelled);
   if (cancelled) {
-    onion_notify_debug("notify.remote_play.pairing_cancelled");
+    onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.pairing_cancelled");
     invalidate_pin_registration("page_popped");
   }
   join_confirm_registration_thread();

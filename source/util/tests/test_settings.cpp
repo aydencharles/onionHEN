@@ -52,6 +52,7 @@ static int test_defaults_and_serialize_keys(void) {
   TEST_ASSERT_TRUE(text.find("language=system") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[startup]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("open_after_load=none") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find("show_thanks=true") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[logging]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find(std::string("level=") + default_level_name()) !=
                    std::string::npos);
@@ -136,6 +137,7 @@ static int test_full_schema_roundtrip(void) {
 
   onion::Settings in{};
   in.startup_open_after_load = onion::kStartupOpenHomeMenu;
+  in.show_boot_thanks = false;
   in.cheats_mirror = onion::kCheatsMirrorCnb;
   in.app_jailbreak_enabled = false;
   in.debug_app_jb_msg = true;
@@ -176,6 +178,7 @@ static int test_full_schema_roundtrip(void) {
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
 
   TEST_ASSERT_EQ_INT(in.startup_open_after_load, out.startup_open_after_load);
+  TEST_ASSERT_TRUE(out.show_boot_thanks == in.show_boot_thanks);
   TEST_ASSERT_TRUE(out.app_jailbreak_enabled == in.app_jailbreak_enabled);
   TEST_ASSERT_TRUE(out.debug_app_jb_msg == in.debug_app_jb_msg);
   TEST_ASSERT_TRUE(out.display_tids == in.display_tids);
@@ -234,6 +237,7 @@ static int test_partial_ini_keeps_defaults(void) {
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
   /* Removed keys are ignored; unspecified keys stay at defaults. */
   TEST_ASSERT_EQ_INT(onion::kStartupOpenNone, out.startup_open_after_load);
+  TEST_ASSERT_TRUE(out.show_boot_thanks);
   TEST_ASSERT_EQ_INT(77, out.fan_threshold);
   TEST_ASSERT_TRUE(out.overlay_enabled);
   TEST_ASSERT_TRUE(out.overlay_background);

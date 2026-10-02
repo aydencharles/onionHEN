@@ -20,6 +20,9 @@ language=system
 # open_after_load chooses which page opens after OnionHEN finishes loading.
 # Available values: none, home_menu
 open_after_load=none
+# show_thanks shows the contributor thanks toast when OnionHEN starts.
+# Available values: true, false
+show_thanks=true
 
 [logging]
 # level controls how much OnionHEN records to its log files.

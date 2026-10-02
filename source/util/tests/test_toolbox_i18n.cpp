@@ -48,6 +48,7 @@ static int test_default_zh(void) {
                   "OnionHEN_crash.log 附加到 GitHub Issue：https://github.com/"
                   "aydencharles/onionHEN/issues") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("overlay.pos.top"), "顶部贴边") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("boot.thanks"), "特别感谢通知") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("overlay.align.center"), "居中") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("cheats.enable_fmt"),
                                "为 %s 启用/禁用 %s") == 0);
@@ -58,6 +59,9 @@ static int test_default_zh(void) {
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.made_by"),
                   "%s · 作者：麒麟/0xp0co") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.boot.thanks"),
+                  "特别感谢：kvnhrt, Modmycon") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.conflict"),
                   "OnionHEN 已拒绝启动：%s 正在运行") == 0);
@@ -96,6 +100,8 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(std::strcmp(tr("startup.home_menu"), "Home Menu") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.level"), "Log output level") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.max_bytes"), "Log file size limit") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("boot.thanks"),
+                               "Special thanks notification") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.info"),
                                "Information (recommended)") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.trace"), "Trace") == 0);
@@ -122,6 +128,9 @@ static int test_en(void) {
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.made_by"),
                   "%s made by Kylin/0xp0co") == 0);
+  TEST_ASSERT_TRUE(
+      std::strcmp(onion_notify_tr("notify.boot.thanks"),
+                  "Special Thanks to: kvnhrt, Modmycon") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.conflict"),
                   "OnionHEN refused to start: %s is already running") == 0);

@@ -815,6 +815,8 @@ void append_toolbox_preferences_group(ps5ui::Group& g) {
          toolbox_val("id_start_opt", "0"),
          toolbox_i18n::tr("startup.open_after_load.confirm"),
          toolbox_i18n::tr("startup.open_after_load.confirm_phrase"))
+      .toggle("id_boot_thanks", toolbox_i18n::tr("boot.thanks"),
+              toolbox_on("id_boot_thanks"), toolbox_i18n::tr("boot.thanks.sub"))
       .list("id_ui_lang", toolbox_i18n::tr("lang.list"),
          [](ps5ui::ListBuilder& L) {
            L.item("id_ui_lang_system", toolbox_i18n::tr("lang.system"), "0")

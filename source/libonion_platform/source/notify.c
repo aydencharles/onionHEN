@@ -105,19 +105,19 @@ void onion_notify(int show_watermark, const char *fmt, ...) {
   va_end(args);
 }
 
-void onion_notify_debug_v(const char *fmt, va_list ap) {
+void onion_notify_debug_v(int show_watermark, const char *fmt, va_list ap) {
   OrbisNotificationRequest req;
   memset(&req, 0, sizeof(req));
-  /* Same i18n path as onion_notify; watermark off for bare debug text. */
-  onion_notify_format(req.message, sizeof(req.message), /*show_watermark=*/0,
-                      fmt, ap);
+  /* Same i18n path as onion_notify. No system icon. */
+  onion_notify_format(req.message, sizeof(req.message), show_watermark, fmt,
+                      ap);
   onion_notify_send_request(&req, /*with_system_icon=*/0);
 }
 
-void onion_notify_debug(const char *fmt, ...) {
+void onion_notify_debug(int show_watermark, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  onion_notify_debug_v(fmt, args);
+  onion_notify_debug_v(show_watermark, fmt, args);
   va_end(args);
 }
 

@@ -281,6 +281,8 @@ struct Settings {
   // [startup]
   // Page to open after OnionHEN finishes loading.
   int startup_open_after_load = kStartupOpenNone;
+  // Show the contributor thanks toast when OnionHEN starts.
+  bool show_boot_thanks = true;
 
   // [rest_mode]
   // Extra seconds after Rest Mode trophy SPRX are ready, before Toolbox inject.

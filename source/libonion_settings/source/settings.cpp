@@ -735,6 +735,8 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->startup_open_after_load = parse_startup_open_after_load(
       ini_get(parser, "startup.open_after_load"),
       out->startup_open_after_load);
+  out->show_boot_thanks = parse_bool(ini_get(parser, "startup.show_thanks"),
+                                     out->show_boot_thanks);
   out->log_level =
       parse_log_level(ini_get(parser, "logging.level"), out->log_level);
   out->log_max_bytes =
@@ -876,6 +878,9 @@ std::string settings_serialize(const Settings &in) {
   b += "open_after_load=" +
        std::string(startup_open_after_load_name(in.startup_open_after_load)) +
        "\n";
+  b += "# show_thanks shows the contributor thanks toast when OnionHEN starts.\n";
+  b += "# Available values: true, false\n";
+  b += "show_thanks=" + bool_text(in.show_boot_thanks) + "\n";
   b += "\n";
   b += "[logging]\n";
   b += "# level controls how much OnionHEN records to its log files.\n";

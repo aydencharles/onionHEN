@@ -992,6 +992,9 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                 .label("id_about_tester_4",
                        "小小蔡 · B站谢锡榆 · 荆枫",
                        ps5ui::Style::Center)
+                .label("id_about_tester_5",
+                       "苏打先森 · 噢 · 天天向上",
+                       ps5ui::Style::Center)
                 .label("id_about_more", toolbox_i18n::tr("about.more"),
                        ps5ui::Style::Center);
           },

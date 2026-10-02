@@ -338,7 +338,7 @@
     "notify.boot.starting": "Az OnionHEN indul...",
     "notify.boot.welcome": "Üdvözli az OnionHEN",
     "notify.boot.goto_toolbox": "Ugrás az OnionHEN eszköztárhoz",
-    "notify.boot.made_by": "%s · készítette: Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · készítette: Kylin/0xp0co",
     "notify.boot.cleaned_up": "Az OnionHEN ki lett takarítva.",
     "notify.boot.conflict": "Az OnionHEN nem indult el: %s már fut",
     "notify.boot.decompress_nomem": "Nem sikerült memóriát foglalni a kicsomagolt OnionHEN payloadhoz!",

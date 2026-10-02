@@ -645,6 +645,10 @@ constexpr const char* kIconDonatorSzx =
     "/user/data/OnionHEN/assets/icon_xml_donator_szx.png";
 constexpr const char* kIconDonatorAglx =
     "/user/data/OnionHEN/assets/icon_xml_donator_aglx.png";
+constexpr const char* kIconDonatorXiaomao =
+    "/user/data/OnionHEN/assets/icon_xml_donator_xiaomao.png";
+constexpr const char* kIconDonatorXie =
+    "/user/data/OnionHEN/assets/icon_xml_donator_xie.png";
 
 bool toolbox_on(const char* id) {
   return resolve_toolbox_control_value(id) == "1";
@@ -948,7 +952,11 @@ void append_toolbox_about_group(ps5ui::Group& g) {
              .button("id_donator_ljf", "狂爱龙卷風", std::nullopt,
                      std::nullopt, kIconDonatorLjf)
              .button("id_donator_szx", "石之心", std::nullopt,
-                     std::nullopt, kIconDonatorSzx);
+                     std::nullopt, kIconDonatorSzx)
+             .button("id_donator_xiaomao", "小猫小子", std::nullopt,
+                     std::nullopt, kIconDonatorXiaomao)
+             .button("id_donator_xie", "B站谢锡榆", std::nullopt,
+                     std::nullopt, kIconDonatorXie);
        },
        toolbox_i18n::tr("about.donate.sub"), kIconDonations)
       .group(

@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN 正在启动...",
     "notify.boot.welcome": "欢迎使用 OnionHEN",
     "notify.boot.goto_toolbox": "前往 OnionHEN 工具箱",
-    "notify.boot.made_by": "%s · 作者：麒麟/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · 作者：麒麟/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN 已清理完成。",
     "notify.boot.conflict": "OnionHEN 已拒绝启动：%s 正在运行",
     "notify.boot.decompress_nomem": "无法为解压后的 OnionHEN Payload 分配内存！",

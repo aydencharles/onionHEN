@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN запускається...",
     "notify.boot.welcome": "Ласкаво просимо до OnionHEN",
     "notify.boot.goto_toolbox": "Перейти до інструментів OnionHEN",
-    "notify.boot.made_by": "%s · автор: Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · автор: Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN очищено.",
     "notify.boot.conflict": "OnionHEN відмовився запускатися: %s уже працює",
     "notify.boot.decompress_nomem": "Не вдалося виділити пам’ять для розпакованого payload OnionHEN!",

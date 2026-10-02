@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN się uruchamia...",
     "notify.boot.welcome": "Witamy w OnionHEN",
     "notify.boot.goto_toolbox": "Przejdź do narzędzi OnionHEN",
-    "notify.boot.made_by": "%s · autor: Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · autor: Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN został posprzątany.",
     "notify.boot.conflict": "OnionHEN odmawia startu: %s jest już uruchomiony",
     "notify.boot.decompress_nomem": "Nie udało się przydzielić pamięci dla zdekompresowanego payloadu OnionHEN.",

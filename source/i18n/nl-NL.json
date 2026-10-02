@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN wordt gestart...",
     "notify.boot.welcome": "Welkom bij OnionHEN",
     "notify.boot.goto_toolbox": "Ga naar de OnionHEN-toolbox",
-    "notify.boot.made_by": "%s gemaakt door Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s gemaakt door Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN is opgeschoond.",
     "notify.boot.conflict": "OnionHEN weigert te starten: %s is al actief",
     "notify.boot.decompress_nomem": "Kon geen geheugen toewijzen voor gedecomprimeerde OnionHEN-payload!",

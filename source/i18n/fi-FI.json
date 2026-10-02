@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN käynnistyy...",
     "notify.boot.welcome": "Tervetuloa OnionHENiin",
     "notify.boot.goto_toolbox": "Siirry OnionHEN-työkalupakkiin",
-    "notify.boot.made_by": "%s · tekijä: Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · tekijä: Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN on siivottu.",
     "notify.boot.conflict": "OnionHEN kieltäytyi käynnistymästä: %s on jo käynnissä",
     "notify.boot.decompress_nomem": "Muistin varaaminen puretulle OnionHEN-payloadille epäonnistui!",

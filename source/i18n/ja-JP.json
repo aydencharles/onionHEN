@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN を起動しています...",
     "notify.boot.welcome": "OnionHEN へようこそ",
     "notify.boot.goto_toolbox": "OnionHEN ツールボックスへ",
-    "notify.boot.made_by": "%s · 制作：Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · 制作：Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN の後始末が完了しました。",
     "notify.boot.conflict": "OnionHEN の起動を中止しました。%s が既に実行中です",
     "notify.boot.decompress_nomem": "OnionHEN Payload の展開用メモリを確保できませんでした！",

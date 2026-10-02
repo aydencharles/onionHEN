@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN démarre...",
     "notify.boot.welcome": "Bienvenue dans OnionHEN",
     "notify.boot.goto_toolbox": "Aller à la boîte à outils OnionHEN",
-    "notify.boot.made_by": "%s · par Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · par Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN a été nettoyé.",
     "notify.boot.conflict": "OnionHEN a refusé de démarrer : %s est déjà en cours d’exécution",
     "notify.boot.decompress_nomem": "Échec de l’allocation de mémoire pour le payload décompressé d’OnionHEN !",

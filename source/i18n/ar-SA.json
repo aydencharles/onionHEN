@@ -338,7 +338,7 @@
     "notify.boot.starting": "جاري تشغيل OnionHEN...",
     "notify.boot.welcome": "مرحبًا بك في OnionHEN",
     "notify.boot.goto_toolbox": "الانتقال إلى صندوق أدوات OnionHEN",
-    "notify.boot.made_by": "%s من عمل Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s من عمل Kylin/0xp0co",
     "notify.boot.cleaned_up": "تم تنظيف OnionHEN.",
     "notify.boot.conflict": "رفض OnionHEN البدء: %s قيد التشغيل بالفعل",
     "notify.boot.decompress_nomem": "فشل تخصيص الذاكرة لحمولة OnionHEN بعد فك الضغط!",

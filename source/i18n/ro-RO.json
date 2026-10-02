@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN pornește...",
     "notify.boot.welcome": "Bun venit la OnionHEN",
     "notify.boot.goto_toolbox": "Mergeți la trusa OnionHEN",
-    "notify.boot.made_by": "%s · de Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · de Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN a fost curățat.",
     "notify.boot.conflict": "OnionHEN a refuzat să pornească: %s rulează deja",
     "notify.boot.decompress_nomem": "Alocarea memoriei pentru payload-ul OnionHEN decomprimat a eșuat!",

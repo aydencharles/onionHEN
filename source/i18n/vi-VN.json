@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN đang khởi động...",
     "notify.boot.welcome": "Chào mừng đến với OnionHEN",
     "notify.boot.goto_toolbox": "Đến Hộp công cụ OnionHEN",
-    "notify.boot.made_by": "%s · tạo bởi Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · tạo bởi Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN đã được dọn dẹp.",
     "notify.boot.conflict": "OnionHEN từ chối khởi động: %s đang chạy",
     "notify.boot.decompress_nomem": "Không cấp phát được bộ nhớ cho payload OnionHEN đã giải nén!",

@@ -30,7 +30,9 @@ REQUIRED_TOKENS = {
         "plugins.link.sub": ("Kstuff",),
     },
     "notifications": {
-        "notify.boot.made_by": ("0xp0co", "kvnhrt"),
+        # The boot toast credits the author only; kvnhrt is listed on the
+        # About page as a contributor, not in the startup notification.
+        "notify.boot.made_by": ("0xp0co",),
         "notify.kstuff.loading": ("Kstuff",),
         "notify.kstuff.load_failed": ("Kstuff",),
         "notify.kstuff.load_elfldr_failed": ("Kstuff",),

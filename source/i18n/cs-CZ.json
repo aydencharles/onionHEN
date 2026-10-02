@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN se spouští...",
     "notify.boot.welcome": "Vítejte v OnionHEN",
     "notify.boot.goto_toolbox": "Přejít do nástrojů OnionHEN",
-    "notify.boot.made_by": "%s · autor: Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · autor: Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN bylo vyčištěno.",
     "notify.boot.conflict": "OnionHEN odmítl spustit: %s už běží",
     "notify.boot.decompress_nomem": "Nepodařilo se alokovat paměť pro dekomprimovaný payload OnionHEN!",

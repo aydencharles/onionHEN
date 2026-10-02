@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN wird gestartet...",
     "notify.boot.welcome": "Willkommen bei OnionHEN",
     "notify.boot.goto_toolbox": "Zur OnionHEN-Toolbox",
-    "notify.boot.made_by": "%s · von Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · von Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN wurde aufgeräumt.",
     "notify.boot.conflict": "OnionHEN startet nicht: %s läuft bereits",
     "notify.boot.decompress_nomem": "Speicher für dekomprimierten OnionHEN-Payload konnte nicht reserviert werden!",

@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN sedang mulai...",
     "notify.boot.welcome": "Selamat datang di OnionHEN",
     "notify.boot.goto_toolbox": "Buka Kotak perkakas OnionHEN",
-    "notify.boot.made_by": "%s · oleh Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · oleh Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN telah dibersihkan.",
     "notify.boot.conflict": "OnionHEN menolak mulai: %s sudah berjalan",
     "notify.boot.decompress_nomem": "Gagal mengalokasikan memori untuk payload OnionHEN yang didekompresi!",

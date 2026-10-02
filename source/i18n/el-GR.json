@@ -338,7 +338,7 @@
     "notify.boot.starting": "Το OnionHEN ξεκινά...",
     "notify.boot.welcome": "Καλώς ήρθατε στο OnionHEN",
     "notify.boot.goto_toolbox": "Μετάβαση στην εργαλειοθήκη OnionHEN",
-    "notify.boot.made_by": "%s · από Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · από Kylin/0xp0co",
     "notify.boot.cleaned_up": "Το OnionHEN καθαρίστηκε.",
     "notify.boot.conflict": "Το OnionHEN αρνήθηκε να ξεκινήσει: το %s εκτελείται ήδη",
     "notify.boot.decompress_nomem": "Αποτυχία δέσμευσης μνήμης για το αποσυμπιεσμένο payload του OnionHEN!",

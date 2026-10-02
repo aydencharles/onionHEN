@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN กำลังเริ่มทำงาน...",
     "notify.boot.welcome": "ยินดีต้อนรับสู่ OnionHEN",
     "notify.boot.goto_toolbox": "ไปที่ OnionHEN Toolbox",
-    "notify.boot.made_by": "%s สร้างโดย Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s สร้างโดย Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN ถูกเคลียร์แล้ว",
     "notify.boot.conflict": "OnionHEN ปฏิเสธการเริ่มต้น: %s กำลังทำงานอยู่แล้ว",
     "notify.boot.decompress_nomem": "จัดสรรหน่วยความจำสำหรับ payload OnionHEN ที่แตกไฟล์ไม่สำเร็จ!",

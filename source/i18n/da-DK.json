@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN starter...",
     "notify.boot.welcome": "Velkommen til OnionHEN",
     "notify.boot.goto_toolbox": "Gå til OnionHEN-værktøjskassen",
-    "notify.boot.made_by": "%s · af Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · af Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN er blevet ryddet op.",
     "notify.boot.conflict": "OnionHEN nægter at starte: %s kører allerede",
     "notify.boot.decompress_nomem": "Kunne ikke allokere hukommelse til dekomprimeret OnionHEN-payload!",

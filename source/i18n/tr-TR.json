@@ -338,7 +338,7 @@
     "notify.boot.starting": "OnionHEN başlıyor...",
     "notify.boot.welcome": "OnionHEN’e hoş geldiniz",
     "notify.boot.goto_toolbox": "OnionHEN Araç Kutusu’na gidin",
-    "notify.boot.made_by": "%s · yapan: Kylin/0xp0co & kvnhrt",
+    "notify.boot.made_by": "%s · yapan: Kylin/0xp0co",
     "notify.boot.cleaned_up": "OnionHEN temizlendi.",
     "notify.boot.conflict": "OnionHEN başlamayı reddetti: %s zaten çalışıyor",
     "notify.boot.decompress_nomem": "Açılmış OnionHEN payload’ı için bellek ayrılamadı!",

@@ -51,10 +51,8 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   const bool dynamic_page =
       onion::shellui::dynamic_ui::render_resource(resourceName, new_xml_string);
 
-#if SHELL_DEBUG == 1
   LOG_DEBUG("GetManifestResourceStream_Hook: %s domain=%p root=%p",
               resourceName.c_str(), (void *)domain, (void *)Root_Domain);
-#endif
 
   const bool shortcut = g_ui.any_cheat_shortcut();
   const bool shortcut_not_open = g_ui.cheats_shortcut_activated_not_open;

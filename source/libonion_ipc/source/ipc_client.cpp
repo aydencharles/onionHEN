@@ -225,10 +225,8 @@ bool IPC_Client::IPCSendCommand(DaemonCommands cmd, std::string &ipc_msg1,
   std::lock_guard<std::mutex> lock(mu_);
   std::string json;
 
-#if SHELL_DEBUG == 1
   LOG_DEBUG("Sending command to %s daemon: 0x%X",
               util_daemon_ ? "util" : "crit", static_cast<unsigned>(cmd));
-#endif
 
   IPCMessage msg{};
   msg.magic = 0xDEADBABE;

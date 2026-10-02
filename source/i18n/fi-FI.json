@@ -190,6 +190,8 @@
     "sc.l2_r3": "Pidä L2 + R3",
     "log.level": "Lokin tarkkuus",
     "log.level.sub": "Hallitse OnionHENin lokin tarkkuutta; korkeammat tasot sisältävät enemmän diagnostiikkaa",
+    "log.max_bytes": "Lokitiedoston enimmäiskoko",
+    "log.max_bytes.sub": "Yhden lokitiedoston raja; varmuuskopioita säilytetään 3, joten kokonaiskoko on 4-kertainen",
     "log.off": "Pois",
     "log.error": "Vain virheet",
     "log.warn": "Varoitukset ja virheet",

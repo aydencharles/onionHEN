@@ -20,6 +20,28 @@ static std::string temp_ini_path() {
   return std::string(tmpl);
 }
 
+/*
+ * The serialized default names kLogLevelDefault, whose value follows the build
+ * type: trace in a debug build (so a log-collection payload is verbose out of
+ * the box) and info in release.
+ */
+static const char *default_level_name() {
+  switch (onion::kLogLevelDefault) {
+  case onion::kLogLevelOff:
+    return "off";
+  case onion::kLogLevelError:
+    return "error";
+  case onion::kLogLevelWarn:
+    return "warn";
+  case onion::kLogLevelDebug:
+    return "debug";
+  case onion::kLogLevelTrace:
+    return "trace";
+  default:
+    return "info";
+  }
+}
+
 static int test_defaults_and_serialize_keys(void) {
   onion::Settings s{};
   std::string text = onion::settings_serialize(s);
@@ -31,7 +53,9 @@ static int test_defaults_and_serialize_keys(void) {
   TEST_ASSERT_TRUE(text.find("[startup]") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("open_after_load=none") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("[logging]") != std::string::npos);
-  TEST_ASSERT_TRUE(text.find("level=info") != std::string::npos);
+  TEST_ASSERT_TRUE(text.find(std::string("level=") + default_level_name()) !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(text.find("max_bytes=786432") != std::string::npos);
   TEST_ASSERT_TRUE(text.find("temperature_threshold_celsius=77") !=
                    std::string::npos);
   TEST_ASSERT_TRUE(text.find("resume_reinject_delay_seconds=10") !=
@@ -75,6 +99,7 @@ static int test_roundtrip_file(void) {
   in.startup_open_after_load = onion::kStartupOpenHomeMenu;
   in.ui_lang = onion::kUiLanguageEn;
   in.log_level = onion::kLogLevelDebug;
+  in.log_max_bytes = 2 * 1024 * 1024;
 
   TEST_ASSERT_TRUE(onion::settings_save_file(path.c_str(), in));
 
@@ -87,6 +112,7 @@ static int test_roundtrip_file(void) {
                      out.startup_open_after_load);
   TEST_ASSERT_EQ_INT(onion::kUiLanguageEn, out.ui_lang);
   TEST_ASSERT_EQ_INT(onion::kLogLevelDebug, out.log_level);
+  TEST_ASSERT_EQ_INT(2 * 1024 * 1024, out.log_max_bytes);
   TEST_ASSERT_EQ_INT(onion::kSettingsSchemaVersion, out.schema_version);
 
   unlink(path.c_str());
@@ -445,7 +471,67 @@ static int test_log_level_invalid_falls_back(void) {
 
   onion::Settings out{};
   TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
-  TEST_ASSERT_EQ_INT(onion::kLogLevelInfo, out.log_level);
+  TEST_ASSERT_EQ_INT(onion::kLogLevelDefault, out.log_level);
+
+  unlink(path.c_str());
+  return 0;
+}
+
+/* max_bytes takes raw bytes or a k/m suffix, and is clamped rather than
+ * rejected: a hand-edited config must never yield a 0-byte cap (which the
+ * logger would read as "disable rotation") or an absurd one. */
+static int test_log_max_bytes_parse_policy(void) {
+  struct Case {
+    const char *text;
+    int want;
+  };
+  const Case cases[] = {
+      {"262144", 262144},
+      {"786432", onion::kLogMaxBytesDefault},
+      {"512k", 512 * 1024},
+      {"2m", 2 * 1024 * 1024},
+      {"1", onion::kLogMaxBytesMin},          /* below floor -> floor */
+      {"65535", onion::kLogMaxBytesMin},
+      {"0", onion::kLogMaxBytesDefault},      /* 0 means "default" */
+      {"-5", onion::kLogMaxBytesDefault},
+      {"999999999", onion::kLogMaxBytesMax},  /* above ceiling -> ceiling */
+      {"512m", onion::kLogMaxBytesMax},
+      {"verbose", onion::kLogMaxBytesDefault}, /* unparseable */
+      {"12x", onion::kLogMaxBytesDefault},     /* junk suffix */
+  };
+
+  for (const Case &c : cases) {
+    const std::string path = temp_ini_path();
+    TEST_ASSERT_TRUE(!path.empty());
+
+    FILE *f = fopen(path.c_str(), "w");
+    TEST_ASSERT_TRUE(f != nullptr);
+    fprintf(f, "[meta]\nschema_version=1\n\n[logging]\nmax_bytes=%s\n", c.text);
+    fclose(f);
+
+    onion::Settings out{};
+    TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
+    TEST_ASSERT_EQ_INT(c.want, out.log_max_bytes);
+
+    unlink(path.c_str());
+  }
+  return 0;
+}
+
+/* A config that predates the key must keep the default rather than land on 0. */
+static int test_log_max_bytes_absent_keeps_default(void) {
+  const std::string path = temp_ini_path();
+  TEST_ASSERT_TRUE(!path.empty());
+
+  FILE *f = fopen(path.c_str(), "w");
+  TEST_ASSERT_TRUE(f != nullptr);
+  fputs("[meta]\nschema_version=1\n\n[logging]\nlevel=debug\n", f);
+  fclose(f);
+
+  onion::Settings out{};
+  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &out));
+  TEST_ASSERT_EQ_INT(onion::kLogLevelDebug, out.log_level);
+  TEST_ASSERT_EQ_INT(onion::kLogMaxBytesDefault, out.log_max_bytes);
 
   unlink(path.c_str());
   return 0;
@@ -715,6 +801,10 @@ extern "C" int test_settings_suite(void) {
   failures += onion_test_run("settings_config_mtime_helpers", test_config_mtime_helpers);
   failures += onion_test_run("settings_log_level_invalid",
                              test_log_level_invalid_falls_back);
+  failures += onion_test_run("settings_log_max_bytes_policy",
+                             test_log_max_bytes_parse_policy);
+  failures += onion_test_run("settings_log_max_bytes_absent",
+                             test_log_max_bytes_absent_keeps_default);
   failures += onion_test_run("settings_language_ar", test_language_ar_roundtrip);
   failures += onion_test_run("settings_language_new_locales",
                              test_language_new_locales_roundtrip);

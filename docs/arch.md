@@ -217,7 +217,7 @@ RAM 与 IP。采样实现参考 [PHU Games Tools](https://github.com/ArkSama)（
 | **libonion_sprx** | 标准 SPRX/PRX 加载用例与最小 INI `SprxCatalog`；策略层与 ptrace 运行时解耦，生产适配器通过远程 `pthread_create` 调用 `sceKernelLoadStartModule`，支持幂等检查、超时、返回码、依赖排序和临时内存清理 |
 | **libonion_detour** | 共享 Detour + hde64 钩子栈 |
 | **libonion_proc** | 共享 proc/ucred（allproc 遍历、dynlib、authid）+ **sysctl 进程查询**（`find_pid` / `onion_find_pid_ex` / `isProcessAlive`）；daemon / util / shellui / bootstrapper 共用 |
-| **libonion_platform** | 平台叶子：`if_exists` / `touch_file` / `rmtree`、`OnionHEN_log`（可配置 tag/路径）、`onion_notify`；修一处全树受益 |
+| **libonion_platform** | 平台叶子：`if_exists` / `touch_file` / `rmtree`、`OnionHEN_log`（可配置 tag/路径；sink 状态是**进程内**的，每个进程必须自己调 `onion_log_configure`，否则只进 klog/stdout；多进程共享同一路径时靠单次 `O_APPEND` 写入 + `<path>.lock` 非阻塞轮转锁保证一致；上限经 `onion::apply_log_settings` 由 `[logging] max_bytes` 驱动）、`onion_notify`；修一处全树受益 |
 | **libonion_ready** | 跨进程 ready/runtime 标记（`/system_tmp/onionhen/ready/<name>`）及 wait/timeout 协调 |
 | **onion/lnc.h** | 共享 LNC 启动 ABI（`LncAppParam` / `Flag` / 错误码）；daemon `launcher.hpp` 仅为 shim |
 | **libNineS** | ptrace 注入编排；**proc/ucred → libonion_proc**；**pt/elfldr → libonion_elfldr** |
@@ -361,8 +361,9 @@ struct IPCMessage {
 |------|------|
 | `/data/OnionHEN/` | 数据根目录 |
 | `/data/OnionHEN/config.ini` | 配置 |
-| `/data/OnionHEN/OnionHEN.log` | 日志 |
-| `/data/OnionHEN/OnionHEN_crash.log` | daemon 崩溃信号与回溯日志；跨重启追加保留 |
+| `/data/OnionHEN/OnionHEN.log` | 主日志；daemon、ShellUI、bootstrapper 三个进程共用（各自 tag 区分）。**ShellUI 在 vsh 沙箱内，打开的是同一文件的沙箱视图 `/user/data/OnionHEN/OnionHEN.log`**；`/data` 在沙箱内不可达，写成 `/data/...` 会导致 open 失败、ShellUI 只进 klog 不进文件（`onion_log_configure` 失败时会往 klog 报一条 error）。每条记录一次 `O_APPEND` 写入保证追加原子；轮转由 `<path>.lock` 跨进程串行，锁以非阻塞方式获取，抢不到则跳过本轮轮转。单文件上限由 `config.ini` 的 `[logging] max_bytes` 控制（默认 768 KiB，加 3 份备份共 3 MiB） |
+| `/data/OnionHEN/OnionHEN_util_daemon.log` | util 进程独立日志 |
+| `/data/OnionHEN/OnionHEN_crash.log` | 崩溃信号与回溯日志；daemon / util / bootstrapper 写入，跨重启追加保留。超过 1 MiB 时下一次配置 sink 会把它移到 `.1`（仅保留一代），避免 `/data` 被无界占满 |
 | `/data/OnionHEN/payloads/` | 用户 payload `.elf`（启动时 stage 到同目录） |
 | `/data/OnionHEN/plugins/` | OnionHEN plugin `.elf`（含 `.onion_plugin` descriptor） |
 | `/system_tmp/onionhen/ipc/*` | Unix IPC socket |

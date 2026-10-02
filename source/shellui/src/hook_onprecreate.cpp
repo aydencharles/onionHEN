@@ -73,9 +73,7 @@ int OnPreCreate_Hook(MonoObject *Instance, MonoObject *element) {
     return call_original(Instance, element);
 
   if (!Instance || !element) {
-#if SHELL_DEBUG == 1
     LOG_DEBUG("[LM HOOK] OnPreCreate_Hook: args are null");
-#endif
     return call_original(Instance, element);
   }
 

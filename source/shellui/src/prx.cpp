@@ -29,6 +29,7 @@ along with this program; see the file COPYING. If not, see
 #include "ucred.h"
 #include "webserver.hpp"
 
+#include <onion/log.h>
 #include <onion/notify.h>
 #include <onion/proc_query.h>
 #include <onion/ready.h>
@@ -726,6 +727,32 @@ int main(int argc, char const* argv[]) {
 
   const pid_t pid = getpid();
   AuthIdGuard auth(pid, set_ucred_to_ptrace());
+
+  /*
+   * Open the sinks before the first record. The logger's state is per-process
+   * and ShellUI runs in its own process, so without this call every LOG_*
+   * below would only reach klog and stdout — never OnionHEN.log.
+   *
+   * The path is the sandbox view on purpose. ShellUI runs inside the vsh
+   * sandbox, which exposes /user/data; /data is the elevated view of the same
+   * directory and does not resolve here. The elevated authid above does not
+   * change the mount namespace, so opening /data/OnionHEN/... fails and leaves
+   * the file sink closed — silently, which is how ShellUI ended up with no
+   * records in the shared log. Everything else in shellui already uses
+   * /user/data (assets, payloads, cheats), so this is the same file the daemon
+   * opens as /data/OnionHEN/OnionHEN.log.
+   *
+   * OnionHEN.log is shared with the daemon; log.c serialises rotation across
+   * processes and emits each record with a single O_APPEND write. The tag stays
+   * distinct so records are attributable.
+   *
+   * The crash sink is deliberately NOT configured here: nothing in ShellUI
+   * installs a signal handler, and onion_log_emergency() is only reachable from
+   * one, so the sink would never be written. Wiring up a fault handler inside
+   * the vsh process is its own decision — until then an unhandled fault in
+   * ShellUI is simply not captured.
+   */
+  onion_log_configure("ShellUI", "/user/data/OnionHEN/OnionHEN.log");
 
   if (!resolve_native_symbols(pid))
     return -1;

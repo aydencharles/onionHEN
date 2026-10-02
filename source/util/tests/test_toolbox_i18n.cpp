@@ -28,6 +28,7 @@ static int test_default_zh(void) {
                                "OnionHEN 加载后自动打开") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("startup.home_menu"), "主菜单") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.level"), "日志输出等级") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("log.max_bytes"), "日志文件大小上限") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.info"), "信息（推荐）") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.trace"), "跟踪") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("pkg.installer.sub"),
@@ -94,6 +95,7 @@ static int test_en(void) {
                                "Automatically open after OnionHEN loads") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("startup.home_menu"), "Home Menu") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.level"), "Log output level") == 0);
+  TEST_ASSERT_TRUE(std::strcmp(tr("log.max_bytes"), "Log file size limit") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.info"),
                                "Information (recommended)") == 0);
   TEST_ASSERT_TRUE(std::strcmp(tr("log.trace"), "Trace") == 0);

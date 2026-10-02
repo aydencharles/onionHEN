@@ -24,9 +24,20 @@ open_after_load=none
 [logging]
 # level controls how much OnionHEN records to its log files.
 # Available values: off, error, warn, info, debug, trace
-# Raise to debug when reproducing an issue for a bug report.
-# Release builds compile out trace, so trace behaves as debug.
+# With this line absent the build's default applies: trace in a debug build
+# (so a payload built for log collection is verbose out of the box) and info
+# in a release build. An explicit value here always wins, so delete the line
+# if you want a debug build's default back.
+# Release builds compile out trace, so trace behaves as debug there.
 level=info
+# max_bytes caps a single log file before it rotates, in bytes.
+# A k or m suffix is accepted, e.g. 512k or 2m.
+# Three backups are kept next to the live file, so the retained history is
+# 4x this value (the default 786432 keeps 3 MiB).
+# Range: 65536 .. 67108864 (256 KiB .. 64 MiB per file).
+# Raise it before enabling debug or trace: at trace the default budget can
+# fill in seconds and evict the startup records.
+max_bytes=786432
 
 [home_screen]
 # show_title_ids displays app Title IDs on the PS5 home screen.

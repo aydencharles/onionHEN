@@ -190,6 +190,8 @@
     "sc.l2_r3": "Håll L2 + R3",
     "log.level": "Loggnivå",
     "log.level.sub": "Styr hur detaljerad OnionHEN-loggen är; högre nivåer ger mer diagnostik",
+    "log.max_bytes": "Maximal loggfilstorlek",
+    "log.max_bytes.sub": "Gräns för en loggfil; 3 säkerhetskopior behålls, så totalen är 4 gånger detta värde",
     "log.off": "Av",
     "log.error": "Endast fel",
     "log.warn": "Varningar och fel",

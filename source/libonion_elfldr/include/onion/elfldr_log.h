@@ -20,30 +20,25 @@ along with this program; see the file COPYING. If not, see
 #include <stdio.h>
 #include <string.h>
 
-#include <ps5/klog.h>
+#include <onion/log.h>
 
 #include <onion/pt.h>
 
 
-/**
- * Log to stdout and klog
- **/
-#define LOG_PUTS(s) {					\
-    puts(s);						\
-    klog_puts(s);					\
-  }
+/*
+ * Route through the shared logger instead of printf + klog directly. libonion_elfldr
+ * is -nostdlib, but it is always linked into a host that provides the platform
+ * logger (daemon, bootstrapper, elfldr_server), so these records now reach the
+ * file sink as well as klog and stdout — previously they bypassed it entirely.
+ *
+ * Every call site is a failure path, hence ERROR.
+ */
+#define LOG_PUTS(s) LOG_ERROR("%s", (s))
 
-#define LOG_PRINTF(s, ...) {				\
-    printf(s, __VA_ARGS__);				\
-    klog_printf(s, __VA_ARGS__);			\
-  }
+#define LOG_PRINTF(s, ...) LOG_INFO(s, __VA_ARGS__)
 
-#define LOG_PERROR(s) {							\
-    printf("%s:%d:%s: %s\n", __FILE__, __LINE__, s, strerror(errno));	\
-    klog_printf("%s:%d:%s: %s\n", __FILE__, __LINE__, s, strerror(errno)); \
-  }
+#define LOG_PERROR(s)							\
+  LOG_ERROR("%s:%d:%s: %s", __FILE__, __LINE__, s, strerror(errno))
 
-#define LOG_PT_PERROR(pid, s) {						\
-    printf("%s:%d:%s: %s\n", __FILE__, __LINE__, s, strerror(pt_errno(pid))); \
-    klog_printf("%s:%d:%s: %s\n", __FILE__, __LINE__, s, strerror(pt_errno(pid))); \
-  }
+#define LOG_PT_PERROR(pid, s)						\
+  LOG_ERROR("%s:%d:%s: %s", __FILE__, __LINE__, s, strerror(pt_errno(pid)))

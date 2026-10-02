@@ -190,6 +190,8 @@
     "sc.l2_r3": "Hold L2 + R3",
     "log.level": "Log output level",
     "log.level.sub": "Control OnionHEN log detail; higher levels include more diagnostic output",
+    "log.max_bytes": "Log file size limit",
+    "log.max_bytes.sub": "Cap for a single log file; three backups are kept, so the total is 4x this",
     "log.off": "Off",
     "log.error": "Errors only",
     "log.warn": "Warnings and errors",

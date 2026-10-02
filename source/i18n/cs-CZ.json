@@ -190,6 +190,8 @@
     "sc.l2_r3": "Držet L2 + R3",
     "log.level": "Úroveň protokolu",
     "log.level.sub": "Určete podrobnost protokolu OnionHEN; vyšší úrovně obsahují více diagnostiky",
+    "log.max_bytes": "Limit velikosti protokolu",
+    "log.max_bytes.sub": "Limit pro jeden soubor protokolu; uchovávají se 3 zálohy, celkem tedy čtyřnásobek",
     "log.off": "Vypnuto",
     "log.error": "Pouze chyby",
     "log.warn": "Varování a chyby",

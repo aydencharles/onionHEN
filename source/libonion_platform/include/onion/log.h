@@ -62,9 +62,45 @@ typedef enum {
 #endif
 #endif
 
-/** Default file rotation policy: 256 KiB live log + three generations. */
-#define ONION_LOG_DEFAULT_MAX_BYTES (256u * 1024u)
+/*
+ * Verbosity a process starts at, before it applies its own settings.
+ *
+ * A debug build defaults to the noisiest level it can compile in: a payload
+ * built to collect a bug report should not need anyone to edit config.ini
+ * first, and the reporter is often not the person who built it. Release stays
+ * at INFO so a normal payload is not chatty — a user can still raise it from
+ * the Toolbox, because Release compiles DEBUG in.
+ *
+ * Override per target with -DONION_LOG_DEFAULT_LEVEL=ONION_LOG_<level>.
+ */
+#ifndef ONION_LOG_DEFAULT_LEVEL
+#ifdef NDEBUG
+#define ONION_LOG_DEFAULT_LEVEL ONION_LOG_INFO
+#else
+#define ONION_LOG_DEFAULT_LEVEL ONION_LOG_COMPILE_LEVEL
+#endif
+#endif
+
+/*
+ * Default file rotation policy: 768 KiB live log + three generations, i.e. a
+ * 3 MiB budget for the whole history.
+ *
+ * The budget is what matters, not the per-file size. At TRACE a busy daemon can
+ * write megabytes in seconds, so a tighter cap evicts the startup records — the
+ * ones a bug report actually needs — before anyone reads them. 3 MiB is still
+ * negligible on /data while giving TRACE runs enough room to keep their
+ * beginning.
+ */
+#define ONION_LOG_DEFAULT_MAX_BYTES (768u * 1024u)
 #define ONION_LOG_DEFAULT_ROTATE_COUNT 3u
+
+/**
+ * Crash sink bound. The crash file is append-only with no rotation, so without
+ * a cap it is the one log that grows without limit on a console the user cannot
+ * clean out. Once it is past this size the next process to configure the sink
+ * moves it aside to `<path>.1` instead of appending to it.
+ */
+#define ONION_LOG_DEFAULT_CRASH_MAX_BYTES (1024u * 1024u)
 
 /*
  * Current runtime threshold. Read directly by the macros so the common
@@ -74,13 +110,40 @@ typedef enum {
  */
 extern volatile int onion_log_runtime_level;
 
-/** Configure tag and optional file sink. Pass NULL path to disable the file. */
+/**
+ * Configure tag and optional file sink. Pass NULL path to disable the file.
+ *
+ * The path may be shared by several payload processes (the daemon owns
+ * OnionHEN.log; ShellUI and the bootstrapper append to the same file). Each
+ * process must call this itself — the sink state is per-process, so a process
+ * that never calls it writes to klog and stdout only.
+ *
+ * Sharing a file is safe because a record is emitted with exactly one write()
+ * on an O_APPEND descriptor, which makes the append atomic against the other
+ * writers. The tail of a short write is deliberately never retried: a second
+ * write() could land after a peer's record and tear this one across it, and a
+ * truncated record is easier to read than an interleaved one.
+ *
+ * Rotation is serialised across processes with a `<path>.lock` sidecar, so a
+ * shared path keeps a coherent `.1`/`.2`/`.3` history instead of letting two
+ * writers interleave their rename chains. The lock is taken non-blocking — a
+ * peer caught mid-rotation makes this process skip its turn rather than stall
+ * every thread that logs, since the caller holds the process-wide sink lock.
+ * The sidecar is created next to the log on first rotation and is intentionally
+ * left on disk; it carries no state beyond the kernel lock.
+ */
 void onion_log_configure(const char *tag, const char *log_path);
 
 /**
  * Configure the append-only crash sink used by onion_log_emergency().
  * Existing contents are preserved across process restarts. Pass NULL to
  * disable it.
+ *
+ * This sink has no rotation, so it is bounded instead: if the file already
+ * exceeds ONION_LOG_DEFAULT_CRASH_MAX_BYTES it is moved aside to `<path>.1`
+ * (replacing any previous one) before this process starts appending. Growth
+ * *within* one session is not capped — the writer is a fault handler and has
+ * to stay async-signal-safe.
  */
 void onion_log_configure_crash(const char *crash_path);
 

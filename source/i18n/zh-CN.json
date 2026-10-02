@@ -190,6 +190,8 @@
     "sc.l2_r3": "按住 L2 + R3",
     "log.level": "日志输出等级",
     "log.level.sub": "控制 OnionHEN 运行日志的详细程度；等级越高，诊断信息越丰富",
+    "log.max_bytes": "日志文件大小上限",
+    "log.max_bytes.sub": "单个日志文件的上限；会保留 3 份备份，总占用为其 4 倍",
     "log.off": "关闭",
     "log.error": "仅错误",
     "log.warn": "警告与错误",

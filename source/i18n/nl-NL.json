@@ -190,6 +190,8 @@
     "sc.l2_r3": "L2 + R3 ingedrukt houden",
     "log.level": "Loguitvoerniveau",
     "log.level.sub": "Bepaal de logdetails van OnionHEN; hogere niveaus geven meer diagnostiek",
+    "log.max_bytes": "Maximale logbestandsgrootte",
+    "log.max_bytes.sub": "Limiet voor één logbestand; er blijven 3 back-ups bewaard, dus het totaal is 4x deze waarde",
     "log.off": "Uit",
     "log.error": "Alleen fouten",
     "log.warn": "Waarschuwingen en fouten",

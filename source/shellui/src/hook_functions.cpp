@@ -89,18 +89,14 @@ MonoString *GetString_Hook(MonoObject *Instance, MonoString *str) {
       return oGetString ? oGetString(Instance, str) : str;
 
     if (!str || !Instance) {
-#if SHELL_DEBUG == 1
       LOG_ERROR("GetString_Hook: Invalid Parameters");
-#endif
       /* Prefer original; never invent a string on a broken call. */
       if (oGetString)
         return oGetString(Instance, str);
       return str;
     }
     std::string resourceName = Mono_to_String(str);
-#if SHELL_DEBUG == 1
     LOG_DEBUG("Resource Name: %s", resourceName.c_str());
-#endif
     if (resourceName == "msg_options") {
       return mono_str_ui(toolbox_i18n::tr("pkg.msg.options"));
     } else if (resourceName == "msg_installing") {
@@ -137,16 +133,12 @@ MonoString *GetString_Hook(MonoObject *Instance, MonoString *str) {
     // MonoStrings. Re-allocating with mono_string_new(Root_Domain, ...) on the UI
     // thread has crashed ShellUI (wrong domain / GC). Pass the original through.
     if (resourceName.rfind("msg_", 0) != 0) {
-#if SHELL_DEBUG == 1
       LOG_DEBUG("GetString_Hook: literal XML string, passthrough");
-#endif
       return str;
     }
 
     if (!oGetString) {
-#if SHELL_DEBUG == 1
       LOG_DEBUG("GetString_Hook: oGetString is null");
-#endif
       return str;
     }
     return oGetString(Instance, str);
@@ -159,16 +151,11 @@ int ioctl_hook(int fd, unsigned long request, void *argp) {
   int ret = __syscall(IOCTL_SYSCALL, fd, request, argp);
   if (shellui_hooks_are_ready() && ret == 0 && request == DECRYPT_RNPS_BUNDLE) {
       ioctl_C0105203_args *args = (ioctl_C0105203_args *)argp;
-#if SHELL_DEBUG == 1
       LOG_DEBUG("ioctl_hook called with fd: %d, request: 0x%lX, argp: %p", fd, request, argp);
-#endif
       if (!args || !args->buffer || args->size <= 0) {
-#if SHELL_DEBUG == 1
           LOG_ERROR("homeui_top_nav_patch: ioctl RNPS args invalid");
-#endif
           return ret;
       }
-#if SHELL_DEBUG == 1
       const unsigned char *p = (const unsigned char *)args->buffer;
       const unsigned char b0 = args->size > 0 ? p[0] : 0;
       const unsigned char b1 = args->size > 1 ? p[1] : 0;
@@ -177,7 +164,6 @@ int ioctl_hook(int fd, unsigned long request, void *argp) {
       LOG_DEBUG("homeui_top_nav_patch: ioctl RNPS buffer=%p size=%d "
                   "head=%02x %02x %02x %02x",
                   args->buffer, args->size, b0, b1, b2, b3);
-#endif
       unsigned char *buffer = static_cast<unsigned char *>(args->buffer);
       patch_settings_bundle(buffer, args->size);
       patch_homeui_top_nav(buffer, &args->size, args->size);
@@ -192,15 +178,11 @@ MonoString * CxmlUri_Hook(MonoObject * Instance, MonoString * uri) {
     return CxmlUri ? CxmlUri(Instance, uri) : uri;
 
   if (!Instance || !uri) {
-    #if SHELL_DEBUG==1 
     LOG_DEBUG("CxmlUri_Hook: args are null");
-    #endif
     return CxmlUri(Instance, uri);
   }
   std::string uri_string = Mono_to_String(uri);
-  #if SHELL_DEBUG==1 
   LOG_DEBUG("uri_string: %s", uri_string.c_str());
-  #endif
   ///LOG_DEBUG("CxmlUri_Hook: %s", uri_string.c_str());
   /*
    * NPXS40008 registers its Debug Settings icon as icon_setting.png.  Do not
@@ -210,10 +192,8 @@ MonoString * CxmlUri_Hook(MonoObject * Instance, MonoString * uri) {
    * hooks are ready.
    */
   if (uri_string.find("icon_setting") != std::string::npos) {
-#if SHELL_DEBUG == 1
     LOG_DEBUG("CxmlUri_Hook: intercepted Settings icon -> "
               "/system_ex/vsh_asset/onionhen.png");
-#endif
     return mono_str_ui("/system_ex/vsh_asset/onionhen.png");
   }
   if (uri_string.rfind("//usb") != std::string::npos || uri_string.rfind("//data") != std::string::npos || uri_string.rfind("//user//data") != std::string::npos){
@@ -223,9 +203,7 @@ MonoString * CxmlUri_Hook(MonoObject * Instance, MonoString * uri) {
     while (( pos = new_uri.find("//", pos)) != std::string::npos) {
         new_uri.replace(pos, 2, "/");
     }
-    #if SHELL_DEBUG==1 
     LOG_DEBUG("CxmlUri_Hook: %s", new_uri.c_str());
-    #endif
     return mono_str_ui(new_uri.c_str());
   }
   return CxmlUri(Instance, uri);
@@ -245,22 +223,16 @@ void Patch_Main_thread_Check(MonoImage * image_core) {
 
     uint64_t real_addr = Get_Address_of_Method(image_core, "Sce.PlayStation.Core.Runtime", "Diagnostics", "CheckRunningOnMainThread", 0);
     if (!real_addr) {
-#if SHELL_DEBUG==1
         LOG_ERROR("Failed to get method address");
-#endif
         return;
     }
-#if SHELL_DEBUG==1
     LOG_DEBUG("changing permissions on (0x%llx).", (unsigned long long)real_addr);
-#endif
     
     if (!DetourFunction(real_addr, (void*)&CheckRunningOnMainThread)) {
         LOG_ERROR("Main thread check detour failed");
         return;
     }
-#if SHELL_DEBUG==1
     LOG_DEBUG("Main thread check patched");
-#endif
 
 }
 // Common logic function

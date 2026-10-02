@@ -268,13 +268,9 @@ void patch_settings_bundle(unsigned char *buffer, int size) {
     const int label_count = apply_equal_length_patch(
         legacy, profile->label_offset, kLegacyOldLabel, kLegacyNewLabel,
         sizeof(kLegacyOldLabel));
-#if SHELL_DEBUG == 1
     LOG_DEBUG("settings_bundle_patch: activated '%s' label=%d "
               "(stock icon id preserved; URI is intercepted at runtime)",
               profile->name, label_count);
-#else
-    (void)label_count;
-#endif
     return;
   }
 
@@ -291,11 +287,7 @@ void patch_settings_bundle(unsigned char *buffer, int size) {
   if (label_count != 0) {
     update_hermes_footer_sha1(hbc, file_length);
   }
-#if SHELL_DEBUG == 1
   LOG_DEBUG("settings_bundle_patch: Hermes NPXS40008 label=%d footer=%s "
             "(stock icon id preserved)",
             label_count, label_count != 0 ? "updated" : "unchanged");
-#else
-  (void)label_count;
-#endif
 }

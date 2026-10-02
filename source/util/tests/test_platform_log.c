@@ -3,6 +3,7 @@
 
 #include <onion/log.h>
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,13 @@ static void cleanup_log_files(void) {
   /* Clean up artifacts produced by the previous one-generation policy. */
   snprintf(rotated, sizeof(rotated), "%s.old", g_path);
   unlink(rotated);
+  /* Sidecar for the cross-process rotation lock. */
+  snprintf(rotated, sizeof(rotated), "%s.lock", g_path);
+  unlink(rotated);
   unlink(g_crash_path);
+  /* Previous crash generation kept by the crash-sink cap. */
+  snprintf(rotated, sizeof(rotated), "%s.1", g_crash_path);
+  unlink(rotated);
 }
 
 static void begin(const char *tag) {
@@ -321,6 +328,128 @@ static int test_emergency_preserves_crash_sink(void) {
   return 0;
 }
 
+/* Rotation is serialised across the processes that share a log path, which
+ * needs a sidecar lock next to it. Reconfiguring drops the descriptor but the
+ * sidecar stays behind — it carries no state beyond the kernel lock. */
+static int test_rotation_creates_lock_sidecar(void) {
+  char sidecar[80];
+  char buf[512];
+
+  begin("Lock");
+  onion_log_set_max_bytes(512);
+  for (int i = 0; i < 60; i++) {
+    onion_log_write(ONION_LOG_ERROR, "lock-%02d-padding-padding-padding", i);
+  }
+
+  snprintf(sidecar, sizeof(sidecar), "%s.lock", g_path);
+  TEST_ASSERT_TRUE(file_size(sidecar) >= 0);
+
+  onion_log_configure("Lock", NULL);
+  onion_log_configure("Lock", g_path);
+  onion_log_write(ONION_LOG_ERROR, "after-reconfigure");
+
+  read_file(g_path, buf, sizeof(buf));
+  TEST_ASSERT_TRUE(strstr(buf, "after-reconfigure") != NULL);
+  end();
+  return 0;
+}
+
+/* Two payload processes append to the same path. A rotation done by one of
+ * them must not drop the other's bytes, and the surviving writer must be able
+ * to carry on against the live file afterwards. */
+static int test_rotation_survives_second_writer(void) {
+  static const char peer_record[] = "peer-record-from-other-process\n";
+  char rotated_path[80];
+  char buf[2048];
+
+  begin("Shared");
+  onion_log_set_max_bytes(512);
+
+  /* Stand in for the other process with its own descriptor on the same path. */
+  const int peer = open(g_path, O_WRONLY | O_CREAT | O_APPEND, 0777);
+  TEST_ASSERT_TRUE(peer >= 0);
+  TEST_ASSERT_EQ_INT((int)sizeof(peer_record) - 1,
+                     (int)write(peer, peer_record, sizeof(peer_record) - 1));
+
+  /* Write only until the first rotation happens, so the peer record is still
+   * within the retained generations. */
+  snprintf(rotated_path, sizeof(rotated_path), "%s.1", g_path);
+  for (int i = 0; i < 64 && file_size(rotated_path) < 0; i++) {
+    onion_log_write(ONION_LOG_ERROR, "own-%02d-padding-padding-padding", i);
+  }
+  TEST_ASSERT_TRUE(file_size(rotated_path) > 0);
+
+  read_file(rotated_path, buf, sizeof(buf));
+  TEST_ASSERT_TRUE(strstr(buf, peer_record) != NULL);
+
+  onion_log_write(ONION_LOG_ERROR, "after-rotation");
+  read_file(g_path, buf, sizeof(buf));
+  TEST_ASSERT_TRUE(strstr(buf, "after-rotation") != NULL);
+
+  close(peer);
+  end();
+  return 0;
+}
+
+/* The crash sink has no rotation, so an oversized file must be moved aside
+ * when a process configures it — otherwise /data fills up over time. */
+static int test_crash_sink_caps_oversized_file(void) {
+  char backup[80];
+  char buf[256];
+  static char filler[4096];
+
+  begin("CrashCap");
+
+  /* Stand in for crash files accumulated by earlier sessions. */
+  FILE *stale = fopen(g_crash_path, "w");
+  TEST_ASSERT_TRUE(stale != NULL);
+  memset(filler, 'c', sizeof(filler));
+  for (unsigned i = 0; i <= ONION_LOG_DEFAULT_CRASH_MAX_BYTES / sizeof(filler);
+       ++i) {
+    TEST_ASSERT_EQ_INT(sizeof(filler),
+                       fwrite(filler, 1, sizeof(filler), stale));
+  }
+  fclose(stale);
+  TEST_ASSERT_TRUE(file_size(g_crash_path) >
+                   (long)ONION_LOG_DEFAULT_CRASH_MAX_BYTES);
+
+  onion_log_configure_crash(g_crash_path);
+
+  /* The old contents moved aside; the live file starts fresh. */
+  snprintf(backup, sizeof(backup), "%s.1", g_crash_path);
+  TEST_ASSERT_TRUE(file_size(backup) >
+                   (long)ONION_LOG_DEFAULT_CRASH_MAX_BYTES);
+  TEST_ASSERT_EQ_INT(0, (int)file_size(g_crash_path));
+
+  onion_log_set_level(ONION_LOG_OFF);
+  onion_log_emergency("after-crash-cap");
+  read_file(g_crash_path, buf, sizeof(buf));
+  TEST_ASSERT_TRUE(strstr(buf, "after-crash-cap") != NULL);
+  TEST_ASSERT_TRUE(strstr(buf, "cccc") == NULL); /* old bytes are not mixed in */
+  end();
+  return 0;
+}
+
+/* A sink whose path cannot be opened must degrade, not crash: records fall back
+ * to klog/stdout and no file appears. This is the shape a process whose sandbox
+ * hides the path it was handed runs into — ShellUI pointing at /data inside the
+ * vsh sandbox is the live example. onion_log_configure() reports it on klog,
+ * which is the only channel left once the file sink is closed. */
+static int test_unopenable_sink_degrades(void) {
+  const char *bad = "/nonexistent-onion-dir-xyz/OnionHEN.log";
+
+  onion_log_set_level(ONION_LOG_TRACE);
+  onion_log_configure("NoSink", bad);
+  LOG_ERROR("record with no file sink"); /* must not crash */
+  onion_log_emergency("emergency with no file sink");
+
+  TEST_ASSERT_TRUE(file_size(bad) < 0); /* nothing was created */
+
+  onion_log_configure("OnionHEN", NULL);
+  onion_log_set_level(ONION_LOG_INFO);
+  return 0;
+}
+
 int test_platform_log_suite(void) {
   int failures = 0;
   failures += onion_test_run("log.file_sink", test_log_file_sink);
@@ -333,6 +462,10 @@ int test_platform_log_suite(void) {
   failures += onion_test_run("log.rotation_three_backups", test_rotation_keeps_three_backups);
   failures += onion_test_run("log.rotation_external_append",
                              test_rotation_observes_external_append);
+  failures += onion_test_run("log.rotation_lock_sidecar",
+                             test_rotation_creates_lock_sidecar);
+  failures += onion_test_run("log.rotation_second_writer",
+                             test_rotation_survives_second_writer);
   failures += onion_test_run("log.single_newline", test_single_trailing_newline);
   failures += onion_test_run("log.oversized_truncates", test_oversized_record_truncates);
   failures += onion_test_run("log.level_name_roundtrip", test_level_name_roundtrip);
@@ -340,5 +473,9 @@ int test_platform_log_suite(void) {
   failures += onion_test_run("log.emergency_bypasses_level", test_emergency_bypasses_level);
   failures += onion_test_run("log.emergency_preserves_crash_sink",
                              test_emergency_preserves_crash_sink);
+  failures += onion_test_run("log.crash_sink_caps_oversized",
+                             test_crash_sink_caps_oversized_file);
+  failures += onion_test_run("log.unopenable_sink_degrades",
+                             test_unopenable_sink_degrades);
   return failures;
 }

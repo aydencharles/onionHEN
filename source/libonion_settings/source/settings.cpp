@@ -332,6 +332,40 @@ const char *log_level_name(int v) {
   }
 }
 
+/*
+ * Accepts a raw byte count or a k/m suffixed one ("512k", "2m", "2097152").
+ * 0, negative, and unparseable all fall back to `def`; anything else is clamped
+ * by clamp_log_max_bytes().
+ */
+int parse_max_bytes(const char *s, int def) {
+  if (!s) {
+    return def;
+  }
+  char *end = nullptr;
+  const long long v = std::strtoll(s, &end, 10);
+  if (end == s) {
+    return def;
+  }
+  while (*end == ' ' || *end == '\t') {
+    ++end;
+  }
+  long long mult = 1;
+  if (*end == 'k' || *end == 'K') {
+    mult = 1024;
+    ++end;
+  } else if (*end == 'm' || *end == 'M') {
+    mult = 1024 * 1024;
+    ++end;
+  } else if (*end != '\0') {
+    return def; /* trailing junk */
+  }
+  /* Bound before multiplying so a huge literal cannot overflow. */
+  if (v > kLogMaxBytesMax || v < -kLogMaxBytesMax) {
+    return kLogMaxBytesMax;
+  }
+  return clamp_log_max_bytes(v * mult);
+}
+
 int parse_cheats_mirror(const char *s, int def) {
   if (streq_ci(s, "auto")) {
     return kCheatsMirrorAuto;
@@ -703,6 +737,8 @@ bool apply_parser(IniParser *parser, Settings *out) {
       out->startup_open_after_load);
   out->log_level =
       parse_log_level(ini_get(parser, "logging.level"), out->log_level);
+  out->log_max_bytes =
+      parse_max_bytes(ini_get(parser, "logging.max_bytes"), out->log_max_bytes);
   out->display_tids = parse_bool(
       ini_get(parser, "home_screen.show_title_ids"), out->display_tids);
   out->onionhen_game_opts =
@@ -847,6 +883,14 @@ std::string settings_serialize(const Settings &in) {
   b += "# Raise to debug when reproducing an issue for a bug report.\n";
   b += "# Release builds compile out trace, so trace behaves as debug.\n";
   b += "level=" + std::string(log_level_name(in.log_level)) + "\n";
+  b += "# max_bytes caps a single log file before it rotates, in bytes.\n";
+  b += "# A k or m suffix is accepted, e.g. 512k or 2m.\n";
+  b += "# Three backups are kept next to the live file, so the retained\n";
+  b += "# history is 4x this value (the default 786432 keeps 3 MiB).\n";
+  b += "# Range: 65536 .. 67108864 (256 KiB .. 64 MiB per file).\n";
+  b += "# Raise it before enabling debug or trace: at trace the default\n";
+  b += "# budget can fill in seconds and evict the startup records.\n";
+  b += "max_bytes=" + std::to_string(in.log_max_bytes) + "\n";
   b += "\n";
   b += "[home_screen]\n";
   b += "# show_title_ids displays app Title IDs on the PS5 home screen.\n";

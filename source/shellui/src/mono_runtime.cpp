@@ -118,18 +118,14 @@ uint64_t Get_Address_of_Method(MonoImage *Assembly_Image, const char *Name_Space
   MonoClass *klass = mono_class_from_name(Assembly_Image, Name_Space, Class_Name);
   if (!klass)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("Get_Address_of_Method: failed to open class \"%s\" in namespace \"%s\"", Class_Name, Name_Space);
-#endif
     return 0;
   }
 
   MonoMethod *Method = mono_class_get_method_from_name(klass, Method_Name, Param_Count);
   if (!Method)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("Get_Address_of_Method: failed to find method \"%s\" in class \"%s\"", Method_Name, Class_Name);
-#endif
     return 0;
   }
 
@@ -161,27 +157,21 @@ MonoObject *Get_Instance(MonoClass *klass, const char *Instance)
   MonoProperty *inst_prop = mono_class_get_property_from_name(klass, Instance);
   if (!inst_prop)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("Failed to find Instance property \"%s\" in Class \"%s\".", Instance, klass->name);
-#endif
     return nullptr;
   }
 
   MonoMethod *inst_get_method = mono_property_get_get_method(inst_prop);
   if (!inst_get_method)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("Failed to find get method for \"%s\" in Class \"%s\".", Instance, klass->name);
-#endif
     return nullptr;
   }
 
   MonoObject *inst = mono_runtime_invoke(inst_get_method, 0, 0, 0);
   if (!inst)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("Failed to find get Instance \"%s\" in Class \"%s\".", Instance, klass->name);
-#endif
     return nullptr;
   }
 
@@ -334,35 +324,27 @@ bool SetVersionString(const char *str)
   MonoAssembly *Assembly = mono_domain_assembly_open(Root_Domain, uilib_dll.c_str());
   if (!Assembly)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("SetVersionString: Failed to open assembly.");
-#endif
     return false;
   }
   MonoClass *SystemSoftwareVersionInfo = mono_class_from_name(mono_assembly_get_image(Assembly), uilib.c_str(), Sysinfo.c_str());
   if (!SystemSoftwareVersionInfo)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("SetVersionString: Failed to open class.");
-#endif
     return false;
   }
 
   MonoObject *SystemSoftwareVersionInfo_Instance = Get_Instance(SystemSoftwareVersionInfo, "Instance");
   if (!SystemSoftwareVersionInfo_Instance)
   {
-#if SHELL_DEBUG == 1
     LOG_ERROR("SetVersionString: Failed to open Instance.");
-#endif
     return false;
   }
 
   MonoMethod *Set_Method = mono_class_get_method_from_name(SystemSoftwareVersionInfo, display_info.c_str(), 1);
   if (Set_Method == nullptr)
   {
-#if SHELL_DEBUG == 1
     LOG_DEBUG("SetVersionString: Could not find set method.");
-#endif
     return false;
   }
 
@@ -374,9 +356,7 @@ bool SetVersionString(const char *str)
   {
     MonoString *exc_string = mono_object_to_string(exception, nullptr);
     const char *exc_chars = mono_string_to_utf8(exc_string);
-#if SHELL_DEBUG == 1
     LOG_DEBUG("Exception: %s", exc_chars);
-#endif
     mono_free((void *)exc_chars);
     return false;
   }

@@ -190,6 +190,8 @@
     "sc.l2_r3": "Tenere premuti L2 + R3",
     "log.level": "Livello dei registri",
     "log.level.sub": "Quanto dettaglio registrare; i livelli più alti danno più diagnostica",
+    "log.max_bytes": "Dimensione massima del registro",
+    "log.max_bytes.sub": "Limite per un singolo file di registro; vengono conservate 3 copie, quindi il totale è 4 volte questo valore",
     "log.off": "Disattivato",
     "log.error": "Solo errori",
     "log.warn": "Avvisi ed errori",

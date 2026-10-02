@@ -190,6 +190,8 @@
     "sc.l2_r3": "Manter L2 + R3",
     "log.level": "Nível de registro",
     "log.level.sub": "Controlar o detalhe dos registros do OnionHEN; quanto mais alto, mais diagnóstico",
+    "log.max_bytes": "Tamanho máximo do registo",
+    "log.max_bytes.sub": "Limite de um ficheiro de registo; são mantidas 3 cópias, pelo que o total é 4 vezes este valor",
     "log.off": "Desligado",
     "log.error": "Somente erros",
     "log.warn": "Avisos e erros",

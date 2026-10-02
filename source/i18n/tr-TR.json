@@ -190,6 +190,8 @@
     "sc.l2_r3": "L2 + R3 basılı tut",
     "log.level": "Günlük ayrıntı düzeyi",
     "log.level.sub": "OnionHEN günlüğünün ayrıntısını ayarlayın; yüksek düzeyler daha fazla tanı bilgisi verir",
+    "log.max_bytes": "Günlük dosyası boyut sınırı",
+    "log.max_bytes.sub": "Tek bir günlük dosyası için üst sınır; 3 yedek saklanır, bu yüzden toplam bunun 4 katıdır",
     "log.off": "Kapalı",
     "log.error": "Yalnızca hatalar",
     "log.warn": "Uyarılar ve hatalar",

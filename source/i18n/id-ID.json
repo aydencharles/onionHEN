@@ -190,6 +190,8 @@
     "sc.l2_r3": "Tahan L2 + R3",
     "log.level": "Tingkat keluaran log",
     "log.level.sub": "Atur detail log OnionHEN; tingkat lebih tinggi berisi lebih banyak diagnostik",
+    "log.max_bytes": "Batas ukuran file log",
+    "log.max_bytes.sub": "Batas untuk satu file log; 3 cadangan disimpan, jadi totalnya 4 kali nilai ini",
     "log.off": "Mati",
     "log.error": "Hanya kesalahan",
     "log.warn": "Peringatan dan kesalahan",

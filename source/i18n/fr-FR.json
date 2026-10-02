@@ -190,6 +190,8 @@
     "sc.l2_r3": "Maintenir L2 + R3",
     "log.level": "Niveau des journaux",
     "log.level.sub": "Régler le détail des journaux OnionHEN ; plus le niveau est élevé, plus le diagnostic est riche",
+    "log.max_bytes": "Taille maximale du journal",
+    "log.max_bytes.sub": "Limite d'un fichier journal ; 3 sauvegardes sont conservées, soit 4 fois cette valeur au total",
     "log.off": "Désactivé",
     "log.error": "Erreurs uniquement",
     "log.warn": "Avertissements et erreurs",

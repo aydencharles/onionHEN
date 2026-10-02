@@ -190,6 +190,8 @@
     "sc.l2_r3": "Țineți L2 + R3",
     "log.level": "Nivel jurnal",
     "log.level.sub": "Controlați detalierea jurnalului OnionHEN; nivelurile mai mari includ mai multă diagnosticare",
+    "log.max_bytes": "Limită dimensiune jurnal",
+    "log.max_bytes.sub": "Limită pentru un fișier jurnal; se păstrează 3 copii, deci totalul este de 4 ori această valoare",
     "log.off": "Oprit",
     "log.error": "Doar erori",
     "log.warn": "Avertismente și erori",

@@ -190,6 +190,8 @@
     "sc.l2_r3": "L2 + R3 길게 누르기",
     "log.level": "로그 출력 수준",
     "log.level.sub": "OnionHEN 로그의 상세 정도를 정합니다. 높을수록 진단 정보가 많아집니다",
+    "log.max_bytes": "로그 파일 크기 제한",
+    "log.max_bytes.sub": "로그 파일 하나의 상한입니다. 백업을 3개 보관하므로 전체는 이 값의 4배입니다",
     "log.off": "끔",
     "log.error": "오류만",
     "log.warn": "경고와 오류",

@@ -899,6 +899,17 @@ void append_toolbox_debug_group(ps5ui::Group& g) {
            }
          },
          toolbox_i18n::tr("log.level.sub"), toolbox_val("id_log_level", "3"))
+      .list("id_log_max_bytes", toolbox_i18n::tr("log.max_bytes"),
+            [](ps5ui::ListBuilder& L) {
+              /* Sizes are unit-only on purpose: no locale needs them
+                 translated, so the list stays identical in every language. */
+              L.item("id_log_max_bytes_256k", "256 KiB", "262144")
+                  .item("id_log_max_bytes_768k", "768 KiB", "786432")
+                  .item("id_log_max_bytes_2m", "2 MiB", "2097152")
+                  .item("id_log_max_bytes_8m", "8 MiB", "8388608");
+            },
+            toolbox_i18n::tr("log.max_bytes.sub"),
+            toolbox_val("id_log_max_bytes", "786432"))
       .toggle("id_app_jailbreak_enabled",
               toolbox_i18n::tr("app_jailbreak.enabled"),
               toolbox_on("id_app_jailbreak_enabled"),

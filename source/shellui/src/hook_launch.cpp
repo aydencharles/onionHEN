@@ -26,14 +26,10 @@ int LaunchApp(MonoString* titleId, uint64_t* args, int argsSize, LaunchAppParam 
 
 #if 1
    if(!if_exists(ONION_SYSTEM_TMP_PATCH_PLUGIN)) {
-      #if SHELL_DEBUG == 1
       LOG_DEBUG("patch payload not running .. returning with orig");
-      #endif
 	  unsigned int ret = LaunchApp_orig(titleId, args, argsSize, param);
       if (ret < 0) {
-         #if SHELL_DEBUG == 1
          notify("notify.app.launch_failed", ret);
-         #endif
          return ret;
       }
 
@@ -42,24 +38,18 @@ int LaunchApp(MonoString* titleId, uint64_t* args, int argsSize, LaunchAppParam 
 
    }
 #endif
-#if SHELL_DEBUG == 1
   LOG_DEBUG("LaunchApp called with titleId: %s, argsSize: %d, param->size: %d", mono_string_to_utf8(titleId), argsSize, param->size);
-#endif
   notify("notify.app.launching", mono_string_to_utf8(titleId));
 
   unsigned int ret = LaunchApp_orig(titleId, args, argsSize, param);
   if (ret < 0) {
-    #if SHELL_DEBUG == 1
     notify("notify.app.launch_failed", ret);
-    #endif
     return ret;
   }
 
   app_launched = true;
 
- #if SHELL_DEBUG == 1
   notify("notify.app.launch_returned", ret);
-  #endif
 
   save_appid(ret, ONION_SYSTEM_TMP_APP_LAUNCHED);
   return ret;
@@ -82,17 +72,13 @@ int sceRegMgrGetInt_hook(long regid, int* out_val){
     if (out_val) {
        *out_val = 1;
     }
-#if SHELL_DEBUG==1
     LOG_DEBUG("RegMGR lookup called for SHELLUI_disp_titleid, spoofing out_var to 1");
-#endif
     return 0;
   }
 
   int ret = 0;
   if(__sys_regmgr_call(2, regid, &ret, out_val, SCE_REGMGR_INT_SIZE)){
-#if SHELL_DEBUG==1
     LOG_ERROR("sceRegMgrGetInt_hook: Failed to get regid 0x%lx, ret %d", regid, ret);
-#endif
     ret = SCE_REGMGR_ERROR_PRM_REGID;
   }
 
@@ -125,14 +111,12 @@ void createJson_hook(MonoObject* inst, MonoObject* array, MonoString* id, MonoSt
 
     std::string id_str = Mono_to_String(id);
 
-#if SHELL_DEBUG==1
     LOG_DEBUG("createJson_hook: %p id: %s, label: %s, actionUrl: %s, actionId: %s, messageId: %s", 
                static_cast<void *>(inst), id_str.c_str(), 
                Mono_to_String(label).c_str(), 
                Mono_to_String(actionUrl).c_str(), 
                Mono_to_String(actionId).c_str(), 
                Mono_to_String(messageId).c_str());
-#endif
 
     if(!g_settings.onionhen_game_opts) {
         createJson(inst, array, id, label, actionUrl, actionId, messageId, subMenu, enable);
@@ -143,10 +127,8 @@ void createJson_hook(MonoObject* inst, MonoObject* array, MonoString* id, MonoSt
     std::string extracted_tid = extractTIDFromURI(Mono_to_String(actionUrl));
     if (!extracted_tid.empty() && extracted_tid != g_ui.current_menu_tid) {
         g_ui.current_menu_tid = extracted_tid;
-#if SHELL_DEBUG==1
         //notify("Current menu titleId: %s", g_ui.current_menu_tid.c_str());
         LOG_DEBUG("Updated menu titleId: %s", g_ui.current_menu_tid.c_str());
-#endif
     }
     if(id_str == "MENU_ID_CHECK_PATCH"){  
       //createJson_hook: 8815fec90 id: MENU_ID_CHECK_PATCH, label: , actionUrl: pspatchcheck:check-for-update?titleid=CUSA01127, actionId: , messageId: msgid_check_update

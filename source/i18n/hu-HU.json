@@ -190,6 +190,8 @@
     "sc.l2_r3": "L2 + R3 nyomva tartása",
     "log.level": "Napló kimeneti szintje",
     "log.level.sub": "Az OnionHEN napló részletességének szabályozása; a magasabb szintek több diagnosztikát tartalmaznak",
+    "log.max_bytes": "Naplófájl mérethatára",
+    "log.max_bytes.sub": "Egy naplófájl felső határa; 3 biztonsági másolat marad meg, így a teljes méret ennek négyszerese",
     "log.off": "Ki",
     "log.error": "Csak hibák",
     "log.warn": "Figyelmeztetések és hibák",

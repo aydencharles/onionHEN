@@ -30,38 +30,28 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
     std::string uri_string = Mono_to_String(uri);
     std::string titleId = titleIdForBootAction ? Mono_to_String(titleIdForBootAction) : "";
     
-#if SHELL_DEBUG==1
     LOG_DEBUG("Boot: %s (%s), OPT %i", 
                 uri_string.c_str(), 
                 !titleId.empty() ? titleId.c_str() : "NULL", 
                 opt);
-#endif
   
     if(uri_string == "OnionHEN?Cheats") {
-#if SHELL_DEBUG==1
       LOG_DEBUG("cheats_shortcut URI detected");
-#endif
       g_ui.cheats_shortcut_activated = true;
       return true; // Signal to redirect
     }
     else if(uri_string == "OnionHEN?Cheats_not_open") {
-#if SHELL_DEBUG==1
       LOG_DEBUG("cheats_shortcut (not open) URI detected");
-#endif
       g_ui.cheats_shortcut_activated_not_open = true;
       return true;
     }
     else if (uri_string == "OnionHEN?DL_UPDATE") {
-#if SHELL_DEBUG==1
         LOG_DEBUG("DL_UPDATE URI detected");
-#endif
         
         return true; // Signal to redirect
     }
     else if (is_home_top_nav_uri(uri_string)) {
-#if SHELL_DEBUG==1
       LOG_DEBUG("HomeUI top-nav OnionHEN URI detected");
-#endif
       return true;
     }
 
@@ -82,9 +72,7 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
     const std::string original_uri = Mono_to_String(uri);
     const std::string rewritten = shellui_rewrite_debug_settings_route(original_uri);
     if (rewritten != original_uri) {
-#if SHELL_DEBUG == 1
       LOG_DEBUG("Boot: rewrite debug_settings → old: %s", rewritten.c_str());
-#endif
       return boot_orig(mono_string_new(Root_Domain, rewritten.c_str()), opt,
                        titleIdForBootAction);
     }
@@ -97,9 +85,7 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
       return boot_orig_2 ? boot_orig_2(uri, opt) : false;
 
     const std::string original_uri = Mono_to_String(uri);
-  #if SHELL_DEBUG==1
     LOG_DEBUG("uri_boot_hook_2: %s, opt: %i", original_uri.c_str(), opt);
-  #endif
     if(handle_uri_boot_common(uri, opt, nullptr)) {
       // Redirect to debug settings (no titleId parameter for older fw).
       return boot_orig_2(
@@ -110,9 +96,7 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
 
     const std::string rewritten = shellui_rewrite_debug_settings_route(original_uri);
     if (rewritten != original_uri) {
-#if SHELL_DEBUG == 1
       LOG_DEBUG("Boot2: rewrite debug_settings → old: %s", rewritten.c_str());
-#endif
       return boot_orig_2(mono_string_new(Root_Domain, rewritten.c_str()), opt);
     }
 
@@ -165,9 +149,7 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
           cheats_pressed = true;
           cheats_press_start = std::chrono::steady_clock::now();
           cheats_long_press_triggered = false;
-          #if SHELL_DEBUG == 1
           LOG_DEBUG("Cheats buttons pressed - starting timer");
-          #endif
         } else {
           auto current_time = std::chrono::steady_clock::now();
           auto hold_duration = std::chrono::duration_cast < std::chrono::milliseconds > (
@@ -178,26 +160,21 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
           static auto last_log_time = std::chrono::steady_clock::now();
           if (std::chrono::duration_cast < std::chrono::milliseconds > (
               current_time - last_log_time) >= std::chrono::milliseconds(500)) {
-              #if SHELL_DEBUG == 1
               LOG_DEBUG("Cheats buttons held for %lld ms (need %lld ms)",
               hold_duration.count(),
               LONG_PRESS_DURATION.count());
-              #endif
             last_log_time = current_time;
           }
   
           if (hold_duration >= LONG_PRESS_DURATION && !cheats_long_press_triggered) {
-            #if SHELL_DEBUG == 1
             LOG_DEBUG("Cheats long press threshold reached! Duration: %lld ms",
               hold_duration.count());
-            #endif
             cheas_sc_activated = true;
             cheats_long_press_triggered = true;
           }
         }
       } else {
         if (cheats_pressed) {
-          #if SHELL_DEBUG == 1
           auto current_time = std::chrono::steady_clock::now();
           auto hold_duration = std::chrono::duration_cast < std::chrono::milliseconds > (
             current_time - cheats_press_start
@@ -205,16 +182,13 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
           LOG_DEBUG("Cheats buttons released after %lld ms (needed %lld ms)",
             hold_duration.count(),
             LONG_PRESS_DURATION.count());
-          #endif
         }
         cheats_pressed = false;
         cheats_long_press_triggered = false;
       }
   
       if (cheas_sc_activated) {
-#if SHELL_DEBUG == 1
         LOG_DEBUG("Cheats Shortcut Activated");
-#endif
         GoToURI("OnionHEN?Cheats");
         result.Buttons = None; // Clear the Select button to prevent triggering other actions
         cheas_sc_activated = false; // Reset the flag
@@ -255,19 +229,15 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
       }
   
       if (toolbox_sc_activated) {
-#if SHELL_DEBUG == 1
         LOG_DEBUG("Toolbox Shortcut Activated");
-#endif
         GoToURI(shellui_debug_settings_toolbox_uri());
         result.Buttons = None; // Clear the Select button to prevent triggering other actions
       }
     }
   
-#if SHELL_DEBUG==1
     if (result.Buttons & Option) {
       LOG_DEBUG("Option button pressed");
     }
-#endif
   
     return result;
   }

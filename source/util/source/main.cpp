@@ -106,6 +106,9 @@ int main(void) {
     sceUserServiceInitialize(NULL);
     onion_log_configure(
         "OnionHEN utils", "/data/OnionHEN/OnionHEN_util_daemon.log");
+    /* The faulthandler path writes here; without it a util crash would only
+     * reach klog and the util log, never the file users are asked to attach. */
+    onion_log_configure_crash("/data/OnionHEN/OnionHEN_crash.log");
     /* Real linked kernel export (not a dlsym function-pointer variable). */
     onion_notify_set_send(reinterpret_cast<onion_notify_send_fn>(
         sceKernelSendNotificationRequest));

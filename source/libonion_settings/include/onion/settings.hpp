@@ -99,6 +99,45 @@ inline constexpr int kLogLevelInfo = 3;
 inline constexpr int kLogLevelDebug = 4;
 inline constexpr int kLogLevelTrace = 5;
 
+/*
+ * Default runtime verbosity. Mirrors ONION_LOG_DEFAULT_LEVEL: a debug build
+ * defaults to the noisiest level it compiles in, so a payload built for log
+ * collection is verbose without anyone editing config.ini first — the reporter
+ * is usually not the person who built it. Release stays at info so a normal
+ * payload is not chatty.
+ *
+ * The two are kept in step by a static_assert in log_settings.hpp; an explicit
+ * `level=` in config.ini still wins over this.
+ */
+#ifdef NDEBUG
+inline constexpr int kLogLevelDefault = kLogLevelInfo;
+#else
+inline constexpr int kLogLevelDefault = kLogLevelTrace;
+#endif
+
+/*
+ * Rotation threshold for the file sink, in bytes, per file. The logger keeps
+ * the live file plus three backups, so the retained history is 4x this value —
+ * that budget, not the per-file size, is what a user is really choosing.
+ *
+ * Mirrors ONION_LOG_DEFAULT_MAX_BYTES; log_settings.hpp static_asserts that the
+ * default still lines up with it.
+ */
+inline constexpr int kLogMaxBytesMin = 64 * 1024;         /* 256 KiB total */
+inline constexpr int kLogMaxBytesMax = 64 * 1024 * 1024;  /* 256 MiB total */
+inline constexpr int kLogMaxBytesDefault = 768 * 1024;    /* 3 MiB total */
+
+/** Clamp a requested per-file threshold. 0 or negative means "use default". */
+inline int clamp_log_max_bytes(long long bytes) {
+  if (bytes <= 0)
+    return kLogMaxBytesDefault;
+  if (bytes < kLogMaxBytesMin)
+    return kLogMaxBytesMin;
+  if (bytes > kLogMaxBytesMax)
+    return kLogMaxBytesMax;
+  return static_cast<int>(bytes);
+}
+
 inline constexpr int kOverlayAlignLeft = 0;
 inline constexpr int kOverlayAlignCenter = 1;
 inline constexpr int kOverlayAlignRight = 2;
@@ -301,7 +340,12 @@ struct Settings {
   // Runtime log threshold, matching onion_log_level (1=error .. 5=trace).
   // Lets a user raise verbosity for a bug report without a debug payload;
   // levels stripped at compile time cannot be re-enabled this way.
-  int log_level = kLogLevelInfo;
+  // Defaults to trace in debug builds and info in release — see
+  // kLogLevelDefault.
+  int log_level = kLogLevelDefault;
+  // Per-file rotation threshold in bytes. Raising it is what keeps a TRACE run
+  // from evicting its own startup records. Clamped by clamp_log_max_bytes().
+  int log_max_bytes = kLogMaxBytesDefault;
 
   // Meta
   int schema_version = kSettingsSchemaVersion;

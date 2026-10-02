@@ -190,6 +190,8 @@
     "sc.l2_r3": "L2 + R3 gehalten",
     "log.level": "Protokollstufe",
     "log.level.sub": "Wie ausführlich OnionHEN protokolliert; höhere Stufen liefern mehr Diagnosedaten",
+    "log.max_bytes": "Maximale Logdateigröße",
+    "log.max_bytes.sub": "Obergrenze für eine Logdatei; es werden 3 Sicherungen behalten, insgesamt also das Vierfache",
     "log.off": "Aus",
     "log.error": "Nur Fehler",
     "log.warn": "Warnungen und Fehler",

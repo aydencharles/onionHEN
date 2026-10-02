@@ -190,6 +190,8 @@
     "sc.l2_r3": "Przytrzymaj L2 + R3",
     "log.level": "Poziom dziennika",
     "log.level.sub": "Szczegółowość dzienników OnionHEN; wyższy poziom to więcej diagnostyki",
+    "log.max_bytes": "Limit rozmiaru dziennika",
+    "log.max_bytes.sub": "Limit dla jednego pliku dziennika; zachowywane są 3 kopie, więc całość to 4-krotność tej wartości",
     "log.off": "Wyłączone",
     "log.error": "Tylko błędy",
     "log.warn": "Ostrzeżenia i błędy",

@@ -190,6 +190,8 @@
     "sc.l2_r3": "Giữ L2 + R3",
     "log.level": "Mức nhật ký",
     "log.level.sub": "Điều khiển chi tiết nhật ký OnionHEN; mức cao hơn có nhiều thông tin chẩn đoán hơn",
+    "log.max_bytes": "Giới hạn kích thước tệp nhật ký",
+    "log.max_bytes.sub": "Giới hạn cho một tệp nhật ký; giữ lại 3 bản sao lưu nên tổng dung lượng gấp 4 lần giá trị này",
     "log.off": "Tắt",
     "log.error": "Chỉ lỗi",
     "log.warn": "Cảnh báo và lỗi",

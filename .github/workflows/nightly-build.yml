@@ -1,0 +1,157 @@
+# Build OnionHEN on every push to dev and publish a rolling nightly-build.
+name: nightly-build
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  nightly-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PS5_PAYLOAD_SDK: ${{ github.workspace }}/.ps5-payload-sdk
+      LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install build packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            clang-18 \
+            cmake \
+            curl \
+            file \
+            git \
+            libssl-dev \
+            librsvg2-bin \
+            lld-18 \
+            llvm-18 \
+            ninja-build \
+            pkg-config \
+            python3 \
+            python3-pyelftools \
+            unzip \
+            wget \
+            xz-utils
+          sudo ln -sf /usr/lib/llvm-18/bin/llvm-config /usr/local/bin/llvm-config
+
+      - name: Resolve PS5 Payload SDK release
+        id: sdk
+        run: |
+          set -euo pipefail
+          tag="$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/ps5-payload-dev/sdk/releases/latest \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Cache PS5 Payload SDK
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PS5_PAYLOAD_SDK }}
+          key: ps5-payload-sdk-${{ runner.os }}-${{ steps.sdk.outputs.tag }}
+
+      - name: Install PS5 Payload SDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          curl -fsSL --retry 3 -o "${tmp}/sdk.zip" \
+            "https://github.com/ps5-payload-dev/sdk/releases/download/${{ steps.sdk.outputs.tag }}/ps5-payload-sdk.zip"
+          unzip -q "${tmp}/sdk.zip" -d "${tmp}/out"
+          root="$(find "${tmp}/out" -maxdepth 2 -type d -name 'ps5-payload-sdk' | head -1 || true)"
+          if [[ -z "${root}" && -x "${tmp}/out/bin/prospero-cmake" ]]; then
+            root="${tmp}/out"
+          fi
+          [[ -n "${root}" && -x "${root}/bin/prospero-cmake" ]] || {
+            echo "unexpected SDK zip layout" >&2
+            find "${tmp}/out" | head
+            exit 1
+          }
+          rm -rf "${PS5_PAYLOAD_SDK}"
+          mkdir -p "$(dirname "${PS5_PAYLOAD_SDK}")"
+          cp -a "${root}" "${PS5_PAYLOAD_SDK}"
+          rm -rf "${tmp}"
+          test -x "${PS5_PAYLOAD_SDK}/bin/prospero-cmake"
+
+      - name: Cache kstuff.elf
+        uses: actions/cache@v4
+        with:
+          path: .cache/dependencies
+          key: kstuff-${{ hashFiles('scripts/sync_dependencies.sh') }}
+
+      - name: Build OnionHEN
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:${PS5_PAYLOAD_SDK}/bin:${PATH}"
+          export LLVM_CONFIG="${LLVM_CONFIG}"
+          export PS5_PAYLOAD_SDK="${PS5_PAYLOAD_SDK}"
+          ./scripts/build.sh --release --jobs "$(nproc)"
+
+      - name: Stage nightly-build
+        run: |
+          set -euo pipefail
+          test -f build/bin/OnionHEN.elf
+          rm -rf dist
+          mkdir -p dist
+          cp -f build/bin/OnionHEN.elf dist/OnionHEN.elf
+          {
+            echo "name=nightly-build"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "commit=${GITHUB_SHA}"
+            echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "build_type=Release"
+          } > dist/BUILD_INFO.txt
+          (cd dist && sha256sum OnionHEN.elf BUILD_INFO.txt > SHA256SUMS)
+
+      - name: Upload nightly-build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish rolling nightly-build release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ github.token }}
+          tag: nightly
+          name: nightly-build
+          commit: ${{ github.sha }}
+          allowUpdates: true
+          replacesArtifacts: true
+          removeArtifacts: true
+          prerelease: true
+          makeLatest: false
+          artifacts: dist/OnionHEN.elf,dist/BUILD_INFO.txt,dist/SHA256SUMS
+          body: |
+            Rolling **nightly-build** from `dev`.
+
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Build type: Release
+
+            Download `OnionHEN.elf`. This is not a tagged stable release.

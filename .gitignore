@@ -44,6 +44,7 @@ source/aerolib.csv
 
 # Machine-local helpers (firmware dump verifiers, etc.)
 /.local/
+/.workbuddy-ai/
 
 # Local design notes (not for version control)
 /PLUGIN_ROADMAP.md

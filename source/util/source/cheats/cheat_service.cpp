@@ -218,6 +218,7 @@ int CheatService::writeListJson(
   cJSON *groups = nullptr;
   if (!root || !cJSON_AddStringToObject(root, "mode", mode_name(metadata.mode)) ||
       !cJSON_AddStringToObject(root, "sessionId", metadata.session_id.c_str()) ||
+      !cJSON_AddStringToObject(root, "version", metadata.version.c_str()) ||
       !cJSON_AddBoolToObject(root, "canToggle", metadata.can_toggle) ||
       !cJSON_AddStringToObject(root, "name",
                                files.empty() ? "" : files.front()->file.name) ||
@@ -336,17 +337,25 @@ int CheatService::exportList(const CheatRequest &request,
     }
     const std::vector<CheatSourceDescriptor> sources =
         CheatRepository::resolveBrowse(request.game);
+    if (sources.empty()) {
+      LOG_INFO("[cheats] no cheat file for %s version %s",
+               request.game.title_id.c_str(), request.game.version.c_str());
+      return -1;
+    }
     std::vector<std::unique_ptr<LoadedCheatFile>> files;
     if (load_sources(sources, files) < 0) {
       return -1;
     }
-    return writeListJson({CheatViewMode::Browse, {}, false}, files, out_path);
+    return writeListJson(
+        {CheatViewMode::Browse, {}, false, request.game.version}, files,
+        out_path);
   }
   if (ensureRuntimeLocked(request) < 0) {
     return -1;
   }
-  return writeListJson({CheatViewMode::Runtime, runtime_->session_id, true},
-                       runtime_->files, out_path);
+  return writeListJson(
+      {CheatViewMode::Runtime, runtime_->session_id, true, request.game.version},
+      runtime_->files, out_path);
 }
 
 int CheatService::toggle(const std::string &session_id,

@@ -57,6 +57,7 @@ struct CheatListMetadata {
   CheatViewMode mode = CheatViewMode::Browse;
   std::string session_id;
   bool can_toggle = false;
+  std::string version;
 };
 
 } // namespace onion::cheats

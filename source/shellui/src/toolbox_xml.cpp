@@ -518,21 +518,6 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       show_while_not_open ? not_open_tid : running_tid;
   IPC_Client& client = IPC_Client::getInstance(true);
 
-  std::string game_ver;
-  const bool have_version = client.GameVerFromTid(target_tid, game_ver);
-  const std::string display_ver =
-      have_version ? game_ver : toolbox_i18n::tr("cheats.ver_unknown");
-
-  ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
-                                      target_tid.c_str(),
-                                      display_ver.c_str()));
-
-  if (!g_ui.is_game_open && show_while_not_open) {
-    page.label("id_cheat_disclaimer",
-               toolbox_i18n::format("cheats.not_running_fmt", target_tid.c_str()),
-               ps5ui::Style::Center);
-  }
-
   std::string cheat_path;
   onion_bigapp_process_t process{};
   int process_result = -1;
@@ -557,26 +542,38 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       (process_result == 0 || process_result == -2);
   const std::string mode = runtime_request ? "runtime" : "browse";
   const int cheat_pid = runtime_request ? process.pid : 0;
-  if (!client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,
-                            runtime_request ? process.appid : 0,
-                            runtime_request ? process.process_name : "",
-                            runtime_request ? process.session_generation : 0)) {
-    page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
-               ps5ui::Style::Center);
-    new_xml = page.build();
-    return;
+  std::string json_string;
+  if (client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,
+                           runtime_request ? process.appid : 0,
+                           runtime_request ? process.process_name : "",
+                           runtime_request ? process.session_generation : 0)) {
+    json_string = read_file_to_string(cheat_path.c_str());
+    unlink(cheat_path.c_str());
   }
-
-  const std::string json_string = read_file_to_string(cheat_path.c_str());
-  if (json_string.empty()) {
-    new_xml = page.build();
-    return;
-  }
-  unlink(cheat_path.c_str());
 
   onion_cjson::Root res_json(json_string);
-  if (!res_json) {
+  std::string display_ver = toolbox_i18n::tr("cheats.ver_unknown");
+  if (res_json) {
+    const std::string version =
+        onion_cjson::string_item(res_json.get(), "version", "");
+    if (!version.empty()) {
+      display_ver = version;
+    }
+  } else if (!json_string.empty()) {
     LOG_ERROR("Failed to parse json from cheat response!");
+  }
+
+  ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
+                                                 target_tid.c_str(),
+                                                 display_ver.c_str()));
+  if (!g_ui.is_game_open && show_while_not_open) {
+    page.label("id_cheat_disclaimer",
+               toolbox_i18n::format("cheats.not_running_fmt", target_tid.c_str()),
+               ps5ui::Style::Center);
+  }
+  if (!res_json) {
+    page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
+               ps5ui::Style::Center);
     new_xml = page.build();
     return;
   }

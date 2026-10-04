@@ -142,14 +142,16 @@ int IPC_Client::send_frame_unlocked(const IPCMessage &msg) {
   return ret;
 }
 
-int IPC_Client::recv_frame_unlocked(IPCMessage &msg) {
+int IPC_Client::recv_frame_unlocked(IPCMessage &msg, int recv_timeout_ms) {
   bzero(msg.msg, sizeof(msg.msg));
   if (socket_fd_ < 0) {
     return -1;
   }
 
   struct timeval tv;
-  const int recv_timeout_ms = recv_timeout_ms_.load(std::memory_order_relaxed);
+  if (recv_timeout_ms < 0) {
+    recv_timeout_ms = recv_timeout_ms_.load(std::memory_order_relaxed);
+  }
   tv.tv_sec = recv_timeout_ms / 1000;
   tv.tv_usec = (recv_timeout_ms % 1000) * 1000;
   if (setsockopt(socket_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
@@ -162,18 +164,22 @@ int IPC_Client::recv_frame_unlocked(IPCMessage &msg) {
       socket_fd_, &msg, static_cast<int32_t>(sizeof(msg)));
   if (ret < 0) {
     LOG_ERROR("recv failed: %s", strerror(errno));
+    /* Drop the connection. The handler may still reply after SO_RCVTIMEO. */
+    IPCCloseConnection();
     return ret;
   }
   if (!onion::ipc_frame_is_complete(ret)) {
     LOG_DEBUG("short IPC frame %d (want %zu)", ret, sizeof(msg));
+    IPCCloseConnection();
     return -1;
   }
   onion::ipc_message_force_nul(msg);
   return ret;
 }
 
-int IPC_Client::IPCReceiveData(IPCMessage &msg, std::string &ipc_msg) {
-  const int ret = recv_frame_unlocked(msg);
+int IPC_Client::IPCReceiveData(IPCMessage &msg, std::string &ipc_msg,
+                               int recv_timeout_ms) {
+  const int ret = recv_frame_unlocked(msg, recv_timeout_ms);
   if (ret < 0) {
     return ret;
   }
@@ -221,7 +227,7 @@ int IPC_Client::IPCCloseConnection() {
 }
 
 bool IPC_Client::IPCSendCommand(DaemonCommands cmd, std::string &ipc_msg1,
-                                std::string ipc_msg2) {
+                                std::string ipc_msg2, int recv_timeout_ms) {
   std::lock_guard<std::mutex> lock(mu_);
   std::string json;
 
@@ -268,7 +274,8 @@ bool IPC_Client::IPCSendCommand(DaemonCommands cmd, std::string &ipc_msg1,
     return true;
   }
 
-  IPC_Ret error = static_cast<IPC_Ret>(IPCReceiveData(msg, ipc_msg1));
+  IPC_Ret error =
+      static_cast<IPC_Ret>(IPCReceiveData(msg, ipc_msg1, recv_timeout_ms));
   if (error == IPC_Ret::NO_ERROR) {
     LOG_ERROR("[Daemon] Daemon returned NO ERROR");
     return true;
@@ -419,7 +426,12 @@ bool IPC_Client::GetGameCheats(const std::string &tid, std::string &cheats,
                             std::to_string(generation).c_str());
   }
   std::string json = json_object_str(request);
-  if (!IPCSendCommand(BREW_UTIL_GET_GAME_CHEAT, cheats, json)) {
+  /* This runs on the ShellUI manifest thread. Two 25 s waits there get
+   * SceShellUI killed on 4.03. One short exchange is enough for a directory
+   * scan; a stuck param.json read must not hold the UI thread. */
+  constexpr int kCheatListTimeoutMs = 5000;
+  if (!IPCSendCommand(BREW_UTIL_GET_GAME_CHEAT, cheats, json,
+                      kCheatListTimeoutMs)) {
     LOG_ERROR("Failed to get cheats for %s", tid.c_str());
     return false;
   }

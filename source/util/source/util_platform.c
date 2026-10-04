@@ -6,6 +6,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -220,7 +221,19 @@ static int extract_sfo_string(const unsigned char *buffer, size_t buffer_size,
   return -1;
 }
 
-int util_resolve_game_version(const char *title_id, char *out, size_t out_size) {
+static int read_regular_capped(const char *path, char **buf, size_t *buf_size,
+                               size_t max_size) {
+  struct stat st;
+
+  if (stat(path, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size <= 0 ||
+      (max_size > 0 && (size_t)st.st_size > max_size)) {
+    return -1;
+  }
+  return util_file_read_alloc(path, buf, buf_size, max_size);
+}
+
+static int resolve_game_version_body(const char *title_id, char *out,
+                                    size_t out_size) {
   char path[256];
   char *buf = NULL;
   size_t buf_size = 0;
@@ -250,7 +263,7 @@ int util_resolve_game_version(const char *title_id, char *out, size_t out_size) 
                                  "titleVersion", "version", "APP_VER"};
     for (i = 0; i < sizeof(ps5_json_paths) / sizeof(ps5_json_paths[0]); ++i) {
       snprintf(path, sizeof(path), ps5_json_paths[i], title_id);
-      if (util_file_read_alloc(path, &buf, &buf_size, 256 * 1024) < 0) {
+      if (read_regular_capped(path, &buf, &buf_size, 256 * 1024) < 0) {
         continue;
       }
       if (extract_version_from_json(buf, buf_size, keys,
@@ -267,7 +280,7 @@ int util_resolve_game_version(const char *title_id, char *out, size_t out_size) 
       char ver[32] = {0};
       char app_ver[32] = {0};
       snprintf(path, sizeof(path), ps4_sfo_paths[i], title_id);
-      if (util_file_read_alloc(path, &buf, &buf_size, 256 * 1024) < 0) {
+      if (read_regular_capped(path, &buf, &buf_size, 256 * 1024) < 0) {
         continue;
       }
       extract_sfo_string((const unsigned char *)buf, buf_size, "VERSION", ver,
@@ -295,6 +308,23 @@ int util_resolve_game_version(const char *title_id, char *out, size_t out_size) 
   }
   (void)file_exists;
   return -1;
+}
+
+int util_resolve_game_version(const char *title_id, char *out, size_t out_size) {
+  /* One lookup at a time. A param.json open that blocks in the kernel must
+   * not stack more blocked threads behind the ShellUI menu. */
+  static atomic_int busy = 0;
+  int expected = 0;
+  int rc;
+
+  if (!atomic_compare_exchange_strong(&busy, &expected, 1)) {
+    LOG_WARN("[cheats] version lookup still busy; skipping %s",
+             title_id != NULL ? title_id : "");
+    return -1;
+  }
+  rc = resolve_game_version_body(title_id, out, out_size);
+  atomic_store(&busy, 0);
+  return rc;
 }
 
 static int read_process_table(void **buf_out, size_t *buf_size_out) {

@@ -50,8 +50,15 @@
 - `5.10` 的 `NPXS40002` 是独立 legacy RNPS JavaScript bundle，payload size
   为 `0x185c30`，SHA-256 为
   `bfa53c6bd1fd4c468ebf7ee44955db0cf8286f116a8ab1870b756de0efbfc5fb`。
-  `5.50` HomeUI 与其完全一致，两者共用 HomeUI profile；AppError 组件源码
-  形态与 6.x/7.x 一致。
+  `5.50` 的 `/system_ex` HomeUI 与其完全一致，两者共用 HomeUI profile；
+  AppError 组件源码形态与 6.x/7.x 一致。
+- `5.50` 的 **OTA** `NPXS40002`（`NPXS40002.mnt.bin`）是另一份 legacy
+  bundle，不要和上面这条共用：payload size `0x185ad0`、整文件 SHA-256
+  `42d215cb7f7dee9700f5e05c838be58668d9756728fbe0bcb5f53d11aa90cae3`
+  （file size `0x1865f0`）。它与 5.10/5.50 `/system_ex` 版本同为
+  5x/7x minified 形态，因此复用 `kLegacy5x7xSourceStrategy`，只是 offsets
+  整体前移几十到两百多字节，单独一条 `5.50 OTA NPXS40002 legacy HomeUI`
+  profile 即可。这与 `13.600.007` 需要单独 OTA profile 的情况同源。
 - `6.00`、`6.02` 的 `NPXS40002.bin` 完全一致（SHA-256
   `b376f7ead9140636beac99354a7d958fc18ea4da40580dda590927be936e0a18`），
   是 payload size `0x185d00` 的 legacy RNPS JavaScript bundle，共用一个
@@ -307,6 +314,10 @@ t.Fps=P
 `StartupAnimation` 调试按钮作为宿主，导航顺序改为
 `[OnionHEN, Search, Settings, Profile]`。替换仍为定点、等长修改，并保留其余
 导航项。
+
+同一固件可能同时存在 `/system_ex` 与 OTA 两份 legacy bundle，此时必须各自
+一条 profile（例如 `5.50` 与 `5.50 OTA`）。识别靠 `payload_size` +
+`file_size` + 整文件 SHA-256，offset 不能跨 bundle 复用。
 
 ### 明文 minified JavaScript bundle（8.x）
 

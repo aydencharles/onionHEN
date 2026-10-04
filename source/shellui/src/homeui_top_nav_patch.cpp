@@ -270,6 +270,25 @@ static const SourceHomeUiProfile kSourceHomeUiProfiles[] = {
         /* strategy */ &kLegacy5x7xSourceStrategy,
     },
     {
+        /*
+         * 5.50 ShellUI loads the OTA /mnt/rnps bundle, which is a distinct
+         * legacy bundle from the /system_ex file above (0x185ad0 vs 0x185c30).
+         * Same minified 5x/7x shape, so it reuses kLegacy5x7xSourceStrategy.
+         */
+        /* name */ "5.50 OTA NPXS40002 legacy HomeUI",
+        /* kind */ SourceBundleKind::LegacyRnps,
+        /* payload_size */ 0x185ad0,
+        /* offsets */ {
+            /* title_id */ 0x6e1c0,
+            /* app_error_event_trigger */ 0xb1242,
+            /* navigate_to_home */ 0x3d9ea,
+            /* icon_order */ 0xb117b,
+            /* app_error_source */ 0x124c47,
+            /* export_alias */ 0x124f3b,
+        },
+        /* strategy */ &kLegacy5x7xSourceStrategy,
+    },
+    {
         /* name */ "6.00/6.02 NPXS40002 legacy HomeUI",
         /* kind */ SourceBundleKind::LegacyRnps,
         /* payload_size */ 0x185d00,

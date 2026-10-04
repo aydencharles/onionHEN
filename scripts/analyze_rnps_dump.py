@@ -137,6 +137,14 @@ KNOWN_LEGACY_HOMEUI_PROFILES = [
         "sha256": "bfa53c6bd1fd4c468ebf7ee44955db0cf8286f116a8ab1870b756de0efbfc5fb",
     },
     {
+        # 5.50 ShellUI loads the OTA bundle, not the /system_ex file above.
+        "name": "5.50 OTA NPXS40002 legacy HomeUI",
+        "payload_magic": LEGACY_BUNDLE_MAGIC.hex(),
+        "payload_size": 0x185AD0,
+        "file_size": 0x1865F0,
+        "sha256": "42d215cb7f7dee9700f5e05c838be58668d9756728fbe0bcb5f53d11aa90cae3",
+    },
+    {
         # 6.00 and 6.02 NPXS40002 are byte-identical.
         "name": "6.00/6.02 NPXS40002 legacy HomeUI",
         "payload_magic": LEGACY_BUNDLE_MAGIC.hex(),

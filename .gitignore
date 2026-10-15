@@ -62,3 +62,4 @@ docs/release*.md
 docs/release*.css
 docs/release*.md
 docs/发行说明*.pdf
+logs/*

@@ -18,15 +18,23 @@ constexpr size_t kPersistentExtensionCapacity = 44;
 /*
  * The 11.6 profile builds its tile list from a compile-time `new Array(16)`
  * and has no spare bytecode, so the list cannot grow without bytecode surgery.
- * It does, however, mark five of those sixteen tiles as feature-gated
- * (registryId 2..6: notifications, gamingLounge, music, voiceAgent,
- * broadcast), and a gated tile that is off on the target unit is a free host.
+ * A tile can therefore only be added by taking one over.
  *
- * This build claims exactly one of them - voiceAgent (registryId 5), which is
- * off on retail units - so kVisualHostCapacity116 is 1.  Claiming more means
- * patching each extra tile's descriptor, icon block and action body the same
- * way control_center_patch.cpp does for voice; the registration ABI and the
- * 44 persistent IDs below stay unchanged.
+ * This build claims accessibility (registryId 7).  It is the best host of the
+ * sixteen because module 193's factory emits r29[7] / r23[7] with no
+ * `isRevoked` member at all: the slot is unconditional, so it needs neither a
+ * feature-gate rewrite nor an isRevoked rewrite, and the persisted
+ * control-visibility blob always resolves it.
+ *
+ * The five feature-gated tiles (registryId 2..6: notifications,
+ * gamingLounge, music, voiceAgent, broadcast) are a worse choice.  voiceAgent
+ * in particular is reported disabled by retail firmware and the whole VnaUI
+ * subsystem is compiled out, so it cannot be relied on to appear.
+ *
+ * kVisualHostCapacity116 stays 1: one host, claimed by this patch.  Raising it
+ * means patching another tile's descriptor, icon block and getMenu closure the
+ * same way control_center_patch.cpp does for accessibility; the registration
+ * ABI and the 44 persistent IDs below stay unchanged.
  *
  * The registry format already reserves all 44 IDs supported by the native
  * 64-byte settings record; later slot-bank profiles can raise this without
@@ -36,6 +44,14 @@ constexpr size_t kVisualHostCapacity116 = 1;
 constexpr size_t kMaxIdBytes = 47;
 constexpr size_t kMaxLabelBytes116 = 11;
 constexpr size_t kMaxIconSourceBytes116 = 33;
+/*
+ * Byte capacity of the HBC string slot (#13209) the 11.6 patch repoints at
+ * Registration::web_url.  #13209 declares 39 bytes but the next string in the
+ * compacted storage starts at +38, so 38 is the widest safe write.  Anything
+ * longer cannot be written into the bundle, so it is rejected at registration
+ * time instead of silently skipping the patch.
+ */
+constexpr size_t kMaxWebUrlBytes116 = 38;
 
 enum class Result : uint8_t {
   Ok = 0,
@@ -63,6 +79,18 @@ struct Registration {
   std::string icon_source;
   bool enabled_by_default = false;
   std::string action_uri;
+  /*
+   * URI the tile's popup loads in a native WebViewPS panel.  On the 11.6 host
+   * the popup is driven by the tile's `getMenu` hook, not by `onPress`, so a
+   * web_url gives an in-app panel instead of handing the URI to the system
+   * handler the way action_uri does.
+   *
+   * Must fit the 38-byte string slot the patch rewrites (kUriCapacity), so
+   * keep it short - "http://127.0.0.1:9090/" is 22 bytes.  When empty the
+   * patch falls back to OnionCC?invoke=<registry_id>, which renders nothing
+   * but keeps dispatch_uri() reachable.
+   */
+  std::string web_url;
   InvokeCallback callback = nullptr;
   CInvokeCallback c_callback = nullptr;
   void *callback_context = nullptr;
@@ -75,6 +103,11 @@ struct SnapshotEntry {
   std::string icon_source;
   bool enabled_by_default;
   bool active;
+  /*
+   * Copied out of Registration::web_url so the 11.6 patch can point the tile's
+   * popup WebView at it without reaching back into the SDK's private state.
+   */
+  std::string web_url;
 };
 
 struct DispatchResult {

@@ -6,6 +6,7 @@
 #include "debug_settings_route_runtime.hpp"
 #include "hooked_funcs.hpp"
 #include "ipc.hpp"
+#include "onion_web_server.hpp"
 
 #include <msg.hpp>
 #include <onion/log.h>
@@ -219,8 +220,9 @@ bool valid_registration(const Registration &registration) {
          registration.label.size() <= kMaxLabelBytes116 &&
          !registration.icon_source.empty() &&
          registration.icon_source.size() <= kMaxIconSourceBytes116 &&
+         registration.web_url.size() <= kMaxWebUrlBytes116 &&
          (registration.callback != nullptr || registration.c_callback != nullptr ||
-          !registration.action_uri.empty());
+          !registration.action_uri.empty() || !registration.web_url.empty());
 }
 
 ManifestRecord *record_for_id_locked(std::string_view id) {
@@ -386,7 +388,8 @@ bool visual_registration(SnapshotEntry *entry) {
             active.registration.label,
             active.registration.icon_source,
             active.registration.enabled_by_default,
-            true};
+            true,
+            active.registration.web_url};
   return true;
 }
 
@@ -440,6 +443,12 @@ void initialize_builtin_control() {
   registration.icon_source = "/system_ex/vsh_asset/onionhen.png";
   registration.enabled_by_default = false;
   registration.action_uri = shellui_debug_settings_toolbox_uri();
+  /*
+   * The 11.6 tile popup is a native WebViewPS, not the system URI handler, so
+   * point it at the loopback web UI that prx.cpp starts before this call.  The
+   * address is fixed, so the patch can bake it into the bundle once.
+   */
+  registration.web_url = onion::web_ui::url();
   const Result result = register_control(registration, nullptr);
   if (result != Result::Ok) {
     LOG_ERROR("control_center_sdk: built-in registration failed: %s",

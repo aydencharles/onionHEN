@@ -24,12 +24,12 @@ along with this program; see the file COPYING. If not, see
 #include "homeui_top_nav_patch.hpp"
 #include "ipc.hpp"
 #include "onion_icon_source_hook.hpp"
+#include "onion_web_server.hpp"
 #include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
 #include "toolbox_i18n.hpp"
 #include "ucred.h"
-#include "webserver.hpp"
 
 #include <onion/log.h>
 #include <onion/notify.h>
@@ -825,6 +825,12 @@ int main(int argc, char const* argv[]) {
   toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
 
   shellui_hooks_publish_ready();
+  /*
+   * Bring the loopback web UI up before registering the built-in control. The
+   * control-center tile's popup is a native WebViewPS pointed at web_ui::url(),
+   * so the server has to be listening before the tile is patched in.
+   */
+  onion::web_ui::start();
   onion::control_center::initialize_builtin_control();
   /*
    * Home already cached pre-inject state. Display-TID spoof and the top-nav

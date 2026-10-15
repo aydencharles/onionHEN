@@ -1,34 +1,41 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods
  *
- * Strict, same-size Hermes bytecode patch for 11.6 NPXS40003.  It converts the
- * feature-gated Voice Agent control into one generic extension host.  The host
- * remains a normal native FunctionControl entry, so the stock customization
- * reducer, drag ordering and User.setInfo serialization continue to own state.
+ * Strict, same-size Hermes bytecode patch for 11.6 NPXS40003.  It turns the
+ * stock `accessibility` control (registryId 7) into a generic extension host:
+ * the tile keeps its native FunctionControl shell, while its label, icon and
+ * popup become OnionHEN's and the popup renders an in-process WebView instead
+ * of the stock system menu.  The stock customization reducer, drag ordering
+ * and User.setInfo serialization keep owning tile state.
  *
  * Verified against the 11.6 NPXS40003 profile (HBC v89, fileLength 0x5e9350,
- * source hash ff55cd8f...48ab):
+ * source hash ff55cd8f...48ab).  Three groups of writes, all same-size:
  *
- *   fn #2806  module 193 factory (redux slice), 1872 bytes, no jumps
- *     +0x2fb  Not r23, r25   runtime tile: isRevoked = !enableVoiceAgentFC
- *     +0x49e  Not r26, r25   custom  tile: isRevoked = !enableVoiceAgentFC
- *     +0x4b1  PutNewOwnById  custom tile property name, string #38907
- *     r3 at +0x2fb is GetGlobalObject (always truthy) -> isRevoked = false.
- *     r0 at +0x49e is LoadConstUndefined (falsy) -> isDefault = true.
+ *   fn #35901 module 3478 render body, 80 bytes - rebuilt in place.
+ *     Becomes jsx(FunctionControl, {label: #310, menuHeight: 640,
+ *     icon: {uri: #13094}, getMenu: <closure #35903>}).
  *
- *   fn #35992 module 3482 voice-agent Control Center component, 268 bytes
- *     +0xbd   CreateClosure fn #35999 (the onPress forwarder)
- *     +0xf6   props.onPress
- *     +0xfa   CreateClosure fn #36000 (getMenu), replaced by the URI trampoline
+ *   fn #35903, 689 bytes - module 3479's factory, reclaimed.  Module 3478
+ *     requires 3479 and the stock #35901 closure is the bundle's only
+ *     reference to it, so once the closure points at #35903's body directly
+ *     the factory is dead and its whole slot is free.  Rebuilt as a bare
+ *     native WebViewPS builder pointed at string #13209.
  *
- *   fn #36000 "getMenu" 107 bytes - body replaced by the openURL trampoline.
- *     Its parent environment slot 4 is the same `_closure1_slot4` that
- *     fn #35998 already uses as `LinkingPS.openURL`, so the trampoline's
- *     GetEnvironment r0, 1 + LoadFromEnvironment r0, r0, 4 is correct.
+ *   String storage - #310 (label), #13094 (icon carrier) and #13209 (WebView
+ *     URI) are the three slots the two bodies read.  Repointing #13094 needs
+ *     two identifier relocations first; see the kIconStorage note below.
  *
  * Scope note: 11.6 exposes five feature-gated tiles (registryId 2..6:
- * notifications, gamingLounge, music, voiceAgent, broadcast).  This build
- * claims only voiceAgent, which is off on retail units, so nothing is lost.
- * See CONTROL_CENTER_SDK.md for how to claim the remaining four.
+ * notifications, gamingLounge, music, voiceAgent, broadcast) and ten
+ * unconditional ones.  This build claims accessibility (registryId 7), which
+ * module 193's factory emits with no `isRevoked` member at all, so neither a
+ * feature-gate rewrite nor an isRevoked rewrite is needed.  See
+ * CONTROL_CENTER_SDK.md for how to claim the remaining slots.
+ *
+ * Historical note: an earlier revision also rewrote module 193's revoke
+ * expressions for the Voice Agent tile (registryId 5) and module 3482's
+ * component plus its #36000 getMenu body.  That half has been removed -- it
+ * was only ever a side effect on a tile retail firmware reports disabled, and
+ * the accessibility host never depended on any of it.
  */
 #include "control_center_patch.hpp"
 
@@ -67,26 +74,30 @@ constexpr std::array<uint8_t, 20> kProfileSourceHash = {
     0xff, 0x55, 0xcd, 0x8f, 0x3a, 0xea, 0x18, 0xa0, 0xb1, 0x33,
     0x63, 0xa6, 0x40, 0xe5, 0x68, 0x46, 0xe2, 0x71, 0x48, 0xab};
 
-/* HBC-relative offsets, independently checked against the profile hash. */
-constexpr size_t kModuleFactoryBody = 0x227b64;      // Function #2806
-constexpr size_t kRuntimeVoiceRevokeNot =
-    kModuleFactoryBody + 0x2fb;                       // Not r23, r25
-constexpr size_t kCustomVoiceRevokeNot =
-    kModuleFactoryBody + 0x49e;                       // Not r26, r25
-constexpr size_t kCustomVoiceProperty =
-    kModuleFactoryBody + 0x4b1;                       // isRevoked write
-constexpr size_t kVoiceRegistrySerializedInteger = 0x1d18de;
-constexpr size_t kVoiceComponentOnPressClosure = 0x59dcd1;
-constexpr size_t kVoiceComponentLabelLoad = 0x59dcee;
-constexpr size_t kVoiceComponentIconBlock = 0x59dd02;
-constexpr size_t kVoiceComponentIconBlockSize = 22;
-constexpr size_t kVoiceActionBody = 0x59debb;         // Function #36000
-constexpr size_t kVoiceActionBodySize = 107;
-
+/*
+ * The three string slots the rebuilt bodies read.  All of them are stock
+ * strings belonging to other modules; the accessibility host only borrows
+ * their *slots*, never a live code path:
+ *
+ *   #310  "msgid_voice"     module 3482's tile label   -> OnionHEN's label
+ *   #13094 "voice_command"  module 3482's tile icon    -> repointed at
+ *                                                         kIconStorage
+ *   #13209 "pssettings:voiceagent?entry=voice_agent"   -> the WebView URI
+ *
+ * Module 3482 is the Voice Agent tile, which `enableVoiceAgentFC` keeps from
+ * ever rendering on retail firmware, so overwriting its strings is inert.
+ */
 constexpr size_t kLabelStringStorage = 0x0d599b;      // string #310
 constexpr size_t kLabelStringLengthByte = 0x0ae3ff;
-constexpr size_t kDescriptionCapacity = 26;           // overlapping string #311
-constexpr size_t kDescriptionStringLengthByte = 0x0ae403;
+/*
+ * #310 and #311 ("msgid_voice_cc_description") share one storage base; #310
+ * reads the label prefix and #311 the whole thing.  0x0d59b3 is where string
+ * #15035 ("onGestureFinish") starts, and that identifier is live -- function
+ * #18491 reads it and has nothing to do with the control center -- so the
+ * shared region is 24 bytes, not #311's declared 26.  Only the label is
+ * written now, and the SDK caps it at 11 bytes, so this is headroom.
+ */
+constexpr size_t kLabelStorageCapacity = 0x0d59b3 - kLabelStringStorage; // 24
 constexpr size_t kOriginalIconStringStorage = 0x136b75; // string #13094
 constexpr size_t kSmallStringTable = 0x0adf24;
 constexpr uint16_t kIconStringId = 13094;
@@ -99,13 +110,27 @@ constexpr uint16_t kTooltipTitlePropsStringId = 28944;
 constexpr size_t kTooltipTitlePropsStringEntry =
     kSmallStringTable + kTooltipTitlePropsStringId * sizeof(uint32_t);
 /*
- * String #2902 is dead after the onPress closure is redirected to #36000.
- * Starting two bytes into its compacted storage gives a contiguous 43-byte
- * region.  Relocate the shared `sender` substring into dead string #9487,
- * then use the first 33 bytes as the complete icon source.  The remaining
- * dead bytes also preserve `tooltipTitleProps`, whose old compacted suffix is
- * overwritten by the shorter invocation URI.  A single icon string ID serves
- * both the registry descriptor and live FC component.
+ * The icon carrier needs a contiguous 33-byte storage slot, and the only one
+ * available sits inside string #2902
+ * ("psvoiceagent:main?sender=fc&actiontype=toggle", 45 bytes at 0x0e647e).
+ * That string's single reference is function #35998 in module 3482 -- the
+ * Voice Agent tile, which never renders -- so the region is safe to reuse.
+ * Starting two bytes in leaves 43 contiguous bytes; the first 33 hold the icon
+ * source, which is why kIconStorage is kIconStorageRelative 0x10fa0 and not
+ * 0x10f9e.
+ *
+ * Reusing it clobbers two *live* identifiers whose storage Hermes had
+ * compacted into the same bytes, so both are relocated into dead string #9487
+ * ("go to voice command settings", 28 bytes at 0x11657e) first:
+ *
+ *   #16885 "sender"           storage 0x0e6490, inside the icon region
+ *   #28944 "tooltipTitleProps" storage 0x137a19, its last two bytes overlap
+ *                              the URI slot at 0x137a28
+ *
+ * Neither is a control-center string: #16885 is used as a property name by
+ * functions #11770/#11771/#11897/#17901/#17909/#23091, #28944 by #11770 and
+ * #11771, none of which this patch touches.  Writing them anywhere else would
+ * corrupt unrelated modules.
  *
  * Small string table entries encode (offset_relative_to_string_storage << 1)
  * | (length << 24); kStringStorageBase is that storage base (derived from the
@@ -121,8 +146,119 @@ constexpr uint32_t kSenderRelocatedStorageRelative = 0x4109f;
 constexpr size_t kTooltipTitlePropsRelocatedStorage = 0x116585;
 constexpr uint32_t kTooltipTitlePropsRelocatedStorageRelative = 0x410a5;
 constexpr size_t kUriStringStorage = 0x137a28;        // string #13209
-constexpr size_t kUriCapacity = 39;
+/*
+ * #13209 declares 39 bytes, but string #13210 ("turn off:ps vr") starts one
+ * byte earlier than that, at 0x137a4e, so 38 is the widest write that stays
+ * inside the entry.  (#13210/#13211 have no bytecode references, so a 39-byte
+ * write would be survivable -- but silently mangling a neighbour is not a
+ * property worth relying on.)  The loopback URL this host bakes in is 22
+ * bytes, so the guard is headroom.
+ */
+constexpr size_t kUriCapacity = 0x137a4e - kUriStringStorage; // 38
 constexpr size_t kUriStringLengthByte = 0x0bad8b;
+
+/*
+ * ---------------------------------------------------------------------------
+ * Accessibility host slot (registryId 7)
+ * ---------------------------------------------------------------------------
+ * The tile renders module 3478's default export:
+ *
+ *     memo(() => jsx(FunctionControl, {label, icon, getMenu}))
+ *
+ * `getMenu` -- not `onPress` -- is what the popup container calls, so it is
+ * the correct hook for an in-app panel.  We keep the stock `getMenu` property
+ * name and only redirect the closure at #35903, which becomes a WebView
+ * builder.
+ *
+ * #35903 was module 3479's factory (the AccessibilityMenu).  Module 3478 is
+ * the bundle's only `require(3479)`, and the stock #35901 closure is the only
+ * reference to #35903, so once the closure points at the body directly the
+ * factory is dead and its 689 bytes are free.  The 54-byte #35902 body, which
+ * used to be the tile's getMenu, is left untouched.
+ */
+constexpr size_t kAccessibilityRenderBody = 0x59bb20;   // Function #35901
+constexpr size_t kAccessibilityRenderBodySize = 80;
+constexpr size_t kAccessibilityMenuBody = 0x59bba6;     // Function #35903
+constexpr size_t kAccessibilityMenuBodySize = 689;
+/*
+ * Popup geometry.
+ *
+ * The popup container's size does NOT come from what `getMenu` returns.  The
+ * tile component hands its own props to FunctionControl (module 73), whose
+ * getMenu method (function #1285) reads `props.menuWidth` / `props.menuHeight`
+ * and forwards them to PopupContainer (module 1746, function #19001).  That
+ * one passes them to usePopupStyle (module 2742, function #28065), which
+ *
+ *   width  = menuWidth === undefined ? DEFAULT_MENU_WIDTH (652) : menuWidth
+ *   height = menuHeight (only attached to the style when one is supplied)
+ *
+ * and merges the result over module 796's `popup` style
+ * `{minWidth: 652, maxWidth: 1536, minHeight: 216, maxHeight: 810,
+ *   position: 'absolute', bottom: 190}`.
+ *
+ * Module 3478's stock render body passes neither property, so the popup keeps
+ * its default width and collapses onto `minHeight: 216` -- and the WebView
+ * inside it, styled `{width: '100%', height: '100%'}`, has no definite parent
+ * height to resolve its percentage against.  That is the "too short" panel.
+ *
+ * Module 2765 (music, menuWidth 1040) and the broadcast tile (menuWidth 652,
+ * menuHeight 292) are the stock precedents for driving the popup this way;
+ * this host follows them.  640 sits comfortably inside the platform clamp and
+ * leaves the `bottom: 190` anchor clear of the tile row.
+ *
+ * The width stays at the 652 default: the rebuilt render body is a fixed 80
+ * bytes and menuHeight already takes it to 78, so there is no room for a
+ * second property.  Widening the panel would mean growing the body past its
+ * slot, which this patch deliberately never does.
+ */
+constexpr uint16_t kMenuHeight116 = 640;
+/*
+ * String #310 already carries registration.label ("OnionHEN") once the label
+ * write below has run, so the render body reads it directly and drops the
+ * stock I18nPS.t('msgid_accessibility') call -- `t()` would miss a key that is
+ * not in the translation table.
+ */
+constexpr uint16_t kLabelStringId = 310;
+/* Icon carrier: repointed at kIconStorage by the icon write below. */
+constexpr uint16_t kIconCarrierStringId = 13094;
+/* WebView source URI: the URI write below retargets #13209 at web_url. */
+constexpr uint16_t kWebViewUriStringId = 13209;
+
+/*
+ * Every remaining operand of the two rebuilt bodies, named so the emitted
+ * bytes can be read against the hasm listing line by line.  The ids are the
+ * ones the stock instructions use (verified in
+ * disasm/rnps-control-center.hasm: #35901 for the render body, #33252 for the
+ * only WebViewPS call site in the whole bundle).
+ */
+constexpr uint16_t kJsxIdentifierId = 163;              // 'jsx'
+constexpr uint16_t kDefaultIdentifierId = 115;          // 'default'
+constexpr uint16_t kLabelIdentifierId = 165;            // 'label'
+constexpr uint16_t kIconIdentifierId = 151;             // 'icon'
+constexpr uint16_t kUriIdentifierId = 211;              // 'uri'
+constexpr uint16_t kMenuHeightIdentifierId = 17339;     // 'menuHeight'
+constexpr uint16_t kGetMenuIdentifierId = 24520;        // 'getMenu'
+constexpr uint16_t kSourceIdentifierId = 229;           // 'source'
+constexpr uint16_t kStyleIdentifierId = 77;             // 'style'
+constexpr uint16_t kWidthIdentifierId = 254;            // 'width'
+constexpr uint16_t kHeightIdentifierId = 150;           // 'height'
+constexpr uint16_t kWebViewPsIdentifierId = 33316;      // 'WebViewPS'
+constexpr uint16_t kIgnoreDimByModalIdentifierId = 27578;
+constexpr uint16_t kSuppressDialogShowingIdentifierId = 33369;
+constexpr uint16_t kBackgroundTransparencyIdentifierId = 20605;
+constexpr uint16_t kStartInLoadingStateIdentifierId = 27783;
+constexpr uint16_t kAccessibilitySpeakableIdentifierId = 75;
+constexpr uint16_t kPercentStringId = 1527;             // '100%'
+constexpr uint16_t kOnlySelfStringId = 11249;           // 'onlySelf'
+constexpr uint16_t kMenuClosureFunctionId = 35903;
+
+/* Low/high byte of a 16-bit string or identifier operand. */
+constexpr uint8_t lo8(uint16_t value) {
+  return static_cast<uint8_t>(value & 0xffu);
+}
+constexpr uint8_t hi8(uint16_t value) {
+  return static_cast<uint8_t>(value >> 8);
+}
 
 static_assert(kIconStorage == kStringStorageBase + kIconStorageRelative,
               "icon storage must match its string table entry offset");
@@ -134,8 +270,6 @@ static_assert(kTooltipTitlePropsRelocatedStorage ==
               "tooltipTitleProps relocation must match its entry offset");
 static_assert(kLabelStringLengthByte == kSmallStringTable + 310 * 4 + 3,
               "label length byte must be string #310's entry high byte");
-static_assert(kDescriptionStringLengthByte == kSmallStringTable + 311 * 4 + 3,
-              "description length byte must be string #311's entry high byte");
 static_assert(kUriStringLengthByte == kSmallStringTable + 13209 * 4 + 3,
               "URI length byte must be string #13209's entry high byte");
 
@@ -227,59 +361,162 @@ void write_small_string_entry(HbcView &hbc, size_t entry_offset,
   hbc.data[entry_offset + 3] = static_cast<uint8_t>(encoded >> 24);
 }
 
-std::array<uint8_t, kVoiceComponentIconBlockSize>
-make_icon_block(bool asset_path) {
-  if (asset_path) {
-    /*
-     * PUI Button.icon treats a string as a named system icon.  Local files
-     * must be an ImageSource object: {uri: <string #13094>}.
-     */
-    return {
-        0x71, 0x06, 0x26, 0x33, // LoadConstString r6, #13094
-        0x03, 0x04,             // NewObject r4
-        0x3d, 0x04, 0x06, 0xd3, // PutNewOwnByIdShort r4.uri = r6
-        0x3d, 0x00, 0x04, 0x97, // PutNewOwnByIdShort props.icon = r4
-        0x3d, 0x00, 0x05, 0x20, // PutNewOwnByIdShort props.onPress = r5
-        0x74, 0x04,             // LoadConstUndefined r4
-        0x74, 0x06              // LoadConstUndefined r6; exact-size padding
-    };
-  }
+/*
+ * Module 3478's render function (#35901), rebuilt at its exact 80-byte size.
+ *
+ * Stock body (hasm #35901):
+ *   GetEnvironment r0, 0
+ *   env[2].jsx, env[1].default, env[0].I18nPS.t('msgid_accessibility')
+ *   NewObject props; props.label = t(...); props.icon = 'accessibility'
+ *   CreateEnvironment; CreateClosure #35902; props.getMenu = closure
+ *   Call3 jsx(undefined, FunctionControl, props); Ret
+ *
+ * Ours keeps the frame, the environment reads and the call shape identical,
+ * and changes only the four values:
+ *   string #310            -> props.label   (t() bypassed: #310 already holds
+ *                                            registration.label)
+ *   kMenuHeight116         -> props.menuHeight (see the geometry note above;
+ *                                            this is what gives the popup, and
+ *                                            therefore the WebView inside it,
+ *                                            a definite height)
+ *   {uri: string #13094}   -> props.icon    (PUI Button.icon takes a string as
+ *                                            a named system icon, so a local
+ *                                            PNG needs an ImageSource object)
+ *   closure #35903         -> props.getMenu (property name unchanged, so the
+ *                                            popup container keeps calling it)
+ *
+ * The stock CreateEnvironment/CreateClosure pair is preserved byte for byte:
+ * #35901 has environmentSize 0, so the new environment is a bare parent link
+ * and #35903's `GetEnvironment r0, 1` still lands on the module factory
+ * environment exactly as the old #35902 did.
+ *
+ * Budget: the rebuilt body is 78 of the slot's 80 bytes, and the two left over
+ * are a LoadConstUndefined pair, so the function stays exactly as long as the
+ * stock one.
+ */
+static_assert(kMenuHeight116 >= 216 && kMenuHeight116 <= 810,
+              "menuHeight must stay inside module 796's popup min/max clamp");
 
-  /* Named system icons retain the stock string representation. */
+std::array<uint8_t, kAccessibilityRenderBodySize>
+make_accessibility_render() {
   return {
-      0x71, 0x06, 0x26, 0x33, // LoadConstString r6, #13094
-      0x3d, 0x00, 0x06, 0x97, // PutNewOwnByIdShort props.icon = r6
-      0x3d, 0x00, 0x05, 0x20, // PutNewOwnByIdShort props.onPress = r5
-      0x74, 0x04, 0x08, 0x04, 0x04, // undefined r4 + Mov r4, r4
-      0x3e, 0x00, 0x04, 0xc8, 0x5f  // props.getMenu = undefined
-  };
+      0x29, 0x00, 0x00,                   // GetEnvironment r0, 0
+      0x2e, 0x01, 0x00, 0x02,             // LoadFromEnvironment r1, r0, 2
+      0x34, 0x03, 0x01, 0x01, lo8(kJsxIdentifierId),
+                                          // GetByIdShort r3, r1, #jsx
+      0x2e, 0x01, 0x00, 0x01,             // LoadFromEnvironment r1, r0, 1
+      0x34, 0x02, 0x01, 0x02, lo8(kDefaultIdentifierId),
+                                          // GetByIdShort r2, r1, #default
+      0x71, 0x00, lo8(kLabelStringId), hi8(kLabelStringId),
+                                          // LoadConstString r0, #310
+      0x03, 0x01,                         // NewObject r1 (props)
+      0x3d, 0x01, 0x00, lo8(kLabelIdentifierId),
+                                          // props.label = r0
+      0x6d, 0x05,                         // LoadConstInt r5, kMenuHeight116
+      lo8(kMenuHeight116), hi8(kMenuHeight116), 0x00, 0x00,
+      0x3e, 0x01, 0x05, lo8(kMenuHeightIdentifierId),
+      hi8(kMenuHeightIdentifierId),       // props.menuHeight = r5
+      0x71, 0x06, lo8(kIconCarrierStringId), hi8(kIconCarrierStringId),
+                                          // LoadConstString r6, #13094
+      0x03, 0x04,                         // NewObject r4
+      0x3d, 0x04, 0x06, lo8(kUriIdentifierId),
+                                          // r4.uri = r6
+      0x3d, 0x01, 0x04, lo8(kIconIdentifierId),
+                                          // props.icon = r4
+      0x32, 0x00,                         // CreateEnvironment r0
+      0x62, 0x00, 0x00, lo8(kMenuClosureFunctionId),
+      hi8(kMenuClosureFunctionId),        // CreateClosure r0, r0, #35903
+      0x3e, 0x01, 0x00, lo8(kGetMenuIdentifierId),
+      hi8(kGetMenuIdentifierId),          // props.getMenu = r0
+      0x74, 0x00,                         // LoadConstUndefined r0
+      0x52, 0x00, 0x03, 0x00, 0x02, 0x01, // Call3 r0, r3, r0, r2, r1
+      0x5a, 0x00,                         // Ret r0
+      /* Unreachable padding to the fixed 80-byte body. */
+      0x74, 0x00};
 }
 
-std::array<uint8_t, kVoiceActionBodySize> make_action_body(uint16_t uri_id) {
-  std::array<uint8_t, kVoiceActionBodySize> body{};
-  size_t cursor = 0;
-  auto emit = [&](uint8_t value) { body[cursor++] = value; };
+/*
+ * The popup body (#35903).  The popup container calls getMenu(props) and
+ * renders whatever it returns, so returning a native WebView is all that is
+ * needed for an in-app panel -- no LinkingPS.openURL involved.
+ *
+ * WebViewPS is not a module: it is a native component resolved out of the
+ * registry that module 1 exposes (`require(149)('NiSiE5q6')`), which is also
+ * where I18nPS comes from.  The bundle references the name 'WebViewPS' exactly
+ * once, in function #33252, and the prop set below is that call site's, minus
+ * the four event/ref props (this panel has no JS handlers to wire).
+ *
+ * #33252 lives inside module 3213's LiteFrame HOC and reads its jsx and native
+ * registry out of environment slots 9 and 4.  We instead read slots 2 and 0 of
+ * the module factory environment, which is what #35903's parent chain exposes:
+ * the factory stores require(1) in slot 0 and require(3)/jsx in slot 2.
+ *
+ * Module 3213 wraps WebViewPS in its own HOC; we deliberately use the bare
+ * native component so the popup keeps its own layout.
+ */
+std::array<uint8_t, kAccessibilityMenuBodySize> make_webview_menu() {
+  static constexpr uint8_t kCode[] = {
+      0x29, 0x00, 0x01,                   // GetEnvironment r0, 1
+      0x2e, 0x01, 0x00, 0x02,             // LoadFromEnvironment r1, r0, 2
+      0x34, 0x01, 0x01, 0x01, lo8(kJsxIdentifierId),
+                                          // GetByIdShort r1, r1, #jsx
+      0x2e, 0x02, 0x00, 0x00,             // LoadFromEnvironment r2, r0, 0
+      0x35, 0x02, 0x02, 0x02, lo8(kWebViewPsIdentifierId),
+      hi8(kWebViewPsIdentifierId),        // GetById r2, r2, #WebViewPS
+      0x71, 0x03, lo8(kWebViewUriStringId), hi8(kWebViewUriStringId),
+                                          // LoadConstString r3, #13209 (URI)
+      0x71, 0x05, lo8(kPercentStringId), hi8(kPercentStringId),
+                                          // LoadConstString r5, #1527 ('100%')
+      0x71, 0x08, lo8(kOnlySelfStringId), hi8(kOnlySelfStringId),
+                                          // LoadConstString r8, #11249
+      0x03, 0x04,                         // NewObject r4 (source)
+      0x3d, 0x04, 0x03, lo8(kUriIdentifierId),
+                                          // r4.uri = r3
+      0x03, 0x06,                         // NewObject r6 (style)
+      0x3d, 0x06, 0x05, lo8(kWidthIdentifierId),
+                                          // r6.width = r5
+      0x3d, 0x06, 0x05, lo8(kHeightIdentifierId),
+                                          // r6.height = r5
+      0x76, 0x09,                         // LoadConstTrue r9
+      0x76, 0x0a,                         // LoadConstTrue r10
+      0x76, 0x0b,                         // LoadConstTrue r11
+      0x77, 0x0c,                         // LoadConstFalse r12
+      0x03, 0x07,                         // NewObject r7 (props)
+      0x3d, 0x07, 0x04, lo8(kSourceIdentifierId),
+                                          // props.source = r4
+      0x3d, 0x07, 0x06, lo8(kStyleIdentifierId),
+                                          // props.style = r6
+      0x3e, 0x07, 0x08, lo8(kIgnoreDimByModalIdentifierId),
+      hi8(kIgnoreDimByModalIdentifierId), // props.ignoreDimByModal = r8
+      0x3e, 0x07, 0x09, lo8(kSuppressDialogShowingIdentifierId),
+      hi8(kSuppressDialogShowingIdentifierId),
+                                          // props.suppressDialogShowing = r9
+      0x3e, 0x07, 0x0a, lo8(kBackgroundTransparencyIdentifierId),
+      hi8(kBackgroundTransparencyIdentifierId),
+                                          // props.backgroundTransparencyEnabled
+      0x3e, 0x07, 0x0b, lo8(kStartInLoadingStateIdentifierId),
+      hi8(kStartInLoadingStateIdentifierId),
+                                          // props.startInLoadingState = r11
+      0x3e, 0x07, 0x0c, lo8(kAccessibilitySpeakableIdentifierId),
+      hi8(kAccessibilitySpeakableIdentifierId),
+                                          // props.accessibilitySpeakable = r12
+      0x74, 0x03,                         // LoadConstUndefined r3
+      0x52, 0x00, 0x01, 0x03, 0x02, 0x07, // Call3 r0, r1, r3, r2, r7
+      0x5a, 0x00,                         // Ret r0
+  };
+  static_assert(sizeof(kCode) <= kAccessibilityMenuBodySize,
+                "WebView builder must fit the reclaimed function slot");
+  static_assert(sizeof(kCode) % 2 == 1,
+                "odd body keeps the LoadConstUndefined padding pair-aligned");
 
-  /* LinkingPS.openURL(<patched string #13209>) through module env slot 4. */
-  emit(0x29); emit(0x00); emit(0x01);                   // GetEnvironment r0, 1
-  emit(0x2e); emit(0x00); emit(0x00); emit(0x04);       // Load env[4]
-  emit(0x35); emit(0x02); emit(0x00); emit(0x01);       // GetById LinkingPS
-  emit(0x0e); emit(0x4d);
-  emit(0x35); emit(0x01); emit(0x02); emit(0x02);       // GetById openURL
-  emit(0x35); emit(0x6b);
-  emit(0x71); emit(0x03);                               // LoadConstString r3
-  emit(static_cast<uint8_t>(uri_id));
-  emit(static_cast<uint8_t>(uri_id >> 8));
-  emit(0x51); emit(0x00); emit(0x01); emit(0x02);       // Call2
-  emit(0x03);
-  emit(0x5a); emit(0x00);                               // Ret r0
-
-  /* Valid unreachable instructions keep the fixed 107-byte function body. */
-  while (cursor + 3 <= body.size()) {
-    emit(0x08); emit(0x00); emit(0x00);                 // Mov r0, r0
+  std::array<uint8_t, kAccessibilityMenuBodySize> body{};
+  memcpy(body.data(), kCode, sizeof(kCode));
+  /* Unreachable filler keeps the fixed 689-byte body.  The trailing byte that
+   * a pair cannot cover stays 0x00 (Unreachable); Ret already ran. */
+  for (size_t i = sizeof(kCode); i + 1 < body.size(); i += 2) {
+    body[i] = 0x74;                     // LoadConstUndefined r0
+    body[i + 1] = 0x00;
   }
-  while (cursor < body.size())
-    emit(0x74), emit(0x00);                             // exact remainder is 2
   return body;
 }
 
@@ -311,22 +548,29 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
    * after a partial write would leave the HBC mutated with a stale footer
    * SHA-1, and the loader rejects the whole bundle instead of ignoring it.
    */
-  const bool asset_path = !registration.icon_source.empty() &&
-                          registration.icon_source.front() == '/';
-  const std::string description = registration.label + " control";
   char uri[24]{};
   const int uri_length = snprintf(uri, sizeof(uri), "OnionCC?invoke=%u",
                                   registration.registry_id);
+  /*
+   * #13209 is the popup's WebView source.  A host that runs a web UI supplies
+   * web_url and the popup loads that; otherwise it falls back to the invoke
+   * URI, which keeps the OnionCC?invoke=<id> dispatch path usable on its own.
+   */
+  const std::string web_uri =
+      registration.web_url.empty()
+          ? std::string(uri, static_cast<size_t>(uri_length > 0 ? uri_length : 0))
+          : registration.web_url;
   if (registration.icon_source.size() > kIconCapacity ||
-      description.size() > kDescriptionCapacity || uri_length <= 0 ||
-      static_cast<size_t>(uri_length) > kUriCapacity) {
+      registration.label.size() > kLabelStorageCapacity || uri_length <= 0 ||
+      web_uri.size() > kUriCapacity) {
     LOG_ERROR("control_center_patch: '%s' does not fit the 11.6 host "
-              "(icon %u/%u, description %u/%u, uri %d/%u)",
+              "(icon %u/%u, label %u/%u, uri %u/%u)",
               registration.id.c_str(),
               static_cast<unsigned>(registration.icon_source.size()),
               static_cast<unsigned>(kIconCapacity),
-              static_cast<unsigned>(description.size()),
-              static_cast<unsigned>(kDescriptionCapacity), uri_length,
+              static_cast<unsigned>(registration.label.size()),
+              static_cast<unsigned>(kLabelStorageCapacity),
+              static_cast<unsigned>(web_uri.size()),
               static_cast<unsigned>(kUriCapacity));
     return;
   }
@@ -339,20 +583,10 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
     return;
   }
 
-  static constexpr uint8_t kRuntimeRevokeExpected[] = {0x0b, 0x17, 0x19};
-  static constexpr uint8_t kCustomRevokeExpected[] = {0x0b, 0x1a, 0x19};
-  static constexpr uint8_t kCustomPropertyExpected[] = {0x3e, 0x19, 0x1a,
-                                                         0xfb, 0x97};
-  static constexpr uint8_t kRegistryExpected[] = {0x05, 0x00, 0x00, 0x00};
-  static constexpr uint8_t kOnPressClosureExpected[] = {0x62, 0x01, 0x04,
-                                                         0x9f, 0x8c};
-  static constexpr uint8_t kLabelLoadExpected[] = {0x2e, 0x07, 0x00, 0x0a};
-  static constexpr uint8_t kIconBlockExpected[] = {
-      0x71, 0x06, 0x26, 0x33, 0x3d, 0x00, 0x06, 0x97,
-      0x3d, 0x00, 0x05, 0x20, 0x62, 0x04, 0x04, 0xa0,
-      0x8c, 0x3e, 0x00, 0x04, 0xc8, 0x5f};
-  static constexpr uint8_t kActionPrefixExpected[] = {0x6a, 0x02, 0x01,
-                                                       0x35, 0x05, 0x02};
+  static constexpr uint8_t kAccessibilityRenderExpected[] = {
+      0x29, 0x00, 0x00, 0x2e, 0x01, 0x00, 0x02, 0x34};
+  static constexpr uint8_t kAccessibilityMenuExpected[] = {
+      0x32, 0x01, 0x6a, 0x02, 0x02, 0x6a, 0x06, 0x03, 0x74, 0x00};
   static constexpr uint8_t kIconEntryExpected[] = {0x2a, 0x2d, 0x0c, 0x0d};
   static constexpr uint8_t kSenderEntryExpected[] = {0x60, 0x1f, 0x02, 0x06};
   static constexpr uint8_t kTooltipTitlePropsEntryExpected[] = {
@@ -368,28 +602,17 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
   static constexpr char kUriExpected[] =
       "pssettings:voiceagent?entry=voice_agent";
 
-  if (!expect(hbc, kRuntimeVoiceRevokeNot, kRuntimeRevokeExpected,
-              sizeof(kRuntimeRevokeExpected), "runtime voice revoke") ||
-      !expect(hbc, kCustomVoiceRevokeNot, kCustomRevokeExpected,
-              sizeof(kCustomRevokeExpected), "custom voice revoke") ||
-      !expect(hbc, kCustomVoiceProperty, kCustomPropertyExpected,
-              sizeof(kCustomPropertyExpected), "custom voice property") ||
-      !expect(hbc, kVoiceRegistrySerializedInteger, kRegistryExpected,
-              sizeof(kRegistryExpected), "voice registryId") ||
-      !expect(hbc, kVoiceComponentOnPressClosure, kOnPressClosureExpected,
-              sizeof(kOnPressClosureExpected), "voice onPress closure") ||
-      !expect(hbc, kVoiceComponentLabelLoad, kLabelLoadExpected,
-              sizeof(kLabelLoadExpected), "voice label load") ||
-      !expect(hbc, kVoiceComponentIconBlock, kIconBlockExpected,
-              sizeof(kIconBlockExpected), "voice icon/property block") ||
-      !expect(hbc, kVoiceActionBody, kActionPrefixExpected,
-              sizeof(kActionPrefixExpected), "voice action body") ||
-      !expect(hbc, kLabelStringStorage,
+  /*
+   * Every probe guards bytes this patch goes on to overwrite.  A mismatch
+   * means the bundle is not the profile the offsets were derived from, so the
+   * patch bails out before touching anything.
+   */
+  if (!expect(hbc, kLabelStringStorage,
               reinterpret_cast<const uint8_t *>(kLabelExpected),
-              sizeof(kLabelExpected) - 1, "voice label") ||
+              sizeof(kLabelExpected) - 1, "label string") ||
       !expect(hbc, kOriginalIconStringStorage,
               reinterpret_cast<const uint8_t *>(kIconExpected),
-              sizeof(kIconExpected) - 1, "voice icon") ||
+              sizeof(kIconExpected) - 1, "icon string") ||
       !expect(hbc, kIconStringEntry, kIconEntryExpected,
               sizeof(kIconEntryExpected), "icon string entry") ||
       !expect(hbc, kSenderStringEntry, kSenderEntryExpected,
@@ -407,33 +630,20 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
               "sender relocation carrier") ||
       !expect(hbc, kUriStringStorage,
               reinterpret_cast<const uint8_t *>(kUriExpected),
-              sizeof(kUriExpected) - 1, "voice URI")) {
+              sizeof(kUriExpected) - 1, "uri string") ||
+      !expect(hbc, kAccessibilityRenderBody, kAccessibilityRenderExpected,
+              sizeof(kAccessibilityRenderExpected), "accessibility render") ||
+      !expect(hbc, kAccessibilityMenuBody, kAccessibilityMenuExpected,
+              sizeof(kAccessibilityMenuExpected), "accessibility menu body")) {
     return;
   }
 
-  /* Both runtime and customization descriptors become non-revoked. */
-  hbc.data[kRuntimeVoiceRevokeNot + 2] = 0x03; // !global == false
-  hbc.data[kCustomVoiceRevokeNot + 2] =
-      registration.enabled_by_default ? 0x00 : 0x03;
-
-  if (registration.enabled_by_default) {
-    /* !undefined == true; store it as isDefault instead of isRevoked. */
-    hbc.data[kCustomVoiceProperty + 3] = 0x81; // isDefault string #34689
-    hbc.data[kCustomVoiceProperty + 4] = 0x87;
-  }
-
-  hbc.data[kVoiceRegistrySerializedInteger] = registration.registry_id;
-
-  /* useCallback now closes over the dedicated action body (#36000). */
-  hbc.data[kVoiceComponentOnPressClosure + 3] = 0xa0;
-  hbc.data[kVoiceComponentOnPressClosure + 4] = 0x8c;
-  static constexpr uint8_t kRawLabelLoad[] = {0x71, 0x07, 0x36, 0x01};
-  memcpy(hbc.data + kVoiceComponentLabelLoad, kRawLabelLoad,
-         sizeof(kRawLabelLoad));
-  const auto icon_block = make_icon_block(asset_path);
-  memcpy(hbc.data + kVoiceComponentIconBlock, icon_block.data(),
-         icon_block.size());
-
+  /*
+   * Identifier surgery first: the icon and URI writes below land on bytes that
+   * Hermes had compacted into the storage of two identifiers other modules
+   * still use, so both get moved into dead string #9487 before anything else
+   * is written.
+   */
   memcpy(hbc.data + kSenderRelocatedStorage, kSender,
          sizeof(kSender) - 1);
   write_small_string_entry(hbc, kSenderStringEntry,
@@ -445,28 +655,42 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
       hbc, kTooltipTitlePropsStringEntry,
       kTooltipTitlePropsRelocatedStorageRelative,
       static_cast<uint8_t>(sizeof(kTooltipTitleProps) - 1));
+
+  /* Icon carrier: point #13094 at the reclaimed 33-byte slot and fill it. */
   memcpy(hbc.data + kIconStorage, registration.icon_source.data(),
          registration.icon_source.size());
   write_small_string_entry(hbc, kIconStringEntry, kIconStorageRelative,
                            static_cast<uint8_t>(registration.icon_source.size()));
 
-  const auto body = make_action_body(13209);
-  memcpy(hbc.data + kVoiceActionBody, body.data(), body.size());
-
-  memcpy(hbc.data + kLabelStringStorage, description.data(),
-         description.size());
+  /*
+   * Tile label.  Only #310 is written; #311 ("msgid_voice_cc_description")
+   * shares the same base but is referenced solely by module 3482's descriptor
+   * literal, which never renders, so its length byte is left alone.
+   */
+  memcpy(hbc.data + kLabelStringStorage, registration.label.data(),
+         registration.label.size());
   hbc.data[kLabelStringLengthByte] =
       static_cast<uint8_t>(registration.label.size());
-  hbc.data[kDescriptionStringLengthByte] =
-      static_cast<uint8_t>(description.size());
+
+  /* Popup WebView source. */
   replace_string(hbc, kUriStringStorage, kUriCapacity, kUriStringLengthByte,
-                 std::string(uri, static_cast<size_t>(uri_length)));
+                 web_uri);
+
+  /*
+   * Accessibility host: rebuild the render body and turn the reclaimed
+   * function slot into a WebView builder.  The stock getMenu property name is
+   * preserved, so the popup container keeps calling it.
+   */
+  const auto render = make_accessibility_render();
+  memcpy(hbc.data + kAccessibilityRenderBody, render.data(), render.size());
+  const auto menu = make_webview_menu();
+  memcpy(hbc.data + kAccessibilityMenuBody, menu.data(), menu.size());
 
   update_footer(hbc);
   LOG_DEBUG("control_center_patch: activated '%s' registryId=%u "
-            "at NPXS40003 hbc_base=0x%llx",
+            "at NPXS40003 hbc_base=0x%llx (accessibility host, webview %s)",
             registration.id.c_str(), registration.registry_id,
-            static_cast<unsigned long long>(hbc.base));
+            static_cast<unsigned long long>(hbc.base), web_uri.c_str());
 #else
   (void)buffer;
   (void)size_ptr;

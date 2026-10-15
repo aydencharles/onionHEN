@@ -15,6 +15,7 @@ along with this program; see the file COPYING. If not, see
 <http://www.gnu.org/licenses/>.  */
 
 #include "hooked_funcs.hpp"
+#include "control_center_patch.hpp"
 #include "homeui_top_nav_patch.hpp"
 #include "settings_bundle_patch.hpp"
 #include "toolbox_i18n.hpp"
@@ -167,6 +168,7 @@ int ioctl_hook(int fd, unsigned long request, void *argp) {
       unsigned char *buffer = static_cast<unsigned char *>(args->buffer);
       patch_settings_bundle(buffer, args->size);
       patch_homeui_top_nav(buffer, &args->size, args->size);
+      patch_control_center(buffer, &args->size, args->size);
   }
   return ret;
 }

@@ -18,10 +18,12 @@ along with this program; see the file COPYING. If not, see
 #include "debug_settings_route_runtime.hpp"
 #include "dynamic_ui_runtime.hpp"
 #include "hooked_funcs.hpp"
+#include "control_center_sdk.hpp"
 #include "defs.h"
 #include "external_symbols.hpp"
 #include "homeui_top_nav_patch.hpp"
 #include "ipc.hpp"
+#include "onion_icon_source_hook.hpp"
 #include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
@@ -588,7 +590,7 @@ bool install_hooks(const ShellImages& img) {
       reinterpret_cast<void*>(&ReactNavigatorManager_UpdateNavigationState_Hook),
       reinterpret_cast<void**>(&ReactNavigatorManager_UpdateNavigationState_Orig));
 
-  install_homeui_top_nav_hooks(img.react_pui);
+  install_onion_icon_source_hook(img.react_pui);
 
   (void)install_optional_diag(
       "[DBG-GETMODEL] GetModel", img.rn_shell, "ReactNative.Modules.ShellUI.Settings",
@@ -823,6 +825,7 @@ int main(int argc, char const* argv[]) {
   toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
 
   shellui_hooks_publish_ready();
+  onion::control_center::initialize_builtin_control();
   /*
    * Home already cached pre-inject state. Display-TID spoof and the top-nav
    * RNPS patch both need NPXS40002 ReloadApp on the UI thread (OnRender), not

@@ -2,6 +2,7 @@
 
 
 #include "hooked_funcs.hpp"
+#include "control_center_sdk.hpp"
 #include "ipc.hpp"
 #include "external_symbols.hpp"
 #include "overlay_text_metrics.hpp"
@@ -597,6 +598,8 @@ void OnRender_Hook(MonoObject* instance) {
 
   /* UI thread: one NPXS40002 reload covers display TIDs and top-nav patch. */
   shellui_poll_home_reload();
+  /* NPXS40003 reloads are queued by Control Center register/unregister. */
+  onion::control_center::poll_reload();
 
   static bool inited = false;
   static unsigned int idle_thread_id[kCpuCores] = {};

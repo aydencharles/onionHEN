@@ -2,6 +2,7 @@
  * Extracted from hook_functions.cpp — hook_boot
  */
 #include "hooked_funcs.hpp"
+#include "control_center_sdk.hpp"
 #include "debug_settings_route_runtime.hpp"
 #include "detour.h"
 #include "ipc.hpp"
@@ -62,6 +63,17 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
     if (!shellui_hooks_are_ready())
       return boot_orig ? boot_orig(uri, opt, titleIdForBootAction) : false;
 
+    /* Control Center tiles fire OnionCC?invoke=<registryId> via LinkingPS. */
+    const auto cc_dispatch =
+        onion::control_center::dispatch_uri(Mono_to_String(uri));
+    if (cc_dispatch.handled) {
+      if (cc_dispatch.redirect_uri.empty())
+        return true;
+      return boot_orig(mono_string_new(Root_Domain,
+                                       cc_dispatch.redirect_uri.c_str()),
+                       opt, titleIdForBootAction);
+    }
+
     if(handle_uri_boot_common(uri, opt, titleIdForBootAction)) {
       return boot_orig(
           mono_string_new(Root_Domain, shellui_debug_settings_toolbox_uri()), opt,
@@ -86,6 +98,17 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
 
     const std::string original_uri = Mono_to_String(uri);
     LOG_DEBUG("uri_boot_hook_2: %s, opt: %i", original_uri.c_str(), opt);
+
+    /* Control Center tiles fire OnionCC?invoke=<registryId> via LinkingPS. */
+    const auto cc_dispatch = onion::control_center::dispatch_uri(original_uri);
+    if (cc_dispatch.handled) {
+      if (cc_dispatch.redirect_uri.empty())
+        return true;
+      return boot_orig_2(mono_string_new(Root_Domain,
+                                         cc_dispatch.redirect_uri.c_str()),
+                         opt);
+    }
+
     if(handle_uri_boot_common(uri, opt, nullptr)) {
       // Redirect to debug settings (no titleId parameter for older fw).
       return boot_orig_2(

@@ -35,6 +35,29 @@ extern "C" {
 #include <ps5/payload.h>
 }
 
+/* The standalone payload is intentionally not linked against the full OnionHEN
+ * notification helpers. It must use the exact PS5 request layout that the OS
+ * expects when sending a toast. */
+struct OrbisNotificationRequest {
+  int32_t type;
+  int32_t req_id;
+  int32_t priority;
+  int32_t msg_id;
+  int32_t target_id;
+  int32_t user_id;
+  int32_t unk1;
+  int32_t unk2;
+  int32_t app_id;
+  int32_t error_num;
+  int32_t unk3;
+  char use_icon_image_uri;
+  char message[1024];
+  char uri[1024];
+  char unkstr[1024];
+};
+static_assert(sizeof(OrbisNotificationRequest) == 0xC30,
+              "OrbisNotificationRequest layout must match PS5 OS ABI");
+
 /* libhijacker reads this global (allproc/rootvnode lookups). The daemon sets
  * it the same way from the payload args. */
 extern "C" uint64_t kernel_base;
@@ -58,12 +81,8 @@ static void show_toast(const char *text) {
   if (!text || !text[0])
     return;
 
-  /* Must match the kernel layout exactly. The payload-local 45-byte pad +
-   * 3075-byte message layout is not the real request structure and can corrupt
-   * system state when sent. */
   OrbisNotificationRequest req{};
   std::memset(&req, 0, sizeof(req));
-
   req.type = 0;
   req.req_id = 0;
   req.priority = 0;
@@ -147,7 +166,6 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
   title_id = tid;
   return true;
 }
-
 
 /* ---- Safe mode only --------------------------------------------------------
  * The full render counter / PS4 BC hook path is intentionally removed. The

@@ -149,17 +149,12 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
 }
 
 
-/* ---- Safe mode (default) -------------------------------------------------
- * Only reads the /dev/dce scanout flip counter. No kernel memory access, no
- * DMAP page-table walks, no code patching in the game, and it waits
- * kWarmupSec after a game starts before touching anything. This is the
- * measured display/flip rate, which equals the game's FPS for most titles.
- * We intentionally keep it warmup-free so the payload is usable as soon as a
- * game starts. */
+/* ---- Safe mode only --------------------------------------------------------
+ * The full render counter / PS4 BC hook path is intentionally removed. The
+ * standalone FPS payload must stay in the scanout-only path so it cannot touch
+ * game memory, kernel memory, or PS4 compatibility hooks. */
 static constexpr unsigned kWarmupSec = 0;
 static constexpr useconds_t kSafeSampleUs = 100000; /* 10 Hz */
-static constexpr const char *kFullModeFlag = "/data/onion_fps_full";
-static constexpr const char *kSafeModeFlag = "/data/onion_fps_safe";
 
 static double mono_sec() {
   struct timespec ts{};
@@ -268,33 +263,13 @@ int main() {
       },
       []() -> int { return sceSystemServiceGetAppIdOfRunningBigApp(); });
 
-  LOG_INFO("standalone fps counter started");
+  LOG_INFO("standalone fps counter started (safe scanout-only mode)");
 
-  pthread_t render_thr{}, vsync_thr{}, display_thr{};
-
-  const bool safe_override = access(kSafeModeFlag, F_OK) == 0;
-  const bool full = !safe_override && access(kFullModeFlag, F_OK) == 0;
-
-  if (safe_override) {
-    LOG_WARN("SAFE mode forced: scanout-only mode enabled. Delete %s to return to safe mode.",
-             kSafeModeFlag);
-    pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
-  } else if (full) {
-    LOG_WARN("FULL mode enabled: %s exists. This is the unsafe path that can panic the kernel.",
-             kFullModeFlag);
-    pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
-    pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
-  } else {
-    LOG_INFO("DEFAULT SAFE MODE: no %s present; using scanout-only sampler.",
-             kFullModeFlag);
-    pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
-  }
-
+  pthread_t render_thr{}, display_thr{};
+  pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
   pthread_create(&display_thr, nullptr, display_thread, nullptr);
 
   pthread_join(render_thr, nullptr);
-  if (full)
-    pthread_join(vsync_thr, nullptr);
   pthread_join(display_thr, nullptr);
   return 0;
 }

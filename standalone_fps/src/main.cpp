@@ -6,8 +6,9 @@
  * fps_sample.h) so any reader (overlay, plugin, your own tool) can use it.
  *
  * Load on a jailbroken console with an elfldr (e.g. port 9021).
- * Optional: pass "--stdout" semantics are not needed; values go to klog.
+ * It also shows the FPS as a system toast every few seconds (kToastEverySec).
  */
+#include <onion/fps_sample.h>
 #include <onion/log.h>
 #include <onion/proc_query.h>
 #include <onion/system_tmp.h>
@@ -39,6 +40,44 @@ int sceKernelGetProcessName(int pid, char *name);
 int sceKernelGetAppInfo(pid_t pid, void *info);
 int sceSystemServiceGetAppIdOfRunningBigApp();
 int sceSystemServiceGetAppTitleId(int app_id, char *title_id);
+int sceKernelSendNotificationRequest(int device, void *req, size_t size,
+                                     int blocking);
+}
+
+/* How often the on-screen FPS toast is shown (seconds). Edit and rebuild. */
+static constexpr unsigned kToastEverySec = 5;
+
+struct NotifyRequest {
+  char pad[45];
+  char message[3075];
+};
+
+static void show_toast(const char *text) {
+  NotifyRequest req{};
+  std::snprintf(req.message, sizeof(req.message), "%s", text);
+  sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+}
+
+/* Reads the published sample and shows it as a system toast. */
+static void *display_thread(void *) {
+  bool shown_any = false;
+  while (!g_stack_shutting_down.load(std::memory_order_acquire)) {
+    OnionFpsSample s;
+    if (onion_fps_read(&s) == 0 && s.fps > 0.f) {
+      char buf[64];
+      std::snprintf(buf, sizeof(buf), "FPS: %.0f", static_cast<double>(s.fps));
+      show_toast(buf);
+      if (!shown_any) {
+        LOG_INFO("fps toast active tid=%s fps=%.1f", s.title_id,
+                 static_cast<double>(s.fps));
+        shown_any = true;
+      }
+    } else {
+      shown_any = false;
+    }
+    sleep(kToastEverySec);
+  }
+  return nullptr;
 }
 
 std::atomic_bool g_stack_shutting_down{false};
@@ -82,11 +121,14 @@ int main() {
 
   LOG_INFO("standalone fps counter started");
 
-  pthread_t render_thr{}, vsync_thr{};
+  pthread_t render_thr{}, vsync_thr{}, display_thr{};
   pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
   pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
 
+  pthread_create(&display_thr, nullptr, display_thread, nullptr);
+
   pthread_join(render_thr, nullptr);
   pthread_join(vsync_thr, nullptr);
+  pthread_join(display_thr, nullptr);
   return 0;
 }

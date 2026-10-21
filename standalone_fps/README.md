@@ -5,5 +5,6 @@ One payload (`fps_counter.elf`) that samples game FPS and publishes it to
 
 Build: `export PS5_PAYLOAD_SDK=...; ./build.sh` -> `build/bin/fps_counter.elf`
 Run: send the ELF to an elfldr (9021) on a jailbroken console, then start a game.
+Display: shows "FPS: NN" as a system toast every 5 s (change kToastEverySec in src/main.cpp).
 Log: `/data/onion_fps.log` (+ klog).
 Read: include `fps_sample.h` and call `onion_fps_read()` (stale after 2 s).

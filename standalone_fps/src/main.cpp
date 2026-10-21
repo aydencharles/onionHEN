@@ -100,13 +100,10 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
 }
 
 
-/* ---- Safe mode (default) -------------------------------------------------
- * Only reads the /dev/dce scanout flip counter. No kernel memory access, no
- * DMAP page-table walks, no code patching in the game, and it waits
- * kWarmupSec after a game starts before touching anything. This is the
- * measured display/flip rate, which equals the game's FPS for most titles.
- * Normal mode (render counters, PS4 BC hook) is the default build mode; create
- * /data/onion_fps_safe to force the scanout-only fallback when needed. */
+/* ---- Safe-mode default -----------------------------------------------------
+ * This payload must not touch game memory by default. The full render/BC hook
+ * path is intentionally unsafe and can take the console down. We keep it
+ * disabled unless the user explicitly creates /data/onion_fps_full. */
 static constexpr unsigned kWarmupSec = 15;
 static constexpr useconds_t kSafeSampleUs = 100000; /* 10 Hz */
 static constexpr const char *kFullModeFlag = "/data/onion_fps_full";
@@ -224,33 +221,28 @@ int main() {
 
   pthread_t render_thr{}, vsync_thr{}, display_thr{};
 
-  /* Normal mode is enabled by default. Create /data/onion_fps_safe to force the
-   * scanout-only path for testing, or /data/onion_fps_full to keep the legacy
-   * full-mode flag for compatibility. */
-  const bool safe_mode = access(kSafeModeFlag, F_OK) == 0;
-  const bool legacy_full = access(kFullModeFlag, F_OK) == 0;
-  const bool full = !safe_mode && (legacy_full || true);
+  const bool safe_override = access(kSafeModeFlag, F_OK) == 0;
+  const bool full = !safe_override && access(kFullModeFlag, F_OK) == 0;
 
-  if (safe_mode) {
-    LOG_WARN("SAFE mode forced: scanout-only mode enabled. Delete %s to return to normal mode.",
+  if (safe_override) {
+    LOG_WARN("SAFE mode forced: scanout-only mode enabled. Delete %s to return to default safe mode.",
              kSafeModeFlag);
     pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
   } else if (full) {
-    LOG_WARN("NORMAL mode (render counters + PS4 BC hook): active by default. "
-             "Create %s to force safe mode.",
-             kSafeModeFlag);
+    LOG_WARN("FULL mode enabled: %s exists. This is the unsafe path that can panic the kernel.",
+             kFullModeFlag);
     pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
     pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
   } else {
-    LOG_WARN("NORMAL mode fallback: forcing the full sampler path for testing.");
-    pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
-    pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
+    LOG_INFO("DEFAULT SAFE MODE: no %s present; using scanout-only sampler.",
+             kFullModeFlag);
+    pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
   }
 
   pthread_create(&display_thr, nullptr, display_thread, nullptr);
 
   pthread_join(render_thr, nullptr);
-  if (full || !safe_mode)
+  if (full)
     pthread_join(vsync_thr, nullptr);
   pthread_join(display_thr, nullptr);
   return 0;

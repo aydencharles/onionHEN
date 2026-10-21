@@ -69,13 +69,12 @@ static void debug_toast_for_sample(float fps) {
   int cpu_temp = 0;
   int gpu_temp = 0;
 
-  if (sceKernelGetCpuTemperature && sceKernelGetCpuTemperature(&cpu_temp) == 0)
+  if (sceKernelGetCpuTemperature(&cpu_temp) == 0)
     ;
   else
     cpu_temp = -1;
 
-  if (sceKernelGetSocSensorTemperature &&
-      sceKernelGetSocSensorTemperature(0, &gpu_temp) == 0)
+  if (sceKernelGetSocSensorTemperature(0, &gpu_temp) == 0)
     ;
   else
     gpu_temp = -1;

@@ -105,10 +105,12 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
  * DMAP page-table walks, no code patching in the game, and it waits
  * kWarmupSec after a game starts before touching anything. This is the
  * measured display/flip rate, which equals the game's FPS for most titles.
- * Full mode (render counters, PS4 BC hook) is opt-in; see main(). */
+ * Normal mode (render counters, PS4 BC hook) is the default build mode; create
+ * /data/onion_fps_safe to force the scanout-only fallback when needed. */
 static constexpr unsigned kWarmupSec = 15;
 static constexpr useconds_t kSafeSampleUs = 100000; /* 10 Hz */
 static constexpr const char *kFullModeFlag = "/data/onion_fps_full";
+static constexpr const char *kSafeModeFlag = "/data/onion_fps_safe";
 
 static double mono_sec() {
   struct timespec ts{};
@@ -221,20 +223,34 @@ int main() {
   LOG_INFO("standalone fps counter started");
 
   pthread_t render_thr{}, vsync_thr{}, display_thr{};
-  const bool full = access(kFullModeFlag, F_OK) == 0;
-  if (full) {
-    LOG_WARN("FULL mode (render counters + PS4 BC hook): touches game/kernel "
-             "memory. Delete %s for safe mode.", kFullModeFlag);
+
+  /* Normal mode is enabled by default. Create /data/onion_fps_safe to force the
+   * scanout-only path for testing, or /data/onion_fps_full to keep the legacy
+   * full-mode flag for compatibility. */
+  const bool safe_mode = access(kSafeModeFlag, F_OK) == 0;
+  const bool legacy_full = access(kFullModeFlag, F_OK) == 0;
+  const bool full = !safe_mode && (legacy_full || true);
+
+  if (safe_mode) {
+    LOG_WARN("SAFE mode forced: scanout-only mode enabled. Delete %s to return to normal mode.",
+             kSafeModeFlag);
+    pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
+  } else if (full) {
+    LOG_WARN("NORMAL mode (render counters + PS4 BC hook): active by default. "
+             "Create %s to force safe mode.",
+             kSafeModeFlag);
     pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
     pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
   } else {
-    pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
+    LOG_WARN("NORMAL mode fallback: forcing the full sampler path for testing.");
+    pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
+    pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
   }
 
   pthread_create(&display_thr, nullptr, display_thread, nullptr);
 
   pthread_join(render_thr, nullptr);
-  if (full)
+  if (full || !safe_mode)
     pthread_join(vsync_thr, nullptr);
   pthread_join(display_thr, nullptr);
   return 0;

@@ -26,6 +26,15 @@
 #include "globalconf.hpp"
 
 extern "C" {
+#include <ps5/payload.h>
+}
+
+/* libhijacker reads this global (allproc/rootvnode lookups). The daemon sets
+ * it the same way from the payload args. */
+extern "C" uint64_t kernel_base;
+uint64_t kernel_base = 0;
+
+extern "C" {
 int sceKernelGetProcessName(int pid, char *name);
 int sceKernelGetAppInfo(pid_t pid, void *info);
 int sceSystemServiceGetAppIdOfRunningBigApp();
@@ -52,6 +61,9 @@ static void on_term(int) {
 }
 
 int main() {
+  payload_args_t *args = payload_get_args();
+  kernel_base = static_cast<uint64_t>(args->kdata_base_addr);
+
   mkdir(ONION_SYSTEM_TMP_ROOT, 0777);
   onion_log_configure("FPS", "/data/onion_fps.log");
   onion_log_set_level(ONION_LOG_INFO);

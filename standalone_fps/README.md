@@ -1,0 +1,9 @@
+# Standalone FPS counter
+
+One payload (`fps_counter.elf`) that samples game FPS and publishes it to
+`/system_tmp/onionhen/fps_sample`. No daemon, util, kstuff, settings or ShellUI.
+
+Build: `export PS5_PAYLOAD_SDK=...; ./build.sh` -> `build/bin/fps_counter.elf`
+Run: send the ELF to an elfldr (9021) on a jailbroken console, then start a game.
+Log: `/data/onion_fps.log` (+ klog).
+Read: include `fps_sample.h` and call `onion_fps_read()` (stale after 2 s).

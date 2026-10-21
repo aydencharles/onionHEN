@@ -13,6 +13,7 @@
 #include <onion/fps_publish.hpp>
 #include <onion/fps_sample.h>
 #include <onion/log.h>
+#include <onion/notify.h>
 #include <onion/proc_query.h>
 #include <onion/system_tmp.h>
 
@@ -53,15 +54,32 @@ int sceKernelSendNotificationRequest(int device, void *req, size_t size,
 /* How often the on-screen FPS toast is shown (seconds). Edit and rebuild. */
 static constexpr unsigned kToastEverySec = 5;
 
-struct NotifyRequest {
-  char pad[45];
-  char message[3075];
-};
-
 static void show_toast(const char *text) {
-  NotifyRequest req{};
+  if (!text || !text[0])
+    return;
+
+  /* Must match the kernel layout exactly. The payload-local 45-byte pad +
+   * 3075-byte message layout is not the real request structure and can corrupt
+   * system state when sent. */
+  OrbisNotificationRequest req{};
+  std::memset(&req, 0, sizeof(req));
+
+  req.type = 0;
+  req.req_id = 0;
+  req.priority = 0;
+  req.msg_id = 0;
+  req.target_id = -1;
+  req.user_id = 0;
+  req.unk1 = 0;
+  req.unk2 = 0;
+  req.app_id = 0;
+  req.error_num = 0;
+  req.unk3 = 0;
+  req.use_icon_image_uri = 0;
+  req.uri[0] = '\0';
   std::snprintf(req.message, sizeof(req.message), "%s", text);
-  sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+
+  (void)sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
 }
 
 static void debug_toast_for_sample(float fps) {

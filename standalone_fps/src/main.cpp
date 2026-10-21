@@ -44,6 +44,8 @@ int sceKernelGetProcessName(int pid, char *name);
 int sceKernelGetAppInfo(pid_t pid, void *info);
 int sceSystemServiceGetAppIdOfRunningBigApp();
 int sceSystemServiceGetAppTitleId(int app_id, char *title_id);
+int sceKernelGetCpuTemperature(int *temp);
+int sceKernelGetSocSensorTemperature(int sensor, int *temp);
 int sceKernelSendNotificationRequest(int device, void *req, size_t size,
                                      int blocking);
 }
@@ -62,15 +64,45 @@ static void show_toast(const char *text) {
   sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
 }
 
+static void debug_toast_for_sample(float fps) {
+  char buf[128]{};
+  int cpu_temp = 0;
+  int gpu_temp = 0;
+
+  if (sceKernelGetCpuTemperature && sceKernelGetCpuTemperature(&cpu_temp) == 0)
+    ;
+  else
+    cpu_temp = -1;
+
+  if (sceKernelGetSocSensorTemperature &&
+      sceKernelGetSocSensorTemperature(0, &gpu_temp) == 0)
+    ;
+  else
+    gpu_temp = -1;
+
+  if (cpu_temp >= 0 && gpu_temp >= 0) {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f CPU: %dC GPU: %dC",
+                  static_cast<double>(fps), cpu_temp, gpu_temp);
+  } else if (cpu_temp >= 0) {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f CPU: %dC",
+                  static_cast<double>(fps), cpu_temp);
+  } else if (gpu_temp >= 0) {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f GPU: %dC",
+                  static_cast<double>(fps), gpu_temp);
+  } else {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f", static_cast<double>(fps));
+  }
+
+  show_toast(buf);
+}
+
 /* Reads the published sample and shows it as a system toast. */
 static void *display_thread(void *) {
   bool shown_any = false;
   while (!g_stack_shutting_down.load(std::memory_order_acquire)) {
     OnionFpsSample s;
     if (onion_fps_read(&s) == 0 && s.fps > 0.f) {
-      char buf[64];
-      std::snprintf(buf, sizeof(buf), "FPS: %.0f", static_cast<double>(s.fps));
-      show_toast(buf);
+      debug_toast_for_sample(s.fps);
       if (!shown_any) {
         LOG_INFO("fps toast active tid=%s fps=%.1f", s.title_id,
                  static_cast<double>(s.fps));
@@ -100,11 +132,14 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
 }
 
 
-/* ---- Safe-mode default -----------------------------------------------------
- * This payload must not touch game memory by default. The full render/BC hook
- * path is intentionally unsafe and can take the console down. We keep it
- * disabled unless the user explicitly creates /data/onion_fps_full. */
-static constexpr unsigned kWarmupSec = 15;
+/* ---- Safe mode (default) -------------------------------------------------
+ * Only reads the /dev/dce scanout flip counter. No kernel memory access, no
+ * DMAP page-table walks, no code patching in the game, and it waits
+ * kWarmupSec after a game starts before touching anything. This is the
+ * measured display/flip rate, which equals the game's FPS for most titles.
+ * We intentionally keep it warmup-free so the payload is usable as soon as a
+ * game starts. */
+static constexpr unsigned kWarmupSec = 0;
 static constexpr useconds_t kSafeSampleUs = 100000; /* 10 Hz */
 static constexpr const char *kFullModeFlag = "/data/onion_fps_full";
 static constexpr const char *kSafeModeFlag = "/data/onion_fps_safe";
@@ -156,8 +191,7 @@ static void *safe_sampler_thread(void *) {
       started = mono_sec();
       have = false;
       wn = wi = 0;
-      LOG_INFO("safe fps: game %s detected, waiting %us", tid.c_str(),
-               kWarmupSec);
+      LOG_INFO("safe fps: game %s detected; sampling immediately", tid.c_str());
     }
     if (mono_sec() - started < kWarmupSec) {
       publish_sample(false, tid.c_str(), 0.f);
@@ -225,7 +259,7 @@ int main() {
   const bool full = !safe_override && access(kFullModeFlag, F_OK) == 0;
 
   if (safe_override) {
-    LOG_WARN("SAFE mode forced: scanout-only mode enabled. Delete %s to return to default safe mode.",
+    LOG_WARN("SAFE mode forced: scanout-only mode enabled. Delete %s to return to safe mode.",
              kSafeModeFlag);
     pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
   } else if (full) {

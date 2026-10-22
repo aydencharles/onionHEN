@@ -772,6 +772,14 @@ MonoObject* find_container_scene(MonoImage* app_system, const char* path) {
  * outcome in /data/onion_fps_scenes.log so the right name can be pinned down. */
 void probe_menu_scenes(MonoImage* app_system) {
   static const char* const kCandidates[] = {
+      /* names seen in public references */
+      "ContentAreaScene", /* home screen content area */
+      "SystemAreaScene",  /* top system area */
+      "QuickMenuScene",   /* control center / quick menu */
+      "MenuScene",
+      "LayerScene",       /* system overlay layer */
+      "ImposeTop",        /* PS menu top-level scene */
+      /* guesses */
       "Home", "Default", "Main", "System", "Root",
       "Shell", "Menu", "Top", "Overlay", "Dialog",
   };

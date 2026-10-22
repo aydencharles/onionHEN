@@ -82,7 +82,7 @@ void __syscall() {
 void (*OnRender_orig)(MonoObject* instance);
 void (*oUserCustomElementReset)(MonoObject* instance, MonoObject* item) = nullptr;
 void (*oSettingPageStackOnPopping)(MonoObject* instance, MonoObject* outgoing,
-                                   MonoObject* incoming) = nullptr;
+                                    MonoObject* incoming) = nullptr;
 MonoObject* rootWidget = nullptr;
 MonoObject* font = nullptr;
 void (*Orig_ReloadApp)(MonoString* str) = nullptr;
@@ -157,7 +157,7 @@ template <typename Fn>
 bool install_detour_native(const char* name, void* target, void* hook, Fn& out_orig,
                            bool required) {
   return install_detour(name, reinterpret_cast<uint64_t>(target), hook, out_orig,
-                        required);
+                       required);
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +493,7 @@ bool install_mono_hook(const MonoHookSpec& h) {
     return !h.required;
   }
   LOG_DEBUG("Installing mono hook: %s target=%#02lx hook=%p", h.name, addr,
-              h.hook);
+            h.hook);
   if (!InstallDetour(addr, h.hook, h.orig)) {
     LOG_ERROR("Detour failed: %s", h.name);
     if (h.required)
@@ -727,6 +727,8 @@ int fps_overlay_only_main() {
 
   if (!resolve_native_symbols(pid) || !resolve_mono_symbols(pid))
     return -1;
+
+  init_resource_names();
 
   /* Fixed overlay config: FPS / CPU / GPU, stacked, top-left. */
   g_settings.overlay_enabled = true;

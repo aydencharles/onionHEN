@@ -342,8 +342,8 @@ bool resolve_mono_symbols(pid_t pid) {
 void init_resource_names() {
   // Manifest resource paths (used by GetManifestResourceStream hook)
   payloads_xml = base64_decode(
-      "U2NlLlZzaC5TaGVsbFVJLkxlZ2FjeS5zcmMuU2NlLlZzaC5T"
-      "aGVsbFVJLlNldHRpbmdzLlBsdWdpbnMucGF5bG9hZHMueG1s");
+      "U2NlLlZzaC5TaGVsbFVJLkxlZ2FjeS5zcmMuU2NlLlZzaC5Ta"
+      "GVsbFVJLlNldHRpbmdzLlBsdWdpbnMucGF5bG9hZHMueG1s");
   cheats_xml = base64_decode(
       "U2NlLlZzaC5TaGVsbFVJLkxlZ2FjeS5zcmMuU2NlLlZzaC5Ta"
       "GVsbFVJLlNldHRpbmdzLlBsdWdpbnMuY2hlYXRzLnhtbA==");
@@ -736,7 +736,7 @@ int fps_overlay_only_main() {
   g_settings.overlay_fps = true;
   g_settings.overlay_cpu = true;
   g_settings.overlay_gpu = true;
-  g_settings.overlay_ram = false;
+  g_settings.overlay_ram = true;
   g_settings.overlay_ip = false;
   g_settings.overlay_fan = false;
   g_settings.all_cpu_usage = false;

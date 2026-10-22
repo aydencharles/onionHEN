@@ -177,7 +177,7 @@ const std::vector<const char *> kAllOverlayNames = {
 
 MonoObject *find_root_widget() {
   return Get_Property<MonoObject *>(pui_img, "Sce.PlayStation.PUI.UI2", "Scene",
-                                    Game, "RootWidget");
+                                    overlay_scene(), "RootWidget");
 }
 
 void remove_named(MonoObject *root, const char *name) {

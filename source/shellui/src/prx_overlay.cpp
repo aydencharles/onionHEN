@@ -170,7 +170,8 @@ constexpr int kPageTableVram = 2;
 
 MonoObject *find_label(const char *widget_name) {
   MonoObject *root = Get_Property<MonoObject *>(
-      pui_img, "Sce.PlayStation.PUI.UI2", "Scene", Game, "RootWidget");
+      pui_img, "Sce.PlayStation.PUI.UI2", "Scene", overlay_scene(),
+      "RootWidget");
   MonoClass *widget_cls =
       mono_class_from_name(pui_img, "Sce.PlayStation.PUI.UI2", "Widget");
   return Invoke<MonoObject *>(pui_img, widget_cls, root, "FindWidgetByName",
@@ -263,10 +264,11 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   Row rows[2];
   int nrows = 0;
 
-  if (g_settings.overlay_fps) {
+  /* No FPS row without a sample (e.g. on the menu, when no game is running). */
+  if (g_settings.overlay_fps && fps_str && fps_str[0] && fps_str[0] != '-') {
     rows[nrows].id = "id_fps_label";
     std::snprintf(rows[nrows].text, sizeof(rows[nrows].text), "FPS: %s",
-                  (fps_str && fps_str[0]) ? fps_str : "--");
+                  fps_str);
     ++nrows;
   }
 
@@ -546,6 +548,59 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
   return true;
 }
 
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+/* The standalone overlay also draws on the menu scene(s) resolved at startup
+ * (see probe_menu_scenes() in prx.cpp), so it stays visible outside a game.
+ * Each scene gets its own FPS and CPU/GPU labels; whichever scene is on screen
+ * shows them. */
+bool init_extra_scene_widgets(MonoObject *scene) {
+  MonoObject *root = Get_Property<MonoObject *>(
+      pui_img, "Sce.PlayStation.PUI.UI2", "Scene", scene, "RootWidget");
+  if (!root)
+    return false;
+
+  g_overlay_scene = scene;
+  RemoveGameWidget(REMOVE_ALL_OVERLAYS);
+  bool ok = true;
+  if (g_settings.overlay_fps && !CreateGameWidget(CREATE_FPS_OVERLAY))
+    ok = false;
+  if ((g_settings.overlay_cpu || g_settings.overlay_gpu) &&
+      !CreateGameWidget(CREATE_CPU_OVERLAY))
+    ok = false;
+  if (!ok)
+    RemoveGameWidget(REMOVE_ALL_OVERLAYS);
+  g_overlay_scene = nullptr;
+  return ok;
+}
+
+void update_extra_scenes(const char *fps_str, const char *cpu_temp,
+                         const char *gpu_temp) {
+  constexpr size_t kMaxScenes = 16;
+  constexpr unsigned kRetryEvery = 30; /* calls between init retries */
+  static bool ready[kMaxScenes] = {};
+  static unsigned tick = 0;
+  ++tick;
+
+  const size_t n = std::min(g_overlay_extra_scenes.size(), kMaxScenes);
+  for (size_t i = 0; i < n; ++i) {
+    MonoObject *scene = g_overlay_extra_scenes[i];
+    if (!scene)
+      continue;
+    if (!ready[i]) {
+      if (tick % kRetryEvery != 0)
+        continue;
+      ready[i] = init_extra_scene_widgets(scene);
+      if (!ready[i])
+        continue;
+    }
+    g_overlay_scene = scene;
+    layout_bar_labels(fps_str, cpu_temp, nullptr, gpu_temp, nullptr, nullptr,
+                      nullptr, nullptr);
+    g_overlay_scene = nullptr;
+  }
+}
+#endif /* ONIONHEN_FPS_OVERLAY_ONLY */
+
 /** Sample CPU into Usage[]; formats CPU_USAGE. Returns false if sampling skipped/failed. */
 bool sample_cpu_usage(unsigned int idle_tid[kCpuCores], int& current_bank,
                       char* cpu_usage, size_t cpu_usage_sz) {
@@ -735,6 +790,10 @@ void OnRender_Hook(MonoObject* instance) {
         g_settings.overlay_ram ? ram_str : nullptr,
         g_settings.overlay_ip ? ip_address : nullptr,
         g_settings.overlay_fan ? fan_str : nullptr);
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+    update_extra_scenes(g_settings.overlay_fps ? fps_str : nullptr, cpu_temp,
+                        gpu_temp);
+#endif
     frames_until_fps = kFpsUpdateIntervalFrames;
   } else {
     frames_until_fps--;

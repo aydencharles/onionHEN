@@ -33,7 +33,6 @@ along with this program; see the file COPYING. If not, see
 #include <onion/proc_query.h>
 #include <onion/ready.h>
 
-#include <cstdio>
 #include <cstring>
 #include <cstdint>
 #include <string>
@@ -58,10 +57,6 @@ std::string cheats_xml;
 MonoImage* pui_img = nullptr;
 MonoImage* AppSystem_img = nullptr;
 MonoObject* Game = nullptr;
-MonoObject* g_overlay_scene = nullptr;
-#ifdef ONIONHEN_FPS_OVERLAY_ONLY
-std::vector<MonoObject*> g_overlay_extra_scenes;
-#endif
 MonoImage* react_common_img = nullptr;
 
 bool hooked = false;
@@ -750,88 +745,6 @@ void init_overlay_resource_names() {
   appsystem_dll = base64_decode("U2NlLlZzaC5TaGVsbFVJLkFwcFN5c3RlbS5kbGw=");
 }
 
-/* Resolve a ShellUI container scene by path without the toolbox's on-screen
- * notifications. Returns nullptr when the path is unknown. */
-MonoObject* find_container_scene(MonoImage* app_system, const char* path) {
-  MonoClass* layer_manager =
-      mono_class_from_name(app_system, "Sce.Vsh.ShellUI.AppSystem", "LayerManager");
-  if (!layer_manager)
-    return nullptr;
-  MonoMethod* find =
-      mono_class_get_method_from_name(layer_manager, "FindContainerSceneByPath", 1);
-  if (!find)
-    return nullptr;
-  void* args[1] = {mono_string_new(mono_domain_get(), path)};
-  MonoObject* exception = nullptr;
-  MonoObject* scene = mono_runtime_invoke(find, nullptr, args, &exception);
-  return exception ? nullptr : scene;
-}
-
-/* Menu scenes are OPT-IN. The menu scene's path is not public and attaching
- * widgets to the wrong scene can break the overlay, so by default this only
- * PROBES: every candidate name is resolved and the result is written to
- * /data/onion_fps_scenes.log (flushed before any hook is installed). To draw
- * on a scene too, list its exact name, one per line, in
- * /data/onion_fps_scenes.cfg (e.g. "ContentAreaScene"). */
-bool scene_enabled_in_cfg(const char* name) {
-  FILE* cfg = fopen("/data/onion_fps_scenes.cfg", "r");
-  if (!cfg)
-    return false;
-  char line[128];
-  bool found = false;
-  while (!found && fgets(line, sizeof(line), cfg)) {
-    size_t n = strlen(line);
-    while (n && (line[n - 1] == '\n' || line[n - 1] == '\r' || line[n - 1] == ' '))
-      line[--n] = '\0';
-    found = (strcmp(line, name) == 0);
-  }
-  fclose(cfg);
-  return found;
-}
-
-void probe_menu_scenes(MonoImage* app_system) {
-  static const char* const kCandidates[] = {
-      /* names seen in public references */
-      "ContentAreaScene", /* home screen content area */
-      "SystemAreaScene",  /* top system area */
-      "QuickMenuScene",   /* control center / quick menu */
-      "MenuScene",
-      "LayerScene",       /* system overlay layer */
-      "ImposeTop",        /* PS menu top-level scene */
-      /* guesses */
-      "Home", "Default", "Main", "System", "Root",
-      "Shell", "Menu", "Top", "Overlay", "Dialog",
-  };
-  FILE* log = fopen("/data/onion_fps_scenes.log", "w");
-  if (log) {
-    fprintf(log, "Game scene: %p\n", static_cast<void*>(Game));
-    fflush(log);
-  }
-  for (const char* name : kCandidates) {
-    MonoObject* scene = find_container_scene(app_system, name);
-    const bool wanted = scene && scene != Game && scene_enabled_in_cfg(name);
-    bool added = false;
-    if (wanted) {
-      added = true;
-      for (MonoObject* known : g_overlay_extra_scenes)
-        if (known == scene)
-          added = false;
-      if (added)
-        g_overlay_extra_scenes.push_back(scene);
-    }
-    if (log) {
-      fprintf(log, "probe \"%s\": %s (%p)\n", name,
-              !scene ? "not found"
-                     : added ? "resolved, overlay attached (listed in cfg)"
-                             : "resolved, NOT attached (not listed in cfg)",
-              static_cast<void*>(scene));
-      fflush(log);
-    }
-  }
-  if (log)
-    fclose(log);
-}
-
 int fps_overlay_only_main() {
   const pid_t pid = getpid();
   AuthIdGuard auth(pid, set_ucred_to_ptrace());
@@ -866,8 +779,6 @@ int fps_overlay_only_main() {
   ShellImages images;
   if (!load_overlay_images(images) || !resolve_game_container(images.app_system))
     return -1;
-
-  probe_menu_scenes(images.app_system);
 
   char probe[kMprotectProbeSize];
   has_hv_bypass = (sceKernelMprotect(probe, sizeof(probe), kProtRwx) == 0);

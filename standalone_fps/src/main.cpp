@@ -129,6 +129,19 @@ static void publish_sample(bool valid, const char *tid, float fps) {
   onion::fps::publish(s);
 }
 
+/* Tells the overlay (inside SceShellUI) that this payload is going away so it
+ * can remove its widgets immediately. A killed payload (SIGKILL) cannot do
+ * this; the overlay then notices the heartbeat stopped (see
+ * fps_payload_alive() in prx_overlay.cpp). */
+static void publish_shutdown() {
+  OnionFpsSample s{};
+  s.pid = ONION_FPS_PID_SHUTDOWN;
+  s.valid = 0;
+  s.source = ONION_FPS_SRC_SCANOUT;
+  s.unix_ns = onion_fps_realtime_ns();
+  onion::fps::publish(s);
+}
+
 static void *safe_sampler_thread(void *) {
   onion::fps::DceSource dce;
   std::string cached_tid;
@@ -184,12 +197,18 @@ static void *safe_sampler_thread(void *) {
       last_t = now;
       have = true;
     } else if (dce.unavailable()) {
-      LOG_ERROR("safe fps: /dev/dce unavailable, giving up");
+      static bool logged = false;
+      if (!logged) {
+        LOG_ERROR("safe fps: /dev/dce unavailable");
+        logged = true;
+      }
+      /* Keep the heartbeat alive; the overlay hides itself if it stops. */
       publish_sample(false, tid.c_str(), 0.f);
-      sleep(5);
+      sleep(1);
     }
     usleep(kSafeSampleUs);
   }
+  publish_shutdown();
   return nullptr;
 }
 

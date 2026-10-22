@@ -362,16 +362,6 @@ extern  std::string debug_settings_xml;
 extern MonoImage* pui_img;
 extern MonoImage* AppSystem_img;
 extern MonoObject* Game;
-/* Scene the overlay widgets are currently being created/updated on. nullptr =
- * the Game scene. The standalone FPS build points it at extra container scenes
- * (menu) for the duration of one update. */
-extern MonoObject* g_overlay_scene;
-inline MonoObject* overlay_scene() { return g_overlay_scene ? g_overlay_scene : Game; }
-#ifdef ONIONHEN_FPS_OVERLAY_ONLY
-#include <vector>
-/* Extra container scenes (menu) the standalone overlay also draws on. */
-extern std::vector<MonoObject*> g_overlay_extra_scenes;
-#endif
 
 
 

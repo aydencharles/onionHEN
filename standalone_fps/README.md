@@ -29,13 +29,8 @@ Appearance is fixed in code: layout in `layout_bar_labels()`
 colour/weight in `source/shellui/src/shellui_overlay_widgets.cpp`, enabled
 metrics/position in `fps_overlay_only_main()` (`source/shellui/src/prx.cpp`).
 
-## Menu scenes (experimental, opt-in)
-
-The overlay always draws over a running game. On startup it also probes
-candidate ShellUI scene names and writes what resolved to
-`/data/onion_fps_scenes.log`. It draws on a menu scene only if you list that
-scene's exact name (one per line) in `/data/onion_fps_scenes.cfg`, e.g.:
-
-    ContentAreaScene
-
-Try one name at a time and reload `fps_counter.elf`.
+Stopping the payload: on a clean exit (SIGTERM/SIGINT) it publishes a shutdown
+marker and the overlay removes all its widgets at once. If the payload is
+killed outright, the overlay notices that the heartbeat (the payload publishes
+at least once a second) stopped for 4 s and removes its widgets too. Starting
+the payload again brings the overlay back without re-injecting.

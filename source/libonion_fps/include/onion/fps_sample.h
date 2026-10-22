@@ -22,6 +22,11 @@ extern "C" {
 #define ONION_FPS_MAGIC 0x4F465053u /* 'OFPS' */
 #define ONION_FPS_SAMPLE_BYTES 128
 #define ONION_FPS_STALE_NS 2000000000ull /* 2 s */
+/* sample.pid value published by the payload when it exits cleanly. */
+#define ONION_FPS_PID_SHUTDOWN (-2)
+/* The overlay treats the payload as gone when no sample (valid or not) has
+ * been published for this long. The payload publishes at least once a second. */
+#define ONION_FPS_HEARTBEAT_TIMEOUT_NS 4000000000ull /* 4 s */
 
 enum OnionFpsSource {
   ONION_FPS_SRC_NONE = 0,

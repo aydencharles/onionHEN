@@ -13,6 +13,7 @@
 #include <onion/fps_publish.hpp>
 #include <onion/fps_sample.h>
 #include <onion/log.h>
+#include <onion/notify.h>
 #include <onion/proc_query.h>
 #include <onion/system_tmp.h>
 
@@ -34,6 +35,29 @@ extern "C" {
 #include <ps5/payload.h>
 }
 
+/* The standalone payload is intentionally not linked against the full OnionHEN
+ * notification helpers. It must use the exact PS5 request layout that the OS
+ * expects when sending a toast. */
+struct OrbisNotificationRequest {
+  int32_t type;
+  int32_t req_id;
+  int32_t priority;
+  int32_t msg_id;
+  int32_t target_id;
+  int32_t user_id;
+  int32_t unk1;
+  int32_t unk2;
+  int32_t app_id;
+  int32_t error_num;
+  int32_t unk3;
+  char use_icon_image_uri;
+  char message[1024];
+  char uri[1024];
+  char unkstr[1024];
+};
+static_assert(sizeof(OrbisNotificationRequest) == 0xC30,
+              "OrbisNotificationRequest layout must match PS5 OS ABI");
+
 /* libhijacker reads this global (allproc/rootvnode lookups). The daemon sets
  * it the same way from the payload args. */
 extern "C" uint64_t kernel_base;
@@ -44,6 +68,8 @@ int sceKernelGetProcessName(int pid, char *name);
 int sceKernelGetAppInfo(pid_t pid, void *info);
 int sceSystemServiceGetAppIdOfRunningBigApp();
 int sceSystemServiceGetAppTitleId(int app_id, char *title_id);
+int sceKernelGetCpuTemperature(int *temp);
+int sceKernelGetSocSensorTemperature(int sensor, int *temp);
 int sceKernelSendNotificationRequest(int device, void *req, size_t size,
                                      int blocking);
 }
@@ -51,15 +77,59 @@ int sceKernelSendNotificationRequest(int device, void *req, size_t size,
 /* How often the on-screen FPS toast is shown (seconds). Edit and rebuild. */
 static constexpr unsigned kToastEverySec = 5;
 
-struct NotifyRequest {
-  char pad[45];
-  char message[3075];
-};
-
 static void show_toast(const char *text) {
-  NotifyRequest req{};
+  if (!text || !text[0])
+    return;
+
+  OrbisNotificationRequest req{};
+  std::memset(&req, 0, sizeof(req));
+  req.type = 0;
+  req.req_id = 0;
+  req.priority = 0;
+  req.msg_id = 0;
+  req.target_id = -1;
+  req.user_id = 0;
+  req.unk1 = 0;
+  req.unk2 = 0;
+  req.app_id = 0;
+  req.error_num = 0;
+  req.unk3 = 0;
+  req.use_icon_image_uri = 0;
+  req.uri[0] = '\0';
   std::snprintf(req.message, sizeof(req.message), "%s", text);
-  sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+
+  (void)sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+}
+
+static void debug_toast_for_sample(float fps) {
+  char buf[128]{};
+  int cpu_temp = 0;
+  int gpu_temp = 0;
+
+  if (sceKernelGetCpuTemperature(&cpu_temp) == 0)
+    ;
+  else
+    cpu_temp = -1;
+
+  if (sceKernelGetSocSensorTemperature(0, &gpu_temp) == 0)
+    ;
+  else
+    gpu_temp = -1;
+
+  if (cpu_temp >= 0 && gpu_temp >= 0) {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f CPU: %dC GPU: %dC",
+                  static_cast<double>(fps), cpu_temp, gpu_temp);
+  } else if (cpu_temp >= 0) {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f CPU: %dC",
+                  static_cast<double>(fps), cpu_temp);
+  } else if (gpu_temp >= 0) {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f GPU: %dC",
+                  static_cast<double>(fps), gpu_temp);
+  } else {
+    std::snprintf(buf, sizeof(buf), "FPS: %.0f", static_cast<double>(fps));
+  }
+
+  show_toast(buf);
 }
 
 /* Reads the published sample and shows it as a system toast. */
@@ -68,9 +138,7 @@ static void *display_thread(void *) {
   while (!g_stack_shutting_down.load(std::memory_order_acquire)) {
     OnionFpsSample s;
     if (onion_fps_read(&s) == 0 && s.fps > 0.f) {
-      char buf[64];
-      std::snprintf(buf, sizeof(buf), "FPS: %.0f", static_cast<double>(s.fps));
-      show_toast(buf);
+      debug_toast_for_sample(s.fps);
       if (!shown_any) {
         LOG_INFO("fps toast active tid=%s fps=%.1f", s.title_id,
                  static_cast<double>(s.fps));
@@ -99,16 +167,12 @@ bool Get_Running_App_TID(std::string &title_id, int &BigAppid) {
   return true;
 }
 
-
-/* ---- Safe mode (default) -------------------------------------------------
- * Only reads the /dev/dce scanout flip counter. No kernel memory access, no
- * DMAP page-table walks, no code patching in the game, and it waits
- * kWarmupSec after a game starts before touching anything. This is the
- * measured display/flip rate, which equals the game's FPS for most titles.
- * Full mode (render counters, PS4 BC hook) is opt-in; see main(). */
-static constexpr unsigned kWarmupSec = 15;
+/* ---- Safe mode only --------------------------------------------------------
+ * The full render counter / PS4 BC hook path is intentionally removed. The
+ * standalone FPS payload must stay in the scanout-only path so it cannot touch
+ * game memory, kernel memory, or PS4 compatibility hooks. */
+static constexpr unsigned kWarmupSec = 0;
 static constexpr useconds_t kSafeSampleUs = 100000; /* 10 Hz */
-static constexpr const char *kFullModeFlag = "/data/onion_fps_full";
 
 static double mono_sec() {
   struct timespec ts{};
@@ -157,8 +221,7 @@ static void *safe_sampler_thread(void *) {
       started = mono_sec();
       have = false;
       wn = wi = 0;
-      LOG_INFO("safe fps: game %s detected, waiting %us", tid.c_str(),
-               kWarmupSec);
+      LOG_INFO("safe fps: game %s detected; sampling immediately", tid.c_str());
     }
     if (mono_sec() - started < kWarmupSec) {
       publish_sample(false, tid.c_str(), 0.f);
@@ -218,24 +281,13 @@ int main() {
       },
       []() -> int { return sceSystemServiceGetAppIdOfRunningBigApp(); });
 
-  LOG_INFO("standalone fps counter started");
+  LOG_INFO("standalone fps counter started (safe scanout-only mode)");
 
-  pthread_t render_thr{}, vsync_thr{}, display_thr{};
-  const bool full = access(kFullModeFlag, F_OK) == 0;
-  if (full) {
-    LOG_WARN("FULL mode (render counters + PS4 BC hook): touches game/kernel "
-             "memory. Delete %s for safe mode.", kFullModeFlag);
-    pthread_create(&render_thr, nullptr, fps_sampler_thread, nullptr);
-    pthread_create(&vsync_thr, nullptr, vsync_fps_sampler_thread, nullptr);
-  } else {
-    pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
-  }
-
+  pthread_t render_thr{}, display_thr{};
+  pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
   pthread_create(&display_thr, nullptr, display_thread, nullptr);
 
   pthread_join(render_thr, nullptr);
-  if (full)
-    pthread_join(vsync_thr, nullptr);
   pthread_join(display_thr, nullptr);
   return 0;
 }

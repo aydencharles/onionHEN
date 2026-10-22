@@ -721,6 +721,30 @@ void run_keep_alive() {
  */
 namespace {
 
+/* Only the assemblies the overlay hook touches. Everything else load_shell_images()
+ * requires (Legacy, ReactNative.*, CaptureMenu, ...) belongs to the toolbox and
+ * must not be able to fail the overlay. */
+bool load_overlay_images(ShellImages& out) {
+  out.core = require_dll("Sce.PlayStation.Core.dll");
+  out.pui = require_dll("Sce.PlayStation.PUI.dll");
+  out.app_system = require_dll(appsystem_dll.c_str());
+  if (!out.core || !out.pui || !out.app_system)
+    return false;
+
+  AppSystem_img = out.app_system;
+  pui_img = out.pui;
+  return true;
+}
+
+/* Only the names the overlay path can reach (AppSystem for the Game scene,
+ * Legacy/UI3 for the progress pollers). Skips the manifest-resource names and
+ * their debug dump, which only the toolbox needs. */
+void init_overlay_resource_names() {
+  legacy_dec = base64_decode("U2NlLlZzaC5TaGVsbFVJLkxlZ2FjeS5kbGw="); // Legacy.dll
+  UI3_dec = base64_decode("U2NlLlZzaC5TaGVsbFVJLlNldHRpbmdzLkNvcmVVSTM="); // Settings.CoreUI3
+  appsystem_dll = base64_decode("U2NlLlZzaC5TaGVsbFVJLkFwcFN5c3RlbS5kbGw=");
+}
+
 int fps_overlay_only_main() {
   const pid_t pid = getpid();
   AuthIdGuard auth(pid, set_ucred_to_ptrace());
@@ -728,21 +752,22 @@ int fps_overlay_only_main() {
   if (!resolve_native_symbols(pid) || !resolve_mono_symbols(pid))
     return -1;
 
-  init_resource_names();
+  init_overlay_resource_names();
 
-  /* Fixed overlay config: FPS / CPU / GPU, stacked, top-left. */
+  /* Fixed overlay config: two text rows (FPS / CPU+GPU temps), top-left,
+   * no background panel. Font size is fixed in overlay::effective_font_pt(). */
   g_settings.overlay_enabled = true;
-  g_settings.overlay_background = true;
+  g_settings.overlay_background = false;
   g_settings.overlay_fps = true;
   g_settings.overlay_cpu = true;
   g_settings.overlay_gpu = true;
-  g_settings.overlay_ram = true;
+  g_settings.overlay_ram = false;
   g_settings.overlay_ip = false;
   g_settings.overlay_fan = false;
   g_settings.all_cpu_usage = false;
   g_settings.overlay_pos = 0;   /* top edge */
   g_settings.overlay_align = 0; /* left */
-  g_settings.overlay_font_size = onion::kOverlayFontMedium;
+  g_settings.overlay_font_size = onion::kOverlayFontLarge; /* unused: see above */
 
   if (!mono_get_root_domain)
     return -1;
@@ -752,7 +777,7 @@ int fps_overlay_only_main() {
   mono_thread_attach(Root_Domain);
 
   ShellImages images;
-  if (!load_shell_images(images) || !resolve_game_container(images.app_system))
+  if (!load_overlay_images(images) || !resolve_game_container(images.app_system))
     return -1;
 
   char probe[kMprotectProbeSize];

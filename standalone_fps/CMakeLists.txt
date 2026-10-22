@@ -1,9 +1,12 @@
 # Standalone FPS counter + on-screen overlay.
 #
 # Builds, in one configure and without the daemon/util/kstuff/bootstrapper:
-#   shellui.elf   the overlay-only ShellUI module (ONIONHEN_FPS_OVERLAY_ONLY)
-#   fps_counter.elf  the payload: safe scanout sampler + injector that embeds
-#                    shellui.elf and injects it into SceShellUI.
+#   build/internal/shellui.elf  intermediate: the overlay-only ShellUI module
+#                               (ONIONHEN_FPS_OVERLAY_ONLY). NOT a payload;
+#                               never load it on its own.
+#   build/bin/fps_counter.elf   THE payload: safe scanout sampler + injector
+#                               that embeds shellui.elf and injects it into
+#                               SceShellUI. This is the only file to load.
 # All code is reused from ../source so it stays in sync with the fork.
 cmake_minimum_required(VERSION 3.20)
 project(fps_counter C CXX ASM)
@@ -24,9 +27,13 @@ set(ONIONHEN_PS5_STUB_DIR "${PROJECT_ROOT}/platform/ps5/stubs")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_ROOT}/cmake")
 include(OnionTarget)
 
+# Layout: build/bin/ holds ONLY fps_counter.elf (the one payload to load).
+# Everything else, including the overlay shellui.elf that gets embedded into
+# it, is an intermediate and lives under build/internal/.
 set(ONIONHEN_OUT_LIB "${CMAKE_BINARY_DIR}/lib")
-set(ONIONHEN_OUT_BIN "${CMAKE_BINARY_DIR}/bin")
-file(MAKE_DIRECTORY "${ONIONHEN_OUT_LIB}" "${ONIONHEN_OUT_BIN}")
+set(ONIONHEN_OUT_BIN "${CMAKE_BINARY_DIR}/internal")
+set(FPS_FINAL_BIN_DIR "${CMAKE_BINARY_DIR}/bin")
+file(MAKE_DIRECTORY "${ONIONHEN_OUT_LIB}" "${ONIONHEN_OUT_BIN}" "${FPS_FINAL_BIN_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${ONIONHEN_OUT_BIN}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${ONIONHEN_OUT_LIB}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${ONIONHEN_OUT_LIB}")
@@ -72,11 +79,14 @@ set(FPS_LIB "${PROJECT_ROOT}/libonion_fps")
 add_executable(fps_counter
   src/main.cpp
   src/embedded_overlay.c
+  src/kstuff_check.c
   "${FPS_LIB}/source/fps_formula.cpp"
   "${FPS_LIB}/source/fps_dce.cpp"
   "${FPS_LIB}/source/fps_publish.cpp"
 )
-set_target_properties(fps_counter PROPERTIES OUTPUT_NAME "fps_counter.elf")
+set_target_properties(fps_counter PROPERTIES
+  OUTPUT_NAME "fps_counter.elf"
+  RUNTIME_OUTPUT_DIRECTORY "${FPS_FINAL_BIN_DIR}")
 
 # shim/ first so main.cpp's daemon_ops.hpp / globalconf.hpp / <onion/settings.hpp>
 # resolve to the small stand-ins.
@@ -96,7 +106,8 @@ set_source_files_properties(src/embedded_overlay.c PROPERTIES
   OBJECT_DEPENDS "${ONIONHEN_OUT_BIN}/shellui.elf")
 add_dependencies(fps_counter shellui)
 
-target_link_options(fps_counter PRIVATE -Wl,--gc-sections)
+# --icf=none: the SDK's crt1.o carries no .llvm_addrsig, so --icf=safe only warns.
+target_link_options(fps_counter PRIVATE -Wl,--gc-sections -Wl,--icf=none)
 target_link_libraries(fps_counter PRIVATE
   NineS onion_elfldr onion_proc onion_ready onion_platform
   SceSystemService kernel_sys)

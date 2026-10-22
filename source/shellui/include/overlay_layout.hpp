@@ -27,6 +27,20 @@ inline constexpr int kMetricMemory = 3;
 inline constexpr int kMetricIp = 4;
 inline constexpr int kMetricFan = 5;
 
+/* Overlay font size in points. The standalone FPS build (ONIONHEN_FPS_OVERLAY_ONLY)
+ * ignores the small/medium/large setting and uses one larger fixed size so it
+ * matches the reference HUD; the full build keeps the configured size. */
+inline constexpr int kStandaloneFontPt = 28;
+
+inline constexpr int effective_font_pt(int configured_pt) {
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+  (void)configured_pt;
+  return kStandaloneFontPt;
+#else
+  return configured_pt;
+#endif
+}
+
 enum class BarEdge { Top, Bottom };
 enum class BarAlign { Left, Center, Right };
 

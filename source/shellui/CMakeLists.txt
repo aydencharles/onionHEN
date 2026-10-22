@@ -18,7 +18,11 @@ target_compile_options(${PROJECT_NAME} PUBLIC
 	$<$<COMPILE_LANGUAGE:CXX>:${CXX_DEFS} ${CXX_FLAGS}>
 	$<$<COMPILE_LANGUAGE:ASM>:${ASM_FLAGS}>
 )
-target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--gc-sections" "-Wl,--icf=safe")
+# --icf=safe needs .llvm_addrsig in every input object; the SDK's crt1.o has
+# none, so lld warns ("--icf=safe conservatively ignores SHT_LLVM_ADDRSIG").
+# The standalone overlay build therefore links without ICF (set below); the
+# full build keeps --icf=safe.
+target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--gc-sections")
 
 # A/B: disable HomeUI top-nav Hermes patch without editing sources.
 #   cmake -DONIONHEN_SHELLUI_HOMEUI_TOP_NAV_PATCH=OFF ...
@@ -34,7 +38,10 @@ endif()
 option(ONIONHEN_FPS_OVERLAY_ONLY "Build shellui as the standalone FPS overlay" OFF)
 if(ONIONHEN_FPS_OVERLAY_ONLY)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE ONIONHEN_FPS_OVERLAY_ONLY=1)
+	target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--icf=none")
 	message(STATUS "shellui: FPS overlay-only mode")
+else()
+	target_link_options(${PROJECT_NAME} PRIVATE "-Wl,--icf=safe")
 endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)

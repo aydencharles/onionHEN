@@ -1,10 +1,10 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — P0 split.
  *
  * Horizontal monitor bar:
- *   font_size from overlay.font_size (14/18/24), font_style=0 (regular),
- *   font_weight=600 (semibold), values rendered in neutral near-white gray,
- *   bg_color=000000B4 (~70% black Panel)
- *   EnableThemedTextShadow, UI2.Panel Background*
+ *   font_size from overlay.font_size (14/18/24; fixed larger size in the
+ *   standalone FPS build, see overlay::effective_font_pt), font_style=0
+ *   (regular), font_weight=400, all text pure white, optional black Panel
+ *   background (off in the standalone FPS build).
  */
 
 #include "hooked_funcs.hpp"
@@ -64,7 +64,7 @@ namespace {
 constexpr const char *kBgPanelName = "id_onion_overlay_bg";
 
 constexpr int kFontStyle = 0;    /* 0 = regular */
-constexpr int kFontWeight = 600; /* CSS semibold */
+constexpr int kFontWeight = 400; /* CSS regular (matches the reference HUD) */
 
 /* Intra-segment X offsets from the segment origin. */
 constexpr float kLbl = 0.0f;
@@ -74,9 +74,9 @@ constexpr float kIpVal = 34.0f;
 
 /*
  * Per-group colors (RRGGBBAA → linear 0..1).
- * Labels and values use a near-white neutral gray to match the HUD styling.
+ * Labels and values are pure white to match the reference HUD.
  */
-constexpr float kTextR = 0.90f, kTextG = 0.90f, kTextB = 0.90f;
+constexpr float kTextR = 1.0f, kTextG = 1.0f, kTextB = 1.0f;
 /* color_cpu  = 66FF66FF — green */
 constexpr float kCpuR = kTextR, kCpuG = kTextG, kCpuB = kTextB;
 /* color_gpu  = B366FFFF — purple */
@@ -343,8 +343,9 @@ bool CreateGameWidget(CreateWidget widget) {
 
   apply_overlay_layout(screen_w, screen_h);
   MonoObject *bar_font = CreateUIFont(
-      onion::overlay_font_pt(g_settings.overlay_font_size), kFontStyle,
-      kFontWeight);
+      onion::overlay::effective_font_pt(
+          onion::overlay_font_pt(g_settings.overlay_font_size)),
+      kFontStyle, kFontWeight);
   if (!bar_font)
     return false;
 

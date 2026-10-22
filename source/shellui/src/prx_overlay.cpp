@@ -216,6 +216,7 @@ void set_label_layout(const char *widget_name, float margin_left,
   Set_Property(label_cls, label, "NumberOfLines", 1);
 }
 
+#ifndef ONIONHEN_FPS_OVERLAY_ONLY /* standalone build has no background panel */
 /** Resize/move the translucent background panel to wrap the stacked block. */
 void set_bg_panel_rect(float x, float y, float w, float h) {
   MonoObject *panel = find_label("id_onion_overlay_bg");
@@ -228,7 +229,104 @@ void set_bg_panel_rect(float x, float y, float w, float h) {
   Set_Property(panel_cls, panel, "Width", w);
   Set_Property(panel_cls, panel, "Height", h);
 }
+#endif
 
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+/**
+ * Standalone FPS overlay: two plain text rows, no background panel.
+ *
+ *   FPS: 59.94
+ *   CPU: 43°C / GPU: 35°C
+ *
+ * Each row is a single label (id_fps_label / id_cpu_label); every other
+ * overlay widget is parked off-screen. Usage percentages, RAM, IP and fan are
+ * not shown in this build.
+ */
+void layout_bar_labels(const char *fps_str, const char *cpu_temp,
+                       const char *cpu_usage, const char *gpu_temp,
+                       const char *gpu_usage, const char *ram_str,
+                       const char *ip_str, const char *fan_str) {
+  (void)cpu_usage;
+  (void)gpu_usage;
+  (void)ram_str;
+  (void)ip_str;
+  (void)fan_str;
+
+  const float font_pt = static_cast<float>(onion::overlay::effective_font_pt(
+      onion::overlay_font_pt(g_settings.overlay_font_size)));
+  constexpr float kOff = -4096.0f;
+
+  struct Row {
+    const char *id;
+    char text[96];
+  };
+  Row rows[2];
+  int nrows = 0;
+
+  if (g_settings.overlay_fps) {
+    rows[nrows].id = "id_fps_label";
+    std::snprintf(rows[nrows].text, sizeof(rows[nrows].text), "FPS: %s",
+                  (fps_str && fps_str[0]) ? fps_str : "--");
+    ++nrows;
+  }
+
+  const bool show_cpu = g_settings.overlay_cpu;
+  const bool show_gpu = g_settings.overlay_gpu;
+  if (show_cpu || show_gpu) {
+    const char *c = (cpu_temp && cpu_temp[0]) ? cpu_temp : "--";
+    const char *g = (gpu_temp && gpu_temp[0]) ? gpu_temp : "--";
+    rows[nrows].id = "id_cpu_label";
+    if (show_cpu && show_gpu)
+      std::snprintf(rows[nrows].text, sizeof(rows[nrows].text),
+                    "CPU: %s / GPU: %s", c, g);
+    else if (show_cpu)
+      std::snprintf(rows[nrows].text, sizeof(rows[nrows].text), "CPU: %s", c);
+    else
+      std::snprintf(rows[nrows].text, sizeof(rows[nrows].text), "GPU: %s", g);
+    ++nrows;
+  }
+  if (nrows == 0)
+    return;
+
+  const float screen_w = g_overlay_layout.bar_w;
+  if (screen_w <= 1.0f)
+    return;
+
+  const float line_h = g_overlay_layout.bar_h;
+  const bool bottom = onion::overlay::bar_edge_from_pos(g_settings.overlay_pos) ==
+                      onion::overlay::BarEdge::Bottom;
+  /* Bottom edge: grow upward so the last row sits on the screen edge. */
+  const float y_base = bottom ? g_overlay_layout.bar_y -
+                                    static_cast<float>(nrows - 1) * line_h
+                              : g_overlay_layout.bar_y;
+  const float margin_top = g_overlay_layout.label_margin_top;
+
+  static const char *kAll[] = {
+      "id_fps_label",        "id_fps_value",       "id_fps_sep",
+      "id_cpu_label",        "id_cpu_temp_value",  "id_cpu_usage_value",
+      "id_cpu_sep",          "id_gpu_label",       "id_gpu_temp_value",
+      "id_gpu_usage_value",  "id_gpu_sep",         "id_ram_label",
+      "id_ram_value",        "id_ram_sep",         "id_ip_label",
+      "id_ip_value",         "id_ip_sep",          "id_fan_label",
+      "id_fan_value",        "id_fan_sep",
+  };
+  for (const char *id : kAll)
+    set_label_layout(id, kOff, margin_top, 0.0f, y_base);
+
+  for (int r = 0; r < nrows; ++r) {
+    /* The estimator is tuned for 18pt bold; pad it so regular text never clips. */
+    const float w =
+        onion::overlay::estimate_text_width(rows[r].text, font_pt) * 1.3f +
+        16.0f;
+    const float x = onion::overlay::pack_origin(
+        screen_w, w,
+        onion::overlay::bar_align_from_value(g_settings.overlay_align));
+    const float y = y_base + static_cast<float>(r) * line_h;
+    set_label_layout(rows[r].id, x, margin_top, w, y);
+    set_label_text(rows[r].id, rows[r].text);
+  }
+}
+#else
 /**
  * Stacked layout: one metric group per row, values lined up in columns.
  *
@@ -243,8 +341,8 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
                        const char *cpu_usage, const char *gpu_temp,
                        const char *gpu_usage, const char *ram_str,
                        const char *ip_str, const char *fan_str) {
-  const float font_pt =
-      static_cast<float>(onion::overlay_font_pt(g_settings.overlay_font_size));
+  const float font_pt = static_cast<float>(onion::overlay::effective_font_pt(
+      onion::overlay_font_pt(g_settings.overlay_font_size)));
   const float scale = font_pt / onion::overlay::kRefFontSize;
   const float kPairGap = 10.0f * scale; /* label column -> value column */
   const float kValGap = 10.0f * scale;  /* value column -> second value */
@@ -359,6 +457,8 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   }
 }
 
+#endif /* ONIONHEN_FPS_OVERLAY_ONLY */
+
 void discover_idle_thread_ids(unsigned int idle_tid[kCpuCores]) {
   int count = kMaxProcThreads;
   if (sceKernelGetCpuUsage(reinterpret_cast<Proc_Stats*>(&Stat_Data), &count) ||
@@ -393,8 +493,9 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
     return true;
 
   /* Regular font: style=0, weight=400 */
-  font = CreateUIFont(onion::overlay_font_pt(g_settings.overlay_font_size), 0,
-                      400);
+  font = CreateUIFont(onion::overlay::effective_font_pt(
+                          onion::overlay_font_pt(g_settings.overlay_font_size)),
+                      0, 400);
   if (!font)
     return false;
 
@@ -408,10 +509,13 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
     if (!CreateGameWidget(CREATE_CPU_OVERLAY))
       widgets_ready = false;
   }
+#ifndef ONIONHEN_FPS_OVERLAY_ONLY
+  /* The standalone build prints GPU temp in the CPU row; no GPU widgets. */
   if (g_settings.overlay_gpu) {
     if (!CreateGameWidget(CREATE_GPU_OVERLAY))
       widgets_ready = false;
   }
+#endif
   if (g_settings.overlay_ram) {
     if (!CreateGameWidget(CREATE_RAM_OVERLAY))
       widgets_ready = false;
@@ -494,10 +598,14 @@ void format_fps_text(char *buf, size_t buf_sz) {
     return;
   OnionFpsSample sample {};
   if (onion_fps_read(&sample) == 0 && sample.valid && sample.fps >= 1.f) {
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+    snprintf(buf, buf_sz, "%.2f", sample.fps);
+#else
     if (sample.fps >= 100.f)
       snprintf(buf, buf_sz, "%.0f", sample.fps);
     else
       snprintf(buf, buf_sz, "%.1f", sample.fps);
+#endif
   } else {
     snprintf(buf, buf_sz, "--");
   }
@@ -522,7 +630,11 @@ void update_overlay_metrics(unsigned int idle_tid[kCpuCores], int& current_bank,
   if (g_settings.overlay_gpu) {
     int soc_temp = 0;
     sceKernelGetSocSensorTemperature(0, &soc_temp);
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+    snprintf(gpu_temp, gpu_temp_sz, "%d\xC2\xB0" "C", soc_temp); /* 35°C */
+#else
     snprintf(gpu_temp, gpu_temp_sz, "%dC", soc_temp);
+#endif
     Get_Page_Table_Stats(kVmSystem, kPageTableVram, &VRAM.Used, &VRAM.Free,
                          &VRAM.Total);
     VRAM.Percentage =
@@ -536,7 +648,11 @@ void update_overlay_metrics(unsigned int idle_tid[kCpuCores], int& current_bank,
   if (g_settings.overlay_cpu || g_settings.all_cpu_usage) {
     int cpu_t = 0;
     sceKernelGetCpuTemperature(&cpu_t);
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+    snprintf(cpu_temp, cpu_temp_sz, "%d\xC2\xB0" "C", cpu_t); /* 43°C */
+#else
     snprintf(cpu_temp, cpu_temp_sz, "%dC", cpu_t);
+#endif
   }
 
   if (g_settings.overlay_fan) {

@@ -1,8 +1,8 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — P0 split.
  *
  * Horizontal monitor bar:
- *   font_size from overlay.font_size (14/18/24), font_style=1 (Bold), font_weight=900
- *   per-metric label colors; values white
+ *   font_size from overlay.font_size (14/18/24), font_style=0 (regular),
+ *   font_weight=600 (semibold), values rendered in neutral near-white gray,
  *   bg_color=000000B4 (~70% black Panel)
  *   EnableThemedTextShadow, UI2.Panel Background*
  */
@@ -64,7 +64,7 @@ namespace {
 constexpr const char *kBgPanelName = "id_onion_overlay_bg";
 
 constexpr int kFontStyle = 0;    /* 0 = regular */
-constexpr int kFontWeight = 400; /* CSS normal */
+constexpr int kFontWeight = 600; /* CSS semibold */
 
 /* Intra-segment X offsets from the segment origin. */
 constexpr float kLbl = 0.0f;
@@ -74,24 +74,25 @@ constexpr float kIpVal = 34.0f;
 
 /*
  * Per-group colors (RRGGBBAA → linear 0..1).
- * Labels use group color; all values use white.
+ * Labels and values use a near-white neutral gray to match the HUD styling.
  */
+constexpr float kTextR = 0.90f, kTextG = 0.90f, kTextB = 0.90f;
 /* color_cpu  = 66FF66FF — green */
-constexpr float kCpuR = 102.0f / 255.0f, kCpuG = 1.0f, kCpuB = 102.0f / 255.0f;
+constexpr float kCpuR = kTextR, kCpuG = kTextG, kCpuB = kTextB;
 /* color_gpu  = B366FFFF — purple */
-constexpr float kGpuR = 179.0f / 255.0f, kGpuG = 102.0f / 255.0f, kGpuB = 1.0f;
+constexpr float kGpuR = kTextR, kGpuG = kTextG, kGpuB = kTextB;
 /* color_mem  = FFB34DFF — orange */
-constexpr float kMemR = 1.0f, kMemG = 179.0f / 255.0f, kMemB = 77.0f / 255.0f;
+constexpr float kMemR = kTextR, kMemG = kTextG, kMemB = kTextB;
 /* color_net  = 80B3FFFF — blue */
-constexpr float kNetR = 128.0f / 255.0f, kNetG = 179.0f / 255.0f, kNetB = 1.0f;
+constexpr float kNetR = kTextR, kNetG = kTextG, kNetB = kTextB;
 /* color_fan  = 33E0FFFF — cyan */
-constexpr float kFanR = 51.0f / 255.0f, kFanG = 224.0f / 255.0f, kFanB = 1.0f;
+constexpr float kFanR = kTextR, kFanG = kTextG, kFanB = kTextB;
 /* color_perf = FFE600FF — yellow (FPS) */
-constexpr float kFpsR = 1.0f, kFpsG = 230.0f / 255.0f, kFpsB = 0.0f;
+constexpr float kFpsR = kTextR, kFpsG = kTextG, kFpsB = kTextB;
 /* color_value = FFFFFFFF */
-constexpr float kValR = 1.0f, kValG = 1.0f, kValB = 1.0f;
-/* Separator pipe — soft white so it does not compete with values. */
-constexpr float kSepR = 0.75f, kSepG = 0.75f, kSepB = 0.75f;
+constexpr float kValR = kTextR, kValG = kTextG, kValB = kTextB;
+/* Separator pipe — soft gray so it does not compete with values. */
+constexpr float kSepR = 0.78f, kSepG = 0.78f, kSepB = 0.78f;
 /* bg_color = 000000B4 → black @ ~70.6% */
 constexpr float kBgR = 0.0f, kBgG = 0.0f, kBgB = 0.0f, kBgA = 180.0f / 255.0f;
 constexpr float kA = 1.0f;
@@ -220,7 +221,7 @@ MonoObject *create_metric_cell(MonoObject *root, const char *label_name,
   char cell_name[96];
   std::snprintf(cell_name, sizeof(cell_name), "%s_cell", label_name);
   Set_Property(panelClass, cell, "Name",
-               mono_string_new(Root_Domain, cell_name));
+              mono_string_new(Root_Domain, cell_name));
   Set_Property(panelClass, cell, "X", x);
   Set_Property(panelClass, cell, "Y", g_overlay_layout.bar_y);
   Set_Property(panelClass, cell, "Width", kInitialLabelWidth);
@@ -272,7 +273,7 @@ void ensure_bg_panel(MonoObject *root) {
   mono_runtime_object_init(panel);
 
   Set_Property(panelClass, panel, "Name",
-               mono_string_new(Root_Domain, kBgPanelName));
+              mono_string_new(Root_Domain, kBgPanelName));
   /* X=0, Y=edge, Width=fullscreen root width. */
   Set_Property(panelClass, panel, "X", 0.0f);
   Set_Property(panelClass, panel, "Y", g_overlay_layout.bar_y);

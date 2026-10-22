@@ -264,12 +264,10 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   Row rows[2];
   int nrows = 0;
 
-  /* No FPS row when no game is running (empty string); "--" while a game runs
-   * but has no value yet. */
-  if (g_settings.overlay_fps && fps_str && fps_str[0]) {
+  if (g_settings.overlay_fps) {
     rows[nrows].id = "id_fps_label";
     std::snprintf(rows[nrows].text, sizeof(rows[nrows].text), "FPS: %s",
-                  fps_str);
+                  (fps_str && fps_str[0]) ? fps_str : "--");
     ++nrows;
   }
 
@@ -659,29 +657,6 @@ bool sample_cpu_usage(unsigned int idle_tid[kCpuCores], int& current_bank,
   return false;
 }
 
-#ifdef ONIONHEN_FPS_OVERLAY_ONLY
-/* True while the payload reports a running game (title id set), even before
- * the first valid FPS value. onion_fps_read() hides such samples. */
-bool fps_game_running() {
-  static OnionFpsSample *map;
-  if (map == nullptr || map == reinterpret_cast<OnionFpsSample *>(MAP_FAILED)) {
-    map = onion_fps_map_ro();
-    if (map == reinterpret_cast<OnionFpsSample *>(MAP_FAILED)) {
-      map = nullptr;
-      return false;
-    }
-  }
-  OnionFpsSample local;
-  if (onion_fps_seqlock_load(map, &local) != 0 || local.magic != ONION_FPS_MAGIC)
-    return false;
-  const uint64_t now = onion_fps_realtime_ns();
-  if (local.unix_ns == 0 || now < local.unix_ns ||
-      now - local.unix_ns > ONION_FPS_STALE_NS)
-    return false;
-  return local.title_id[0] != '\0';
-}
-#endif
-
 void format_fps_text(char *buf, size_t buf_sz) {
   if (!buf || buf_sz == 0)
     return;
@@ -696,12 +671,7 @@ void format_fps_text(char *buf, size_t buf_sz) {
       snprintf(buf, buf_sz, "%.1f", sample.fps);
 #endif
   } else {
-#ifdef ONIONHEN_FPS_OVERLAY_ONLY
-    /* "--" while a game runs without a value yet; empty (row hidden) otherwise. */
-    snprintf(buf, buf_sz, "%s", fps_game_running() ? "--" : "");
-#else
     snprintf(buf, buf_sz, "--");
-#endif
   }
 }
 

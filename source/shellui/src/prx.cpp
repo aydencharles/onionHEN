@@ -767,9 +767,28 @@ MonoObject* find_container_scene(MonoImage* app_system, const char* path) {
   return exception ? nullptr : scene;
 }
 
-/* The menu scene's path is not public. Probe likely names, keep every distinct
- * scene that resolves (the overlay is drawn on all of them), and record the
- * outcome in /data/onion_fps_scenes.log so the right name can be pinned down. */
+/* Menu scenes are OPT-IN. The menu scene's path is not public and attaching
+ * widgets to the wrong scene can break the overlay, so by default this only
+ * PROBES: every candidate name is resolved and the result is written to
+ * /data/onion_fps_scenes.log (flushed before any hook is installed). To draw
+ * on a scene too, list its exact name, one per line, in
+ * /data/onion_fps_scenes.cfg (e.g. "ContentAreaScene"). */
+bool scene_enabled_in_cfg(const char* name) {
+  FILE* cfg = fopen("/data/onion_fps_scenes.cfg", "r");
+  if (!cfg)
+    return false;
+  char line[128];
+  bool found = false;
+  while (!found && fgets(line, sizeof(line), cfg)) {
+    size_t n = strlen(line);
+    while (n && (line[n - 1] == '\n' || line[n - 1] == '\r' || line[n - 1] == ' '))
+      line[--n] = '\0';
+    found = (strcmp(line, name) == 0);
+  }
+  fclose(cfg);
+  return found;
+}
+
 void probe_menu_scenes(MonoImage* app_system) {
   static const char* const kCandidates[] = {
       /* names seen in public references */
@@ -784,12 +803,15 @@ void probe_menu_scenes(MonoImage* app_system) {
       "Shell", "Menu", "Top", "Overlay", "Dialog",
   };
   FILE* log = fopen("/data/onion_fps_scenes.log", "w");
-  if (log)
+  if (log) {
     fprintf(log, "Game scene: %p\n", static_cast<void*>(Game));
+    fflush(log);
+  }
   for (const char* name : kCandidates) {
     MonoObject* scene = find_container_scene(app_system, name);
+    const bool wanted = scene && scene != Game && scene_enabled_in_cfg(name);
     bool added = false;
-    if (scene && scene != Game) {
+    if (wanted) {
       added = true;
       for (MonoObject* known : g_overlay_extra_scenes)
         if (known == scene)
@@ -797,11 +819,14 @@ void probe_menu_scenes(MonoImage* app_system) {
       if (added)
         g_overlay_extra_scenes.push_back(scene);
     }
-    if (log)
+    if (log) {
       fprintf(log, "probe \"%s\": %s (%p)\n", name,
-              scene ? (added ? "resolved, overlay attached" : "resolved (duplicate/Game)")
-                    : "not found",
+              !scene ? "not found"
+                     : added ? "resolved, overlay attached (listed in cfg)"
+                             : "resolved, NOT attached (not listed in cfg)",
               static_cast<void*>(scene));
+      fflush(log);
+    }
   }
   if (log)
     fclose(log);

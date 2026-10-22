@@ -149,7 +149,7 @@ static void *safe_sampler_thread(void *) {
       have = false;
       wn = wi = 0;
       publish_sample(false, nullptr, 0.f);
-      usleep(250000); /* detect a game launch quickly (was 1 s) */
+      sleep(1);
       continue;
     }
     if (tid != cached_tid) {
@@ -158,9 +158,6 @@ static void *safe_sampler_thread(void *) {
       have = false;
       wn = wi = 0;
       LOG_INFO("safe fps: game %s detected; sampling immediately", tid.c_str());
-      /* Tell the overlay a game is running before the first FPS value exists,
-       * so it can show "FPS: --" right away. */
-      publish_sample(false, tid.c_str(), 0.f);
     }
     if (mono_sec() - started < kWarmupSec) {
       publish_sample(false, tid.c_str(), 0.f);
@@ -169,7 +166,6 @@ static void *safe_sampler_thread(void *) {
     }
 
     uint64_t count = 0;
-    bool published = false;
     if (dce.sample(&count)) {
       const double now = mono_sec();
       if (have && count > last_count && now > last_t) {
@@ -182,7 +178,6 @@ static void *safe_sampler_thread(void *) {
             ++wn;
           publish_sample(true, tid.c_str(),
                          onion::fps::rolling_mean(window, wn));
-          published = true;
         }
       }
       last_count = count;
@@ -193,9 +188,6 @@ static void *safe_sampler_thread(void *) {
       publish_sample(false, tid.c_str(), 0.f);
       sleep(5);
     }
-    /* Keep the "game running, no value yet" marker fresh until FPS is valid. */
-    if (!published)
-      publish_sample(false, tid.c_str(), 0.f);
     usleep(kSafeSampleUs);
   }
   return nullptr;

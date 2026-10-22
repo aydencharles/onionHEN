@@ -1,19 +1,19 @@
-/* Standalone FPS counter payload.
+/* Standalone FPS counter + on-screen overlay payload.
  *
- * Runs the same sampler code as the OnionHEN daemon (daemon_fps.cpp, compiled
- * unmodified) but without the daemon, util, kstuff stack, settings or ShellUI.
- * Publishes the result to /system_tmp/onionhen/fps_sample (seqlock mmap, see
- * fps_sample.h) so any reader (overlay, plugin, your own tool) can use it.
+ * Samples the scanout (flip) counter from /dev/dce (safe mode: no game or
+ * kernel memory access), publishes the result to
+ * /system_tmp/onionhen/fps_sample (seqlock mmap, see fps_sample.h) and injects
+ * a small ShellUI module (the embedded fps_overlay ELF) into SceShellUI that
+ * draws FPS / CPU / GPU as stacked rows on screen.
  *
  * Load on a jailbroken console with an elfldr (e.g. port 9021).
- * It also shows the FPS as a system toast every few seconds (kToastEverySec).
  */
 #include <onion/fps_dce.hpp>
 #include <onion/fps_formula.hpp>
 #include <onion/fps_publish.hpp>
 #include <onion/fps_sample.h>
 #include <onion/log.h>
-#include <onion/notify.h>
+#include <onion/ready.h>
 #include <onion/proc_query.h>
 #include <onion/system_tmp.h>
 
@@ -32,122 +32,41 @@
 #include "globalconf.hpp"
 
 extern "C" {
-#include <ps5/payload.h>
-}
-
-/* The standalone payload is intentionally not linked against the full OnionHEN
- * notification helpers. It must use the exact PS5 request layout that the OS
- * expects when sending a toast. */
-struct OrbisNotificationRequest {
-  int32_t type;
-  int32_t req_id;
-  int32_t priority;
-  int32_t msg_id;
-  int32_t target_id;
-  int32_t user_id;
-  int32_t unk1;
-  int32_t unk2;
-  int32_t app_id;
-  int32_t error_num;
-  int32_t unk3;
-  char use_icon_image_uri;
-  char message[1024];
-  char uri[1024];
-  char unkstr[1024];
-};
-static_assert(sizeof(OrbisNotificationRequest) == 0xC30,
-              "OrbisNotificationRequest layout must match PS5 OS ABI");
-
-/* libhijacker reads this global (allproc/rootvnode lookups). The daemon sets
- * it the same way from the payload args. */
-extern "C" uint64_t kernel_base;
-uint64_t kernel_base = 0;
-
-extern "C" {
 int sceKernelGetProcessName(int pid, char *name);
 int sceKernelGetAppInfo(pid_t pid, void *info);
 int sceSystemServiceGetAppIdOfRunningBigApp();
 int sceSystemServiceGetAppTitleId(int app_id, char *title_id);
-int sceKernelGetCpuTemperature(int *temp);
-int sceKernelGetSocSensorTemperature(int sensor, int *temp);
-int sceKernelSendNotificationRequest(int device, void *req, size_t size,
-                                     int blocking);
+
+/* libNineS: ptrace-injects an ELF into the process `pid`. */
+bool Inject_Toolbox(int pid, uint8_t *elf);
+
+/* Embedded fps_overlay ELF (see embedded_overlay.c). */
+extern uint8_t fps_overlay_elf_start[];
 }
 
-/* How often the on-screen FPS toast is shown (seconds). Edit and rebuild. */
-static constexpr unsigned kToastEverySec = 5;
-
-static void show_toast(const char *text) {
-  if (!text || !text[0])
-    return;
-
-  OrbisNotificationRequest req{};
-  std::memset(&req, 0, sizeof(req));
-  req.type = 0;
-  req.req_id = 0;
-  req.priority = 0;
-  req.msg_id = 0;
-  req.target_id = -1;
-  req.user_id = 0;
-  req.unk1 = 0;
-  req.unk2 = 0;
-  req.app_id = 0;
-  req.error_num = 0;
-  req.unk3 = 0;
-  req.use_icon_image_uri = 0;
-  req.uri[0] = '\0';
-  std::snprintf(req.message, sizeof(req.message), "%s", text);
-
-  (void)sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
-}
-
-static void debug_toast_for_sample(float fps) {
-  char buf[128]{};
-  int cpu_temp = 0;
-  int gpu_temp = 0;
-
-  if (sceKernelGetCpuTemperature(&cpu_temp) == 0)
-    ;
-  else
-    cpu_temp = -1;
-
-  if (sceKernelGetSocSensorTemperature(0, &gpu_temp) == 0)
-    ;
-  else
-    gpu_temp = -1;
-
-  if (cpu_temp >= 0 && gpu_temp >= 0) {
-    std::snprintf(buf, sizeof(buf), "FPS: %.0f CPU: %dC GPU: %dC",
-                  static_cast<double>(fps), cpu_temp, gpu_temp);
-  } else if (cpu_temp >= 0) {
-    std::snprintf(buf, sizeof(buf), "FPS: %.0f CPU: %dC",
-                  static_cast<double>(fps), cpu_temp);
-  } else if (gpu_temp >= 0) {
-    std::snprintf(buf, sizeof(buf), "FPS: %.0f GPU: %dC",
-                  static_cast<double>(fps), gpu_temp);
-  } else {
-    std::snprintf(buf, sizeof(buf), "FPS: %.0f", static_cast<double>(fps));
-  }
-
-  show_toast(buf);
-}
-
-/* Reads the published sample and shows it as a system toast. */
-static void *display_thread(void *) {
-  bool shown_any = false;
+/* Keeps the overlay injected into SceShellUI. Re-injects after a ShellUI
+ * restart (new pid, e.g. Rest Mode resume). */
+static void *injector_thread(void *) {
+  pid_t injected_pid = -1;
   while (!g_stack_shutting_down.load(std::memory_order_acquire)) {
-    OnionFpsSample s;
-    if (onion_fps_read(&s) == 0 && s.fps > 0.f) {
-      debug_toast_for_sample(s.fps);
-      if (!shown_any) {
-        LOG_INFO("fps toast active tid=%s fps=%.1f", s.title_id,
-                 static_cast<double>(s.fps));
-        shown_any = true;
+    const pid_t pid = onion_find_pid("SceShellUI");
+    if (pid > 0 && pid != injected_pid &&
+        !onion_ready_matches_pid(ONION_READY_TOOLBOX, pid)) {
+      LOG_INFO("injecting fps overlay into SceShellUI pid=%d",
+               static_cast<int>(pid));
+      if (Inject_Toolbox(static_cast<int>(pid), fps_overlay_elf_start) &&
+          onion_ready_wait_pid(ONION_READY_TOOLBOX, pid, 45000, 250)) {
+        injected_pid = pid;
+        LOG_INFO("fps overlay ready (pid=%d)", static_cast<int>(pid));
+      } else {
+        LOG_ERROR("fps overlay injection failed (pid=%d), retrying",
+                  static_cast<int>(pid));
+        sleep(10);
       }
-    } else {
-      shown_any = false;
+    } else if (pid > 0 && onion_ready_matches_pid(ONION_READY_TOOLBOX, pid)) {
+      injected_pid = pid;
     }
-    sleep(kToastEverySec);
+    sleep(3);
   }
   return nullptr;
 }
@@ -262,9 +181,6 @@ static void on_term(int) {
 }
 
 int main() {
-  payload_args_t *args = payload_get_args();
-  kernel_base = static_cast<uint64_t>(args->kdata_base_addr);
-
   mkdir(ONION_SYSTEM_TMP_ROOT, 0777);
   onion_log_configure("FPS", "/data/onion_fps.log");
   onion_log_set_level(ONION_LOG_INFO);
@@ -281,13 +197,13 @@ int main() {
       },
       []() -> int { return sceSystemServiceGetAppIdOfRunningBigApp(); });
 
-  LOG_INFO("standalone fps counter started (safe scanout-only mode)");
+  LOG_INFO("standalone fps counter started (safe scanout-only mode + overlay)");
 
-  pthread_t render_thr{}, display_thr{};
+  pthread_t render_thr{}, inject_thr{};
   pthread_create(&render_thr, nullptr, safe_sampler_thread, nullptr);
-  pthread_create(&display_thr, nullptr, display_thread, nullptr);
+  pthread_create(&inject_thr, nullptr, injector_thread, nullptr);
 
   pthread_join(render_thr, nullptr);
-  pthread_join(display_thr, nullptr);
+  pthread_join(inject_thr, nullptr);
   return 0;
 }

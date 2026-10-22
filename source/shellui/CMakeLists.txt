@@ -29,6 +29,14 @@ if(NOT ONIONHEN_SHELLUI_HOMEUI_TOP_NAV_PATCH)
 	message(STATUS "shellui: HomeUI top-nav patch DISABLED")
 endif()
 
+# Standalone FPS overlay build (see standalone_fps/): the module only installs
+# the per-frame overlay hook and skips toolbox/settings/plugin startup.
+option(ONIONHEN_FPS_OVERLAY_ONLY "Build shellui as the standalone FPS overlay" OFF)
+if(ONIONHEN_FPS_OVERLAY_ONLY)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE ONIONHEN_FPS_OVERLAY_ONLY=1)
+	message(STATUS "shellui: FPS overlay-only mode")
+endif()
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(I18N_DIR "${D_CWD}/../i18n")

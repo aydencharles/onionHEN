@@ -63,8 +63,8 @@ namespace {
 
 constexpr const char *kBgPanelName = "id_onion_overlay_bg";
 
-constexpr int kFontStyle = 1;    /* 1 = Bold bit */
-constexpr int kFontWeight = 900; /* CSS black */
+constexpr int kFontStyle = 0;    /* 0 = regular */
+constexpr int kFontWeight = 400; /* CSS normal */
 
 /* Intra-segment X offsets from the segment origin. */
 constexpr float kLbl = 0.0f;

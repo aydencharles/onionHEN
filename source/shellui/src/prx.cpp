@@ -713,6 +713,73 @@ void run_keep_alive() {
 
 } // namespace
 
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+/*
+ * Standalone FPS overlay entry. Used by standalone_fps: no toolbox, no
+ * settings file, no plugin bridge, no resource hooks. Only the per-frame
+ * overlay hook (PUI.Application.Update -> OnRender_Hook) is installed.
+ */
+namespace {
+
+int fps_overlay_only_main() {
+  const pid_t pid = getpid();
+  AuthIdGuard auth(pid, set_ucred_to_ptrace());
+
+  if (!resolve_native_symbols(pid) || !resolve_mono_symbols(pid))
+    return -1;
+
+  /* Fixed overlay config: FPS / CPU / GPU, stacked, top-left. */
+  g_settings.overlay_enabled = true;
+  g_settings.overlay_background = true;
+  g_settings.overlay_fps = true;
+  g_settings.overlay_cpu = true;
+  g_settings.overlay_gpu = true;
+  g_settings.overlay_ram = false;
+  g_settings.overlay_ip = false;
+  g_settings.overlay_fan = false;
+  g_settings.all_cpu_usage = false;
+  g_settings.overlay_pos = 0;   /* top edge */
+  g_settings.overlay_align = 0; /* left */
+  g_settings.overlay_font_size = onion::kOverlayFontMedium;
+
+  if (!mono_get_root_domain)
+    return -1;
+  Root_Domain = mono_get_root_domain();
+  if (!Root_Domain)
+    return -1;
+  mono_thread_attach(Root_Domain);
+
+  ShellImages images;
+  if (!load_shell_images(images) || !resolve_game_container(images.app_system))
+    return -1;
+
+  char probe[kMprotectProbeSize];
+  has_hv_bypass = (sceKernelMprotect(probe, sizeof(probe), kProtRwx) == 0);
+  Patch_Main_thread_Check(images.core);
+
+  shellui_hooks_begin_install();
+  (void)install_mono_hook(
+      {"PUI.Application.Update", images.pui, "Sce.PlayStation.PUI",
+       "Application", "Update", 0, reinterpret_cast<void*>(&OnRender_Hook),
+       reinterpret_cast<void**>(&OnRender_orig), false});
+  if (!OnRender_orig) {
+    LOG_ERROR("fps overlay: Application.Update hook failed");
+    shellui_hooks_publish_failed();
+    return -1;
+  }
+
+  set_proc_authid(pid, auth.old_authid);
+  auth.release();
+  setup_proc_hooks();
+  shellui_hooks_publish_ready();
+  hooked = true;
+  run_keep_alive();
+  return 0;
+}
+
+} // namespace
+#endif
+
 // ---------------------------------------------------------------------------
 // main — orchestration only
 // ---------------------------------------------------------------------------
@@ -723,6 +790,10 @@ int main(int argc, char const* argv[]) {
 
   if (hooked)
     return 0;
+
+#ifdef ONIONHEN_FPS_OVERLAY_ONLY
+  return fps_overlay_only_main();
+#endif
 
   const pid_t pid = getpid();
   AuthIdGuard auth(pid, set_ucred_to_ptrace());

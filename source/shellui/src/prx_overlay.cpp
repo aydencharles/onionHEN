@@ -1,6 +1,7 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — P0 split. */
 
 
+#include <algorithm>
 #include "hooked_funcs.hpp"
 #include "ipc.hpp"
 #include "external_symbols.hpp"
@@ -185,7 +186,7 @@ void set_label_text(const char *widget_name, const char *text) {
 }
 
 void set_label_layout(const char *widget_name, float margin_left,
-                      float margin_top, float width) {
+                      float margin_top, float width, float cell_y) {
   MonoClass *label_cls =
       mono_class_from_name(pui_img, "Sce.PlayStation.PUI.UI2", "Label");
   MonoClass *panel_cls =
@@ -199,7 +200,7 @@ void set_label_layout(const char *widget_name, float margin_left,
   MonoObject *cell = find_label(cell_name);
   if (cell) {
     Set_Property(panel_cls, cell, "X", margin_left);
-    Set_Property(panel_cls, cell, "Y", g_overlay_layout.bar_y);
+    Set_Property(panel_cls, cell, "Y", cell_y);
     Set_Property(panel_cls, cell, "Width", width);
     Set_Property(panel_cls, cell, "Height", g_overlay_layout.bar_h);
   }
@@ -215,13 +216,28 @@ void set_label_layout(const char *widget_name, float margin_left,
   Set_Property(label_cls, label, "NumberOfLines", 1);
 }
 
+/** Resize/move the translucent background panel to wrap the stacked block. */
+void set_bg_panel_rect(float x, float y, float w, float h) {
+  MonoObject *panel = find_label("id_onion_overlay_bg");
+  if (!panel)
+    return;
+  MonoClass *panel_cls =
+      mono_class_from_name(pui_img, "Sce.PlayStation.PUI.UI2", "Panel");
+  Set_Property(panel_cls, panel, "X", x);
+  Set_Property(panel_cls, panel, "Y", y);
+  Set_Property(panel_cls, panel, "Width", w);
+  Set_Property(panel_cls, panel, "Height", h);
+}
+
 /**
- * Lay out metrics as slots packed left/center/right on the full-width bar.
- * Labels use PositionType + margins layout.
- * Horizontal: label + value(s) + " | " between items (not after the last).
+ * Stacked layout: one metric group per row, values lined up in columns.
  *
- * Width is measured from the live text so groups (esp. RAM / IP / all-CPU)
- * expand instead of wrapping when every metric is enabled.
+ *   FPS  60
+ *   CPU  54C  12%
+ *   GPU  61C  40%
+ *
+ * The block is placed left/center/right by overlay.align and top/bottom by
+ * overlay.pos. Labels use PositionType + margins layout.
  */
 void layout_bar_labels(const char *fps_str, const char *cpu_temp,
                        const char *cpu_usage, const char *gpu_temp,
@@ -230,21 +246,10 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
   const float font_pt =
       static_cast<float>(onion::overlay_font_pt(g_settings.overlay_font_size));
   const float scale = font_pt / onion::overlay::kRefFontSize;
-  const float kPairGap = 8.0f * scale;   /* label → first value */
-  const float kValGap = 10.0f * scale;   /* value → value (temp / usage) */
-  const float kSepGap = 10.0f * scale;   /* last value → "|" */
-  const float kAfterSep = 16.0f * scale; /* "|" → next group label */
+  const float kPairGap = 10.0f * scale; /* label column -> value column */
+  const float kValGap = 10.0f * scale;  /* value column -> second value */
+  const float kPad = 8.0f * scale;      /* background padding */
   constexpr float kOff = -4096.0f;
-
-  struct Piece {
-    const char *id;
-    const char *text;
-    float width;
-    bool is_label; /* group title (CPU/GPU/…) */
-    bool is_sep;   /* trailing pipe after an item */
-  };
-  std::vector<Piece> pieces;
-  pieces.reserve(24);
 
   struct GroupSpec {
     bool on;
@@ -254,124 +259,73 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
     const char *v0;
     const char *id_v1;
     const char *v1;
-    const char *id_sep;
   };
   GroupSpec specs[onion::kOverlayMetricCount]{};
   specs[onion::kOverlayMetricFps] = {g_settings.overlay_fps && fps_str,
-                                     "id_fps_label",
-                                     "FPS",
-                                     "id_fps_value",
-                                     fps_str,
-                                     nullptr,
-                                     nullptr,
-                                     "id_fps_sep"};
+                                     "id_fps_label", "FPS", "id_fps_value",
+                                     fps_str, nullptr, nullptr};
   specs[onion::kOverlayMetricCpu] = {
       (g_settings.overlay_cpu || g_settings.all_cpu_usage) && cpu_temp,
-      "id_cpu_label",
-      "CPU",
-      "id_cpu_temp_value",
-      cpu_temp,
-      "id_cpu_usage_value",
-      cpu_usage,
-      "id_cpu_sep"};
+      "id_cpu_label", "CPU", "id_cpu_temp_value", cpu_temp,
+      "id_cpu_usage_value", cpu_usage};
   specs[onion::kOverlayMetricGpu] = {g_settings.overlay_gpu && gpu_temp,
-                                     "id_gpu_label",
-                                     "GPU",
-                                     "id_gpu_temp_value",
-                                     gpu_temp,
-                                     "id_gpu_usage_value",
-                                     gpu_usage,
-                                     "id_gpu_sep"};
+                                     "id_gpu_label", "GPU", "id_gpu_temp_value",
+                                     gpu_temp, "id_gpu_usage_value", gpu_usage};
   specs[onion::kOverlayMetricMemory] = {g_settings.overlay_ram && ram_str,
-                                        "id_ram_label",
-                                        "RAM",
-                                        "id_ram_value",
-                                        ram_str,
-                                        nullptr,
-                                        nullptr,
-                                        "id_ram_sep"};
+                                        "id_ram_label", "RAM", "id_ram_value",
+                                        ram_str, nullptr, nullptr};
   specs[onion::kOverlayMetricIp] = {g_settings.overlay_ip && ip_str,
-                                    "id_ip_label",
-                                    "IP",
-                                    "id_ip_value",
-                                    ip_str,
-                                    nullptr,
-                                    nullptr,
-                                    "id_ip_sep"};
+                                    "id_ip_label", "IP", "id_ip_value", ip_str,
+                                    nullptr, nullptr};
   specs[onion::kOverlayMetricFan] = {g_settings.overlay_fan && fan_str,
-                                     "id_fan_label",
-                                     "FAN",
-                                     "id_fan_value",
-                                     fan_str,
-                                     nullptr,
-                                     nullptr,
-                                     "id_fan_sep"};
+                                     "id_fan_label", "FAN", "id_fan_value",
+                                     fan_str, nullptr, nullptr};
 
   auto order = g_settings.overlay_order;
   onion::overlay_normalize_order(order);
-  GroupSpec groups[onion::kOverlayMetricCount];
-  int ng = 0;
+  GroupSpec rows[onion::kOverlayMetricCount];
+  int nrows = 0;
   for (int metric : order) {
     if (metric < 0 || metric >= onion::kOverlayMetricCount)
       continue;
-    if (!specs[metric].on)
+    if (!specs[metric].on || !specs[metric].v0 || !specs[metric].v0[0])
       continue;
-    groups[ng++] = specs[metric];
+    rows[nrows++] = specs[metric];
   }
-
-  if (ng == 0)
+  if (nrows == 0)
     return;
 
-  for (int g = 0; g < ng; ++g) {
-    const GroupSpec &gs = groups[g];
-    if (!gs.v0 || !gs.v0[0])
-      continue;
-    pieces.push_back({gs.id_l, gs.lab,
-                      onion::overlay::estimate_text_width(gs.lab, font_pt), true,
-                      false});
-    pieces.push_back({gs.id_v0, gs.v0,
-                      onion::overlay::estimate_text_width(gs.v0, font_pt), false,
-                      false});
-    if (gs.id_v1 && gs.v1 && gs.v1[0])
-      pieces.push_back(
-          {gs.id_v1, gs.v1,
-           onion::overlay::estimate_text_width(gs.v1, font_pt), false, false});
-    /* Pipe after every item except the last. */
-    if (g + 1 < ng)
-      pieces.push_back({gs.id_sep, "|",
-                        onion::overlay::estimate_text_width("|", font_pt), false,
-                        true});
+  /* Column widths: widest label, widest first value, widest second value. */
+  float label_w = 0.f, v0_w = 0.f, v1_w = 0.f;
+  bool any_v1 = false;
+  for (int r = 0; r < nrows; ++r) {
+    label_w = std::max(label_w,
+                       onion::overlay::estimate_text_width(rows[r].lab, font_pt));
+    v0_w = std::max(v0_w,
+                    onion::overlay::estimate_text_width(rows[r].v0, font_pt));
+    if (rows[r].id_v1 && rows[r].v1 && rows[r].v1[0]) {
+      any_v1 = true;
+      v1_w = std::max(
+          v1_w, onion::overlay::estimate_text_width(rows[r].v1, font_pt));
+    }
   }
-
-  if (pieces.empty())
-    return;
-
-  auto gap_after = [&](size_t i) -> float {
-    if (i + 1 >= pieces.size())
-      return 0.f;
-    if (pieces[i].is_label)
-      return kPairGap;
-    if (pieces[i].is_sep)
-      return kAfterSep;
-    if (pieces[i + 1].is_sep)
-      return kSepGap;
-    if (pieces[i + 1].is_label)
-      return kAfterSep;
-    return kValGap;
-  };
-
-  float total = 0.f;
-  for (size_t i = 0; i < pieces.size(); ++i) {
-    total += pieces[i].width;
-    total += gap_after(i);
-  }
+  const float block_w =
+      label_w + kPairGap + v0_w + (any_v1 ? kValGap + v1_w : 0.f);
 
   const float screen_w = g_overlay_layout.bar_w;
   if (screen_w <= 1.0f)
     return;
-  float x = onion::overlay::pack_origin(
-      screen_w, total,
+  const float x0 = onion::overlay::pack_origin(
+      screen_w, block_w,
       onion::overlay::bar_align_from_value(g_settings.overlay_align));
+
+  const float line_h = g_overlay_layout.bar_h;
+  const bool bottom = onion::overlay::bar_edge_from_pos(g_settings.overlay_pos) ==
+                      onion::overlay::BarEdge::Bottom;
+  /* Bottom edge: grow upward so the last row sits on the screen edge. */
+  const float y_base = bottom ? g_overlay_layout.bar_y -
+                                    static_cast<float>(nrows - 1) * line_h
+                              : g_overlay_layout.bar_y;
   const float margin_top = g_overlay_layout.label_margin_top;
 
   static const char *kAll[] = {
@@ -384,12 +338,24 @@ void layout_bar_labels(const char *fps_str, const char *cpu_temp,
       "id_fan_value",        "id_fan_sep",
   };
   for (const char *id : kAll)
-    set_label_layout(id, kOff, margin_top, 0.0f);
+    set_label_layout(id, kOff, margin_top, 0.0f, y_base);
 
-  for (size_t i = 0; i < pieces.size(); ++i) {
-    set_label_layout(pieces[i].id, x, margin_top, pieces[i].width);
-    set_label_text(pieces[i].id, pieces[i].text);
-    x += pieces[i].width + gap_after(i);
+  set_bg_panel_rect(x0 - kPad, y_base, block_w + 2.0f * kPad,
+                    static_cast<float>(nrows) * line_h);
+
+  const float v0_x = x0 + label_w + kPairGap;
+  const float v1_x = v0_x + v0_w + kValGap;
+  for (int r = 0; r < nrows; ++r) {
+    const GroupSpec &gs = rows[r];
+    const float y = y_base + static_cast<float>(r) * line_h;
+    set_label_layout(gs.id_l, x0, margin_top, label_w, y);
+    set_label_text(gs.id_l, gs.lab);
+    set_label_layout(gs.id_v0, v0_x, margin_top, v0_w, y);
+    set_label_text(gs.id_v0, gs.v0);
+    if (gs.id_v1 && gs.v1 && gs.v1[0]) {
+      set_label_layout(gs.id_v1, v1_x, margin_top, v1_w, y);
+      set_label_text(gs.id_v1, gs.v1);
+    }
   }
 }
 
@@ -426,9 +392,9 @@ bool init_overlay_once(unsigned int idle_tid[kCpuCores]) {
   if (!g_settings.overlay_enabled)
     return true;
 
-  /* style=Bold(1), weight=900 */
-  font = CreateUIFont(onion::overlay_font_pt(g_settings.overlay_font_size), 1,
-                      900);
+  /* Regular font: style=0, weight=400 */
+  font = CreateUIFont(onion::overlay_font_pt(g_settings.overlay_font_size), 0,
+                      400);
   if (!font)
     return false;
 

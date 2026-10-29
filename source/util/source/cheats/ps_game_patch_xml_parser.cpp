@@ -906,6 +906,11 @@ bool decodeValue(std::string_view type, std::string_view value,
   return true;
 }
 
+bool isPatchLineField(std::string_view name) {
+  return name == "Type" || name == "Address" || name == "Value" ||
+         name == "Offset" || name == "Target" || name == "Size";
+}
+
 bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
                    uint64_t image_base, onion_cheat_entry_t &entry,
                    std::string &reason) {
@@ -949,6 +954,24 @@ bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
   std::vector<onion_patch_t> patches;
   patches.reserve(lines.size());
   for (const XmlNode *line : lines) {
+    if (!trim(line->text).empty()) {
+      reason = "Line contains unsupported text";
+      return false;
+    }
+    for (const XmlAttribute &attr : line->attributes) {
+      if (!isPatchLineField(attr.name)) {
+        reason = "Line contains an unsupported attribute";
+        return false;
+      }
+    }
+    for (size_t child : line->children) {
+      if (!isPatchLineField(nodes[child].name) ||
+          !nodes[child].children.empty() ||
+          !nodes[child].attributes.empty()) {
+        reason = "Line contains an unsupported element";
+        return false;
+      }
+    }
     onion_patch_t patch{};
     std::string_view type;
     std::string_view address;

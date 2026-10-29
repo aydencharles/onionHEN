@@ -505,6 +505,10 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   resolved.reserve(entry.patch_count);
   for (size_t patch_index = 0; patch_index < entry.patch_count; ++patch_index) {
     onion_patch_t &patch = entry.patches[patch_index];
+    if (patch.is_asm) {
+      status = status_tr("notify.cheats.asm_unassembled", entry.name);
+      return -1;
+    }
     if (patch.on_len == 0 || patch.on_len > sizeof(patch.on) ||
         patch.off_len > sizeof(patch.off)) {
       status = status_tr("notify.cheats.invalid_patch", entry.name);

@@ -192,8 +192,9 @@ metadata's `ImageBase` (default `0x00400000`) and then to its `AppElf` module.
 The direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`, `float32`,
 `float64`, `utf8`, and `utf16` are supported; `bytes` values may contain up to
 255 bytes. Pattern types `mask` and `mask_jump32` support `?` and `??`
-wildcards, a signed `Offset` from the match start, and a unique match in the
-readable module ranges. `mask_jump32` also uses an exact `Target` byte sequence
+wildcards in two-digit hex byte pairs, with whitespace optional between pairs,
+a signed `Offset` from the match start, and a unique match in the readable
+module ranges. `mask_jump32` also uses an exact `Target` byte sequence
 to locate a code cave and an optional `Size` (minimum 5, default 5) for the
 branch and NOP padding. If a pattern or target is missing or ambiguous, the
 entry is not applied. Disabling one-way patches restores the bytes captured

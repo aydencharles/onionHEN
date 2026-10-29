@@ -168,7 +168,7 @@ OnionHEN 插件属于独立类别，应放在 `/data/OnionHEN/plugins/`。
 
 `SOURCE_ID` 只用于标识物理来源。没有 `PROCESS` 的文件是通用来源；带进程名的文件只匹配对应进程。相同游戏、版本和进程的多个 JSON、SHN、MC4、ShnExt 来源会同时加载。
 
-Illusion PS-Game-Patch XML 需手动放入上述目录，文件名使用 `<TITLE_ID>_<VERSION>.xml`；内置下载器不会同步 XML。`TitleID` 和 `AppVer`（支持逗号分隔的版本列表及 `mask` 通配版本）必须匹配文件名。直接地址类型支持 `byte`、`bytes16/32/64`、`bytes`、`float32/64`、`utf8` 和 `utf16`，其中 `bytes` 最多 255 字节。`mask` 和 `mask_jump32` 支持 `?`/`??` 通配符及相对匹配起点的有符号 `Offset`，并要求在可读模块范围内找到唯一匹配。`mask_jump32` 还使用精确 `Target` 字节序列定位代码洞，`Size`（至少 5，默认 5）指定跳转和 NOP 填充长度。找不到唯一签名或代码洞时不会应用补丁。关闭单向补丁时会恢复启用前保存的字节；如果游戏内存中的补丁字节已被更改，则会拒绝覆盖。
+Illusion PS-Game-Patch XML 需手动放入上述目录，文件名使用 `<TITLE_ID>_<VERSION>.xml`；内置下载器不会同步 XML。`TitleID` 和 `AppVer`（支持逗号分隔的版本列表及 `mask` 通配版本）必须匹配文件名。直接地址类型支持 `byte`、`bytes16/32/64`、`bytes`、`float32/64`、`utf8` 和 `utf16`，其中 `bytes` 最多 255 字节。`mask` 和 `mask_jump32` 支持两位十六进制字节对（字节间可省略空格）、`?`/`??` 通配符及相对匹配起点的有符号 `Offset`，并要求在可读模块范围内找到唯一匹配。`mask_jump32` 还使用精确 `Target` 字节序列定位代码洞，`Size`（至少 5，默认 5）指定跳转和 NOP 填充长度。找不到唯一签名或代码洞时不会应用补丁。关闭单向补丁时会恢复启用前保存的字节；如果游戏内存中的补丁字节已被更改，则会拒绝覆盖。
 
 金手指从磁盘加载。文件有改动时会重新载入，不必重启整套进程。
 

@@ -32,7 +32,7 @@ onion::cheats
 ├── i_cheat_parser.hpp
 │   ├── JsonCheatParser
 │   ├── XmlCheatParser          # .shn Trainer XML
-│   ├── PsGamePatchXmlParser    # .xml Illusion direct-address patches
+│   ├── PsGamePatchXmlParser    # .xml Illusion direct-address and signature patches
 │   ├── Mc4CheatParser          # AES-256-CBC → XML
 │   └── ShnExtCheatParser       # Adapter → C parser
 ├── CheatParserFactory          # createByFormat / loadFile / loadBuffer
@@ -83,7 +83,7 @@ IPC handleIPC
 | `.shn` | `XmlCheatParser` | Trainer XML |
 | `.mc4` | `Mc4CheatParser` | Base64 + AES-256-CBC → XML |
 | `.ShnExt` | `ShnExtCheatParser` | deflate + AES + cJSON + 可选 keystone |
-| `.xml` | `PsGamePatchXmlParser` | Illusion PS-Game-Patch direct-address lines; one-way toggles capture and restore original bytes |
+| `.xml` | `PsGamePatchXmlParser` | Illusion PS-Game-Patch direct-address and unique-signature patches (`mask` / `mask_jump32`); one-way toggles capture and restore original bytes |
 
 加载入口：`CheatParserFactory::loadFile` / `loadBuffer`（`CheatRepository` 调用）。
 

@@ -911,6 +911,19 @@ bool isPatchLineField(std::string_view name) {
          name == "Offset" || name == "Target" || name == "Size";
 }
 
+bool hasNodeField(const std::vector<XmlNode> &nodes, const XmlNode &node,
+                  const char *name) {
+  if (attribute(node, name) != nullptr) {
+    return true;
+  }
+  for (size_t child : node.children) {
+    if (nodes[child].name == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
                    uint64_t image_base, onion_cheat_entry_t &entry,
                    std::string &reason) {
@@ -985,7 +998,17 @@ bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
         !uniqueNodeValue(nodes, *line, "Offset", offset_text) ||
         !uniqueNodeValue(nodes, *line, "Target", target_text) ||
         !uniqueNodeValue(nodes, *line, "Size", size_text)) {
-      reason = "line has repeated or ambiguous Type/Address/Value";
+      reason = "line has repeated or ambiguous fields";
+      return false;
+    }
+
+    const bool has_offset = hasNodeField(nodes, *line, "Offset");
+    const bool has_target = hasNodeField(nodes, *line, "Target");
+    const bool has_size = hasNodeField(nodes, *line, "Size");
+    const bool is_pattern = type == "mask" || type == "mask_jump32";
+    if ((!is_pattern && (has_offset || has_target || has_size)) ||
+        (type == "mask" && (has_target || has_size))) {
+      reason = "line contains fields that are not supported by its Type";
       return false;
     }
 
@@ -994,6 +1017,7 @@ bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
       patch.kind = type == "mask" ? ONION_PATCH_MASK
                                   : ONION_PATCH_MASK_JUMP32;
       if (address.empty() || value.empty() ||
+          (has_offset && offset_text.empty()) ||
           !decodePattern(address, patch) ||
           !parseSignedOffset(offset_text, patch.pattern_offset) ||
           !decodeValue("bytes", value, patch)) {
@@ -1005,14 +1029,12 @@ bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
         if (!decodeBytes(target_text, patch.target, sizeof(patch.target),
                          target_len) ||
             target_len > ONION_MAX_PATTERN_BYTES ||
+            (has_size && size_text.empty()) ||
             !parseJumpSize(size_text, patch.jump_size)) {
           reason = "mask_jump32 requires valid Target bytes and Size >= 5";
           return false;
         }
         patch.target_len = static_cast<uint16_t>(target_len);
-      } else if (!target_text.empty() || !size_text.empty()) {
-        reason = "mask does not accept Target or Size";
-        return false;
       }
     } else {
       patch.kind = ONION_PATCH_DIRECT;

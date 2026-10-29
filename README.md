@@ -193,13 +193,14 @@ The direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`, `float32`,
 `float64`, `utf8`, and `utf16` are supported; `bytes` values may contain up to
 255 bytes. Pattern types `mask` and `mask_jump32` support `?` and `??`
 wildcards in two-digit hex byte pairs, with whitespace optional between pairs,
-a signed `Offset` from the match start, and a unique match in the readable
-module ranges. `mask_jump32` also uses an exact `Target` byte sequence
-to locate a code cave and an optional `Size` (minimum 5, default 5) for the
-branch and NOP padding. If a pattern or target is missing or ambiguous, the
-entry is not applied. Disabling one-way patches restores the bytes captured
-when they were enabled; if live bytes changed, OnionHEN refuses to overwrite
-them.
+a signed `Offset` from the match start. `mask` must resolve uniquely in
+readable module ranges. For `mask_jump32`, both the source pattern and exact
+`Target` code-cave signature must resolve uniquely in executable ranges, and
+both write ranges must remain executable. Its optional `Size` (minimum 5,
+default 5) controls the branch and NOP padding. If a pattern or target is
+missing or ambiguous, the entry is not applied. Disabling one-way patches
+restores the bytes captured when they were enabled; if live bytes changed,
+OnionHEN refuses to overwrite them.
 Integer line values accept decimal numbers or hexadecimal values prefixed with
 `0x`, `#`, or `$`; values outside the selected type's width are rejected.
 String values support the format's `\n`, `\t`, `\r`, `\0`, `\\`, and

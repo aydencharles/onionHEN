@@ -86,6 +86,8 @@ static_assert(sizeof(Elf64ProgramHeader) == 56,
 constexpr size_t kScanChunkSize = 64 * 1024;
 constexpr size_t kMaxElfProgramHeaders = 128;
 constexpr uint64_t kMaxModuleScanBytes = uint64_t{1} << 30;
+constexpr uint32_t kElfProgramExecute = 1;
+constexpr uint32_t kElfProgramRead = 4;
 
 bool rangesOverlap(uint64_t lhs_start, size_t lhs_length, uint64_t rhs_start,
                    size_t rhs_length) {
@@ -180,8 +182,8 @@ bool isMasterDependent(const onion_cheat_file_t &file, int index) {
          entry.patches[0].section != 0;
 }
 
-bool addReadableRange(std::vector<ModuleRange> &ranges, uint64_t start,
-                     uint64_t size, uint64_t &total_size) {
+bool addScanRange(std::vector<ModuleRange> &ranges, uint64_t start,
+                  uint64_t size, uint64_t &total_size) {
   if (start == 0 || size == 0 ||
       start > std::numeric_limits<uint64_t>::max() - size ||
       size > kMaxModuleScanBytes ||
@@ -193,8 +195,9 @@ bool addReadableRange(std::vector<ModuleRange> &ranges, uint64_t start,
   return true;
 }
 
-bool deriveElfReadableRanges(pid_t pid, uint64_t base, IMemoryBackend &mem,
-                            std::vector<ModuleRange> &ranges) {
+bool deriveElfScanRanges(pid_t pid, uint64_t base, IMemoryBackend &mem,
+                         uint32_t required_flags,
+                         std::vector<ModuleRange> &ranges) {
   Elf64Header header{};
   if (base == 0 || mem.read(pid, base, &header, sizeof(header)) < 0 ||
       std::memcmp(header.ident, "\x7f" "ELF", 4) != 0 ||
@@ -252,14 +255,15 @@ bool deriveElfReadableRanges(pid_t pid, uint64_t base, IMemoryBackend &mem,
   const uint64_t load_bias = base - first_page;
   uint64_t total_size = 0;
   for (const Elf64ProgramHeader &program : programs) {
-    if (program.type != 1 || (program.flags & 4) == 0 ||
+    if (program.type != 1 ||
+        (program.flags & required_flags) != required_flags ||
         program.memory_size == 0) {
       continue;
     }
     if (load_bias > std::numeric_limits<uint64_t>::max() -
                         program.virtual_address ||
-        !addReadableRange(ranges, load_bias + program.virtual_address,
-                          program.memory_size, total_size)) {
+        !addScanRange(ranges, load_bias + program.virtual_address,
+                      program.memory_size, total_size)) {
       ranges.clear();
       return false;
     }
@@ -267,16 +271,18 @@ bool deriveElfReadableRanges(pid_t pid, uint64_t base, IMemoryBackend &mem,
   return !ranges.empty();
 }
 
-bool getReadableModuleRanges(pid_t pid, const util_module_info_t &module,
-                             uint64_t base, IMemoryBackend &mem,
-                             std::vector<ModuleRange> &ranges) {
+bool getModuleScanRanges(pid_t pid, const util_module_info_t &module,
+                         uint64_t base, IMemoryBackend &mem,
+                         uint32_t required_prot, uint32_t required_flags,
+                         std::vector<ModuleRange> &ranges) {
   ranges.clear();
   uint64_t total_size = 0;
   for (const util_module_section_t &section : module.sections) {
-    if (section.size == 0 || (section.prot & PROT_READ) == 0) {
+    if (section.size == 0 ||
+        (section.prot & required_prot) != required_prot) {
       continue;
     }
-    if (!addReadableRange(ranges, section.vaddr, section.size, total_size)) {
+    if (!addScanRange(ranges, section.vaddr, section.size, total_size)) {
       ranges.clear();
       return false;
     }
@@ -288,7 +294,7 @@ bool getReadableModuleRanges(pid_t pid, const util_module_info_t &module,
               });
     return true;
   }
-  return deriveElfReadableRanges(pid, base, mem, ranges);
+  return deriveElfScanRanges(pid, base, mem, required_flags, ranges);
 }
 
 bool containsRange(const std::vector<ModuleRange> &ranges, uint64_t address,
@@ -501,6 +507,8 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
 
   std::vector<ModuleRange> readable_ranges;
   bool ranges_ready = false;
+  std::vector<ModuleRange> executable_ranges;
+  bool executable_ranges_ready = false;
   std::vector<ResolvedPatch> resolved;
   resolved.reserve(entry.patch_count);
   for (size_t patch_index = 0; patch_index < entry.patch_count; ++patch_index) {
@@ -546,8 +554,8 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
           return -1;
         }
         if (!ranges_ready) {
-          if (!getReadableModuleRanges(pid, mod, base, *backend,
-                                       readable_ranges)) {
+          if (!getModuleScanRanges(pid, mod, base, *backend, PROT_READ,
+                                   kElfProgramRead, readable_ranges)) {
             LOG_WARN("[Cheat] Cannot establish safe scan ranges for '%s'",
                      entry.name);
             status = status_tr("notify.cheats.invalid_patch", entry.name);
@@ -557,7 +565,22 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         }
         uint64_t pattern_match = 0;
         uint64_t patch_address = 0;
-        if (!scanUnique(pid, readable_ranges, patch.pattern,
+        const std::vector<ModuleRange> *search_ranges = &readable_ranges;
+        if (patch.kind == ONION_PATCH_MASK_JUMP32) {
+          if (!executable_ranges_ready) {
+            if (!getModuleScanRanges(
+                    pid, mod, base, *backend, PROT_READ | PROT_EXEC,
+                    kElfProgramRead | kElfProgramExecute, executable_ranges)) {
+              LOG_WARN("[Cheat] Cannot establish executable scan ranges for '%s'",
+                       entry.name);
+              status = status_tr("notify.cheats.invalid_patch", entry.name);
+              return -1;
+            }
+            executable_ranges_ready = true;
+          }
+          search_ranges = &executable_ranges;
+        }
+        if (!scanUnique(pid, *search_ranges, patch.pattern,
                         patch.pattern_mask, patch.pattern_len, *backend,
                         pattern_match) ||
             !addSignedOffset(pattern_match, patch.pattern_offset,
@@ -593,10 +616,11 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
           }
           uint64_t cave_address = 0;
           const size_t cave_length = patch.on_len + 5;
-          if (!scanUnique(pid, readable_ranges, patch.target, nullptr,
+          if (!scanUnique(pid, executable_ranges, patch.target, nullptr,
                           patch.target_len, *backend, cave_address) ||
-              !containsRange(readable_ranges, cave_address, cave_length) ||
-              !containsRange(readable_ranges, patch_address, patch.jump_size) ||
+              !containsRange(executable_ranges, cave_address, cave_length) ||
+              !containsRange(executable_ranges, patch_address,
+                             patch.jump_size) ||
               cave_address >
                   std::numeric_limits<uint64_t>::max() - patch.on_len) {
             LOG_WARN("[Cheat] mask_jump32 cave or source range invalid for '%s'",

@@ -65,11 +65,13 @@ signed `Offset` relative to the first signature byte. `mask` writes the hex
 `Value` at the resolved address.
 `mask_jump32` uses `Target` as an exact byte sequence to locate a code cave,
 writes the hex `Value` there, and adds a return branch; optional `Size` (default
-5, minimum 5) controls the source branch and NOP padding. Signatures and targets
-must resolve uniquely within readable module ranges. A metadata block is
-skipped as a whole if any line is unsupported or malformed. Disabling an XML
-patch restores the bytes captured before it was enabled, provided the live
-bytes still match the applied patch.
+5, minimum 5) controls the source branch and NOP padding. `mask` signatures
+must resolve uniquely within readable module ranges. A `mask_jump32` source and
+target must resolve uniquely within executable module ranges, and both write
+ranges must remain executable. A metadata block is skipped as a whole if any
+line is unsupported or malformed. Disabling an XML patch restores the bytes
+captured before it was enabled, provided the live bytes still match the applied
+patch.
 Integer values accept decimal or prefixed hexadecimal (`0x`, `#`, `$`) input
 and must fit the selected type width. UTF string values support `\n`, `\t`,
 `\r`, `\0`, `\\`, and `\xHH` escapes.

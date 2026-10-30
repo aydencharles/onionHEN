@@ -74,7 +74,8 @@ void fill_context(const CheatRequest &request, game_context_t &out) {
 }
 
 int load_sources(const std::vector<CheatSourceDescriptor> &sources,
-                 std::vector<std::unique_ptr<LoadedCheatFile>> &out) {
+                 std::vector<std::unique_ptr<LoadedCheatFile>> &out,
+                 const GameKey &game) {
   out.clear();
   out.reserve(sources.size());
   for (const CheatSourceDescriptor &source : sources) {
@@ -87,7 +88,7 @@ int load_sources(const std::vector<CheatSourceDescriptor> &sources,
     const size_t slash = source.path.find_last_of('/');
     const std::string name = source.path.substr(slash + 1);
     if (onion_cheat_parse_filename(name.c_str(), &loaded->filename) < 0 ||
-        CheatRepository::loadFile(source.path, loaded->file) < 0) {
+        CheatRepository::loadFile(source.path, loaded->file, game) < 0) {
       out.clear();
       return -1;
     }
@@ -196,7 +197,7 @@ int CheatService::ensureRuntimeLocked(const CheatRequest &request) {
   CheatRequest bound = request;
   bound.process = next->process;
   fill_context(bound, next->context);
-  if (load_sources(sources, next->files) < 0) {
+  if (load_sources(sources, next->files, request.game) < 0) {
     LOG_ERROR("[cheats] failed to load runtime sources title='%s'",
               request.game.title_id.c_str());
     return -1;
@@ -337,7 +338,7 @@ int CheatService::exportList(const CheatRequest &request,
     const std::vector<CheatSourceDescriptor> sources =
         CheatRepository::resolveBrowse(request.game);
     std::vector<std::unique_ptr<LoadedCheatFile>> files;
-    if (load_sources(sources, files) < 0) {
+    if (load_sources(sources, files, request.game) < 0) {
       return -1;
     }
     return writeListJson({CheatViewMode::Browse, {}, false}, files, out_path);

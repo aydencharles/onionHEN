@@ -44,6 +44,7 @@ IPC DOWNLOAD_CHEATS
 ```text
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>.xml
+/data/OnionHEN/cheats/<TITLE_ID>.xml
 ```
 
 `PROCESS` and 8-hex `SOURCE_ID` are optional. `SOURCE_ID` identifies a
@@ -52,9 +53,10 @@ into this directory with their original names. The repository returns all
 sources compatible with title/version/process; format priority only
 determines deterministic display order.
 
-Illusion PS-Game-Patch XML is read from a local `<TITLE_ID>_<VERSION>.xml`
-file. The XML `TitleID` list and a metadata `AppVer` entry must match that
-filename; comma-separated version lists and `AppVer="mask"` are accepted.
+Illusion PS-Game-Patch XML accepts the upstream `<TITLE_ID>.xml` name or a
+local `<TITLE_ID>_<VERSION>.xml` name. The XML `TitleID` list and metadata
+`AppVer` are checked against the active game; comma-separated version lists
+and `AppVer="mask"` are accepted.
 Each metadata block targets its `AppElf`; a direct address is converted to a
 module-relative offset as `Address - ImageBase`, with `ImageBase` defaulting to
 `0x00400000`. Direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`,

@@ -112,8 +112,14 @@ std::vector<ScannedCandidate> scanMatchingPaths(
       LOG_DEBUG("[cheats] skip %s: filename parse failed", entry->d_name);
       continue;
     }
+    const char *extension =
+        onion_cheat_extension_for_rank(parts.extension_rank);
+    const bool unversioned_xml =
+        parts.version[0] == '\0' && extension != nullptr &&
+        std::strcmp(extension, "xml") == 0;
     if (strcasecmp(parts.title_id, title_id) != 0 ||
-        std::strcmp(parts.version, version.c_str()) != 0) {
+        (!unversioned_xml &&
+         std::strcmp(parts.version, version.c_str()) != 0)) {
       continue;
     }
     if (!isRegularEntry(ONION_CHEATS_DIR, entry)) {
@@ -217,8 +223,15 @@ bool CheatRepository::statSignature(const std::string &path,
   return true;
 }
 
-int CheatRepository::loadFile(const std::string &path, onion_cheat_file_t &out) {
-  return CheatParserFactory::loadFile(path, out);
+int CheatRepository::loadFile(const std::string &path, onion_cheat_file_t &out,
+                              const GameKey &game) {
+  std::string title_id;
+  std::string version;
+  if (!normalizeGame(game, title_id, version)) {
+    return CheatParserFactory::loadFile(path, out);
+  }
+  return CheatParserFactory::loadFile(path, out, title_id.c_str(),
+                                      version.c_str());
 }
 
 void CheatRepository::ensureCheatsDir() {

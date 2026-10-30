@@ -176,6 +176,7 @@ optional process and 8-hex source ID:
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].mc4
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].ShnExt
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>.xml
+/data/OnionHEN/cheats/<TITLE_ID>.xml
 ```
 
 `PROCESS` is optional. `SOURCE_ID` is a stable physical-source discriminator.
@@ -184,10 +185,12 @@ independent JSON, SHN, MC4, ShnExt, and Illusion XML files can coexist. A source
 with an explicit process is only used for that process; a source without one is
 generic.
 
-Illusion PS-Game-Patch XML files use the title ID and `AppVer` selected by the
-filename; comma-separated versions and `AppVer="mask"` are accepted. Put them
-in `/data/OnionHEN/cheats/` as `<TITLE_ID>_<VERSION>.xml`; XML catalogs are not
-downloaded by `DOWNLOAD_CHEATS`. Direct addresses are resolved relative to the
+Illusion PS-Game-Patch XML files use the active title ID and version to select
+matching `TitleID` and `AppVer` metadata; comma-separated versions and
+`AppVer="mask"` are accepted. Put upstream files in
+`/data/OnionHEN/cheats/` with their `<TITLE_ID>.xml` names, or use the local
+`<TITLE_ID>_<VERSION>.xml` form. XML catalogs are not downloaded by
+`DOWNLOAD_CHEATS`. Direct addresses are resolved relative to the
 metadata's `ImageBase` (default `0x00400000`) and then to its `AppElf` module.
 The direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`, `float32`,
 `float64`, `utf8`, and `utf16` are supported; `bytes` values may contain up to

@@ -53,7 +53,9 @@ public:
   static std::unique_ptr<ICheatParser>
   createByPath(const std::string &path);
 
-  static int loadFile(const std::string &path, onion_cheat_file_t &out);
+  static int loadFile(const std::string &path, onion_cheat_file_t &out,
+                      const char *target_title_id = nullptr,
+                      const char *target_version = nullptr);
   static int loadBuffer(const std::string &format, const uint8_t *data,
                         size_t size, onion_cheat_file_t &out);
 };

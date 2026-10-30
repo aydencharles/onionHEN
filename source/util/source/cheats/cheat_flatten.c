@@ -227,12 +227,28 @@ int onion_cheat_parse_filename(const char *filename,
     ++sep;
   }
   title_len = (size_t)(sep - title_at);
-  if (*sep == '\0' || title_len < 4 ||
+  if (title_len < 4 ||
       title_len >= sizeof(out->title_id)) {
     return -1;
   }
   memcpy(out->title_id, title_at, title_len);
   out->title_id[title_len] = '\0';
+
+  /* Illusion's public patch collection uses one <TITLE_ID>.xml per title.
+   * Its metadata carries AppVer, so keep the version empty here and let the
+   * parser filter against the active game's version. Do not relax other
+   * formats or prefixed/suffixed names. */
+  if (*sep == '\0') {
+    const char *extension = onion_cheat_extension_for_rank(out->extension_rank);
+    if (title_at != base || extension == NULL ||
+        strcmp(extension, "xml") != 0 || title_len != strlen(base)) {
+      return -1;
+    }
+    for (i = 0; out->title_id[i]; ++i) {
+      out->title_id[i] = (char)toupper((unsigned char)out->title_id[i]);
+    }
+    return 0;
+  }
 
   vstart = sep + 1;
   vend = vstart;

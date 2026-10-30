@@ -52,8 +52,9 @@ public:
   static bool fileExists(const std::string &path);
   static bool statSignature(const std::string &path, FileSignature &out);
 
-  /** Load path into out (clears out first). 0 = ok. */
-  static int loadFile(const std::string &path, onion_cheat_file_t &out);
+  /** Load path for the active game into out (clears out first). 0 = ok. */
+  static int loadFile(const std::string &path, onion_cheat_file_t &out,
+                      const GameKey &game);
 
   static void ensureCheatsDir();
   /** Copy HENCC json/shn/mc4 files into ONION_CHEATS_DIR, keeping names. */

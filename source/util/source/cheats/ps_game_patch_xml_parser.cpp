@@ -1098,7 +1098,7 @@ public:
   int parse(const uint8_t *data, size_t size, onion_cheat_file_t &out) override {
     onion_cheat_file_clear(&out);
     if (target_title_id_.empty() || target_version_.empty()) {
-      LOG_WARN("[cheats] Illusion XML requires a TITLE_ID_VERSION filename");
+      LOG_WARN("[cheats] Illusion XML requires title and version context");
       return -1;
     }
     XmlDocumentParser parser;

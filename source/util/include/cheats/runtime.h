@@ -33,7 +33,9 @@ extern "C" {
 /**
  * Pieces of a recognized cheat filename.
  *
- * Online dumps use TITLEID_VERSION[_PROCESS][_SOURCE_ID].ext. process and
+ * Online dumps use TITLEID_VERSION[_PROCESS][_SOURCE_ID].ext. Illusion XML
+ * also accepts an exact TITLEID.xml filename; its version remains empty and
+ * is selected from XML metadata using the active game context. process and
  * source_id are empty when that segment is omitted. suffix is the raw
  * remainder after the version (author, process, source ID, or a combination).
  */

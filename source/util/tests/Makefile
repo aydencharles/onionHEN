@@ -78,6 +78,7 @@ PROD_C_SRCS := \
 PROD_CXX_SRCS := \
 	$(UTIL_ROOT)/source/cheats/json_cheat_parser.cpp \
 	$(UTIL_ROOT)/source/cheats/xml_cheat_parser.cpp \
+	$(UTIL_ROOT)/source/cheats/ps_game_patch_xml_parser.cpp \
 	$(UTIL_ROOT)/source/cheats/mc4_cheat_parser.cpp \
 	$(UTIL_ROOT)/source/cheats/shn_ext_cheat_parser.cpp \
 	$(UTIL_ROOT)/source/cheats/cheat_parser_factory.cpp \

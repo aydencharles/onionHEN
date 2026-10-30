@@ -12,7 +12,8 @@ namespace onion::cheats {
 /**
  * Strategy: parse a single cheat-file format into onion_cheat_file_t.
  *
- * Implementations: JSON, SHN(XML), MC4 (decrypt → XML), ShnExt (C adapter).
+ * Implementations: JSON, SHN(XML), Illusion PS-Game-Patch XML, MC4
+ * (decrypt → XML), ShnExt (C adapter).
  */
 class ICheatParser {
 public:
@@ -25,7 +26,13 @@ public:
   virtual int parse(const uint8_t *data, size_t size,
                     onion_cheat_file_t &out) = 0;
 
-  /** Short format id: "json", "shn", "mc4", "ShnExt". */
+  /** Optional context for formats scoped by the local cheat filename. */
+  virtual void setTargetGame(const char *title_id, const char *version) {
+    (void)title_id;
+    (void)version;
+  }
+
+  /** Short format id: "json", "shn", "xml", "mc4", "ShnExt". */
   virtual const char *name() const = 0;
 };
 
@@ -37,7 +44,7 @@ class CheatParserFactory {
 public:
   /**
    * Create parser for a format name (case-insensitive for ShnExt).
-   * Accepts "json", "shn", "mc4", "shnext" / "ShnExt", optionally with leading '.'.
+   * Accepts "json", "shn", "xml", "mc4", "shnext" / "ShnExt", optionally with leading '.'.
    */
   static std::unique_ptr<ICheatParser>
   createByFormat(const std::string &format);
@@ -46,7 +53,9 @@ public:
   static std::unique_ptr<ICheatParser>
   createByPath(const std::string &path);
 
-  static int loadFile(const std::string &path, onion_cheat_file_t &out);
+  static int loadFile(const std::string &path, onion_cheat_file_t &out,
+                      const char *target_title_id = nullptr,
+                      const char *target_version = nullptr);
   static int loadBuffer(const std::string &format, const uint8_t *data,
                         size_t size, onion_cheat_file_t &out);
 };

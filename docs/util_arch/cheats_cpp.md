@@ -83,7 +83,7 @@ IPC handleIPC
 | `.shn` | `XmlCheatParser` | Trainer XML |
 | `.mc4` | `Mc4CheatParser` | Base64 + AES-256-CBC → XML |
 | `.ShnExt` | `ShnExtCheatParser` | deflate + AES + cJSON + 可选 keystone |
-| `.xml` | `PsGamePatchXmlParser` | Illusion PS-Game-Patch direct-address and unique-signature patches (`mask` / `mask_jump32`); jump sources and caves are constrained to executable ranges; one-way toggles capture and restore original bytes |
+| `.xml` | `PsGamePatchXmlParser` | Illusion PS-Game-Patch direct-address and unique-signature patches (`mask` / `mask_jump32`); accepts upstream `<TITLE_ID>.xml` and local versioned filenames, with title/version checked from XML metadata; jump sources and caves are constrained to executable ranges; one-way toggles capture and restore original bytes |
 
 加载入口：`CheatParserFactory::loadFile` / `loadBuffer`（`CheatRepository` 调用）。
 

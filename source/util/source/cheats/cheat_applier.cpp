@@ -743,7 +743,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
       LOG_ERROR(
           "[Cheat] Invalid patch for %s pid=%d patch=%zu/%zu reason=%s "
           "on_len=%zu off_len=%zu limit=%d asm=%d",
-          enabling ? "enable" : "disable", (int)pid, i + 1,
+          enabling ? "enable" : "disable", (int)pid, patch_index + 1,
           entry.patch_count, "no resolved segments", patch.on_len,
           patch.off_len, ONION_MAX_PATCH_BYTES, patch.is_asm);
       status = status_tr("notify.cheats.invalid_patch", entry.name);
@@ -773,7 +773,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         LOG_ERROR(
             "[Cheat] Invalid patch for %s pid=%d patch=%zu/%zu segment=%zu "
             "reason=%s address=0x%llx on_len=%zu off_len=%zu limit=%d asm=%d",
-            enabling ? "enable" : "disable", (int)pid, i + 1,
+            enabling ? "enable" : "disable", (int)pid, patch_index + 1,
             entry.patch_count, segment_index + 1, reason,
             static_cast<unsigned long long>(segment.address),
             segment.on.size(), segment.off.size(), ONION_MAX_PATCH_BYTES,

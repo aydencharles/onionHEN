@@ -421,7 +421,13 @@ bool versionMatches(std::string_view versions, std::string_view target) {
     const size_t comma = versions.find(',');
     const std::string_view candidate =
         trim(versions.substr(0, comma));
-    if (candidate == target) {
+    const bool mask_version =
+        candidate.size() == 4 &&
+        (candidate[0] == 'm' || candidate[0] == 'M') &&
+        (candidate[1] == 'a' || candidate[1] == 'A') &&
+        (candidate[2] == 's' || candidate[2] == 'S') &&
+        (candidate[3] == 'k' || candidate[3] == 'K');
+    if (candidate == target || mask_version) {
       return true;
     }
     if (comma == std::string_view::npos) {
@@ -491,6 +497,111 @@ bool parseAddressNumber(std::string_view value, uint64_t &out) {
     return parseUnsignedDigits(value.substr(1), 8, out);
   }
   return parseUnsignedDigits(value, 10, out);
+}
+
+bool parseSignedOffset(std::string_view value, int64_t &out) {
+  value = trim(value);
+  if (value.empty()) {
+    out = 0;
+    return true;
+  }
+  bool negative = false;
+  if (value.front() == '-' || value.front() == '+') {
+    negative = value.front() == '-';
+    value.remove_prefix(1);
+  }
+  unsigned base = 10;
+  if (value.size() >= 2 && value[0] == '0' &&
+      (value[1] == 'x' || value[1] == 'X')) {
+    value.remove_prefix(2);
+    base = 16;
+  } else if (!value.empty() && (value.front() == '#' || value.front() == '$')) {
+    value.remove_prefix(1);
+    base = 16;
+  } else if (value.size() > 1 && value.front() == '0') {
+    value.remove_prefix(1);
+    base = 8;
+  }
+  uint64_t magnitude = 0;
+  const uint64_t negative_limit =
+      static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1;
+  if (!parseUnsignedDigits(value, base, magnitude) ||
+      magnitude > (negative ? negative_limit
+                            : static_cast<uint64_t>(
+                                  std::numeric_limits<int64_t>::max()))) {
+    return false;
+  }
+  if (negative && magnitude == negative_limit) {
+    out = std::numeric_limits<int64_t>::min();
+  } else {
+    out = negative ? -static_cast<int64_t>(magnitude)
+                   : static_cast<int64_t>(magnitude);
+  }
+  return true;
+}
+
+int hexNibble(char c) {
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+  if (c >= 'A' && c <= 'F') {
+    return c - 'A' + 10;
+  }
+  return -1;
+}
+
+bool decodePattern(std::string_view value, onion_patch_t &patch) {
+  size_t fixed_bytes = 0;
+  for (size_t i = 0; i < value.size();) {
+    if (isSpace(value[i])) {
+      ++i;
+      continue;
+    }
+    if (patch.pattern_len >= ONION_MAX_PATTERN_BYTES) {
+      return false;
+    }
+    if (value[i] == '?') {
+      ++i;
+      if (i < value.size() && value[i] == '?') {
+        ++i;
+      }
+      patch.pattern[patch.pattern_len] = 0;
+      patch.pattern_mask[patch.pattern_len++] = 0;
+      continue;
+    }
+    if (i + 1 >= value.size()) {
+      return false;
+    }
+    const int high = hexNibble(value[i]);
+    const int low = hexNibble(value[i + 1]);
+    if (high < 0 || low < 0) {
+      return false;
+    }
+    patch.pattern[patch.pattern_len] =
+        static_cast<uint8_t>((high << 4) | low);
+    patch.pattern_mask[patch.pattern_len++] = 0xff;
+    ++fixed_bytes;
+    i += 2;
+  }
+  return patch.pattern_len > 0 && fixed_bytes > 0;
+}
+
+bool parseJumpSize(std::string_view value, uint16_t &out) {
+  value = trim(value);
+  if (value.empty()) {
+    out = 5;
+    return true;
+  }
+  uint64_t parsed = 0;
+  if (!parseUnsignedDigits(value, 10, parsed) || parsed < 5 ||
+      parsed > ONION_MAX_PATCH_BYTES) {
+    return false;
+  }
+  out = static_cast<uint16_t>(parsed);
+  return true;
 }
 
 bool parseTypedInteger(std::string_view value, size_t width, uint64_t &out) {
@@ -842,31 +953,73 @@ bool buildMetadata(const std::vector<XmlNode> &nodes, const XmlNode &metadata,
     std::string_view type;
     std::string_view address;
     std::string_view value;
+    std::string_view offset_text;
+    std::string_view target_text;
+    std::string_view size_text;
     if (!uniqueNodeValue(nodes, *line, "Type", type) ||
         !uniqueNodeValue(nodes, *line, "Address", address) ||
-        !uniqueNodeValue(nodes, *line, "Value", value)) {
+        !uniqueNodeValue(nodes, *line, "Value", value) ||
+        !uniqueNodeValue(nodes, *line, "Offset", offset_text) ||
+        !uniqueNodeValue(nodes, *line, "Target", target_text) ||
+        !uniqueNodeValue(nodes, *line, "Size", size_text)) {
       reason = "line has repeated or ambiguous Type/Address/Value";
       return false;
     }
-    uint64_t parsed_address = 0;
-    if (type.empty() || address.empty() || value.empty() ||
-        !parseAddressNumber(address, parsed_address) ||
-        parsed_address < image_base ||
-        !decodeValue(type, value, patch)) {
-      reason = "malformed address/value or unsupported Type";
-      return false;
-    }
-    patch.offset = parsed_address - image_base;
-    if (patch.offset > std::numeric_limits<uint64_t>::max() - patch.on_len) {
-      reason = "patch address range overflows";
-      return false;
-    }
-    for (const onion_patch_t &previous : patches) {
-      const uint64_t previous_end = previous.offset + previous.on_len;
-      const uint64_t current_end = patch.offset + patch.on_len;
-      if (patch.offset < previous_end && previous.offset < current_end) {
-        reason = "PatchList contains overlapping direct-address lines";
+
+    bool is_direct = false;
+    if (type == "mask" || type == "mask_jump32") {
+      patch.kind = type == "mask" ? ONION_PATCH_MASK
+                                  : ONION_PATCH_MASK_JUMP32;
+      if (address.empty() || value.empty() ||
+          !decodePattern(address, patch) ||
+          !parseSignedOffset(offset_text, patch.pattern_offset) ||
+          !decodeValue("bytes", value, patch)) {
+        reason = "malformed pattern, offset, or payload";
         return false;
+      }
+      if (type == "mask_jump32") {
+        size_t target_len = 0;
+        if (!decodeBytes(target_text, patch.target, sizeof(patch.target),
+                         target_len) ||
+            target_len > ONION_MAX_PATTERN_BYTES ||
+            !parseJumpSize(size_text, patch.jump_size)) {
+          reason = "mask_jump32 requires valid Target bytes and Size >= 5";
+          return false;
+        }
+        patch.target_len = static_cast<uint16_t>(target_len);
+      } else if (!target_text.empty() || !size_text.empty()) {
+        reason = "mask does not accept Target or Size";
+        return false;
+      }
+    } else {
+      patch.kind = ONION_PATCH_DIRECT;
+      uint64_t parsed_address = 0;
+      if (type.empty() || address.empty() || value.empty() ||
+          !parseAddressNumber(address, parsed_address) ||
+          parsed_address < image_base ||
+          !decodeValue(type, value, patch)) {
+        reason = "malformed address/value or unsupported Type";
+        return false;
+      }
+      patch.offset = parsed_address - image_base;
+      if (patch.offset > std::numeric_limits<uint64_t>::max() - patch.on_len) {
+        reason = "patch address range overflows";
+        return false;
+      }
+      is_direct = true;
+    }
+
+    if (is_direct) {
+      for (const onion_patch_t &previous : patches) {
+        if (previous.kind != ONION_PATCH_DIRECT) {
+          continue;
+        }
+        const uint64_t previous_end = previous.offset + previous.on_len;
+        const uint64_t current_end = patch.offset + patch.on_len;
+        if (patch.offset < previous_end && previous.offset < current_end) {
+          reason = "PatchList contains overlapping direct-address lines";
+          return false;
+        }
       }
     }
     patch.restore_original = true;

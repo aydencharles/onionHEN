@@ -33,8 +33,10 @@ private:
     std::string source_key;
     int cheat_index = -1;
     size_t patch_index = 0;
+    size_t segment_index = 0;
     std::string cheat_name;
     std::vector<uint8_t> original;
+    std::vector<uint8_t> applied;
   };
 
   std::vector<ActiveRange> active_ranges_;

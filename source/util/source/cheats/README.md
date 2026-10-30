@@ -54,14 +54,21 @@ determines deterministic display order.
 
 Illusion PS-Game-Patch XML is read from a local `<TITLE_ID>_<VERSION>.xml`
 file. The XML `TitleID` list and a metadata `AppVer` entry must match that
-filename; comma-separated version lists are accepted. Each metadata block
-targets its `AppElf`; an address is converted to a module-relative offset as
-`Address - ImageBase`, with `ImageBase` defaulting
-to `0x00400000`. Direct-address types `byte`, `bytes16`, `bytes32`, `bytes64`,
-`bytes`, `float32`, `float64`, `utf8`, and `utf16` are supported. `bytes`
-values may contain up to 255 bytes. Metadata blocks containing unsupported
-types such as `mask` and `mask_jump32` are skipped as a whole. Disabling an XML patch restores the bytes captured before it was
-enabled, provided the live bytes still match the patch.
+filename; comma-separated version lists and `AppVer="mask"` are accepted.
+Each metadata block targets its `AppElf`; a direct address is converted to a
+module-relative offset as `Address - ImageBase`, with `ImageBase` defaulting to
+`0x00400000`. Direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`,
+`float32`, `float64`, `utf8`, and `utf16` are supported. `bytes` values may
+contain up to 255 bytes. `mask` and `mask_jump32` signatures use space-delimited
+hex bytes with `?` or `??` wildcard bytes and a signed `Offset` relative to the
+first signature byte. `mask` writes the hex `Value` at the resolved address.
+`mask_jump32` uses `Target` as an exact byte sequence to locate a code cave,
+writes the hex `Value` there, and adds a return branch; optional `Size` (default
+5, minimum 5) controls the source branch and NOP padding. Signatures and targets
+must resolve uniquely within readable module ranges. A metadata block is
+skipped as a whole if any line is unsupported or malformed. Disabling an XML
+patch restores the bytes captured before it was enabled, provided the live
+bytes still match the applied patch.
 Integer values accept decimal or prefixed hexadecimal (`0x`, `#`, `$`) input
 and must fit the selected type width. UTF string values support `\n`, `\t`,
 `\r`, `\0`, `\\`, and `\xHH` escapes.

@@ -185,16 +185,20 @@ with an explicit process is only used for that process; a source without one is
 generic.
 
 Illusion PS-Game-Patch XML files use the title ID and `AppVer` selected by the
-filename; comma-separated `AppVer` lists are accepted. Put them in
-`/data/OnionHEN/cheats/` as `<TITLE_ID>_<VERSION>.xml`; XML catalogs are not downloaded by
-`DOWNLOAD_CHEATS`. OnionHEN resolves each `Address` relative to the metadata's
-`ImageBase` (default `0x00400000`) and then to its `AppElf` module. It supports
-direct-address `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`, `float32`,
-`float64`, `utf8`, and `utf16` lines. `bytes` values may contain up to 255
-bytes. `mask` and `mask_jump32` pattern scans are skipped because OnionHEN does
-not currently resolve patterns. Disabling one-way patches restores the bytes
-captured when they were enabled;
-if the live bytes changed in the meantime, OnionHEN refuses to overwrite them.
+filename; comma-separated versions and `AppVer="mask"` are accepted. Put them
+in `/data/OnionHEN/cheats/` as `<TITLE_ID>_<VERSION>.xml`; XML catalogs are not
+downloaded by `DOWNLOAD_CHEATS`. Direct addresses are resolved relative to the
+metadata's `ImageBase` (default `0x00400000`) and then to its `AppElf` module.
+The direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`, `float32`,
+`float64`, `utf8`, and `utf16` are supported; `bytes` values may contain up to
+255 bytes. Pattern types `mask` and `mask_jump32` support `?` and `??`
+wildcards, a signed `Offset` from the match start, and a unique match in the
+readable module ranges. `mask_jump32` also uses an exact `Target` byte sequence
+to locate a code cave and an optional `Size` (minimum 5, default 5) for the
+branch and NOP padding. If a pattern or target is missing or ambiguous, the
+entry is not applied. Disabling one-way patches restores the bytes captured
+when they were enabled; if live bytes changed, OnionHEN refuses to overwrite
+them.
 Integer line values accept decimal numbers or hexadecimal values prefixed with
 `0x`, `#`, or `$`; values outside the selected type's width are rejected.
 String values support the format's `\n`, `\t`, `\r`, `\0`, `\\`, and

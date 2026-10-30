@@ -33,6 +33,7 @@ typedef struct {
   bool code_cave_reloc;
   bool absolute;
   bool is_asm; /* ShnExt may leave unassembled ASM text */
+  bool restore_original; /* Disable by restoring bytes captured before enable. */
   int section;
   uint64_t offset;
   size_t on_len;

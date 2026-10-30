@@ -11,6 +11,7 @@ IPC / main
        │    └─ CheatParserFactory         # Strategy by extension
        │         ├─ JsonCheatParser
        │         ├─ XmlCheatParser (.shn)
+       │         ├─ PsGamePatchXmlParser (.xml)
        │         ├─ Mc4CheatParser
        │         └─ ShnExtCheatParser → C
        ├─ CheatApplier                    # apply patches
@@ -42,6 +43,7 @@ IPC DOWNLOAD_CHEATS
 
 ```text
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>.xml
 ```
 
 `PROCESS` and 8-hex `SOURCE_ID` are optional. `SOURCE_ID` identifies a
@@ -49,6 +51,33 @@ physical source. Catalog install copies `json/`, `shn/`, and `mc4/` files
 into this directory with their original names. The repository returns all
 sources compatible with title/version/process; format priority only
 determines deterministic display order.
+
+Illusion PS-Game-Patch XML is read from a local `<TITLE_ID>_<VERSION>.xml`
+file. The XML `TitleID` list and a metadata `AppVer` entry must match that
+filename; comma-separated version lists are accepted. Each metadata block
+targets its `AppElf`; an address is converted to a module-relative offset as
+`Address - ImageBase`, with `ImageBase` defaulting
+to `0x00400000`. Direct-address types `byte`, `bytes16`, `bytes32`, `bytes64`,
+`bytes`, `float32`, `float64`, `utf8`, and `utf16` are supported. `bytes`
+values may contain up to 255 bytes. Metadata blocks containing unsupported
+types such as `mask` and `mask_jump32` are skipped as a whole. Disabling an XML patch restores the bytes captured before it was
+enabled, provided the live bytes still match the patch.
+Integer values accept decimal or prefixed hexadecimal (`0x`, `#`, `$`) input
+and must fit the selected type width. UTF string values support `\n`, `\t`,
+`\r`, `\0`, `\\`, and `\xHH` escapes.
+
+Example local file `/data/OnionHEN/cheats/CUSA00001_01.00.xml`:
+
+```xml
+<Patch>
+  <TitleID><ID>CUSA00001</ID></TitleID>
+  <Metadata Name="Example 60 FPS" AppVer="01.00" AppElf="eboot.bin">
+    <PatchList>
+      <Line Type="bytes32" Address="0x00412345" Value="0x00000001"/>
+    </PatchList>
+  </Metadata>
+</Patch>
+```
 
 ## Memory
 

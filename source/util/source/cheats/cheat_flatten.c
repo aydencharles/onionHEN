@@ -11,8 +11,8 @@
 #include <unistd.h>
 
 static const char *const k_cheat_extensions[] = {"json", "shn", "mc4",
-                                                 "ShnExt"};
-/* HENCC catalog folders are json/, shn/, mc4/. ShnExt is not a catalog folder. */
+                                                 "ShnExt", "xml"};
+/* HENCC catalog folders are json/, shn/, and mc4/ only. */
 enum { k_hencc_install_folder_count = 3 };
 _Static_assert(k_hencc_install_folder_count <
                    (int)(sizeof(k_cheat_extensions) /

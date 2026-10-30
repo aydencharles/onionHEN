@@ -7,6 +7,8 @@
 #include <cstring>
 #include <algorithm>
 #include <limits>
+#include <new>
+#include <stdexcept>
 #include <vector>
 
 #include "cheats/i_memory_backend.hpp"
@@ -27,6 +29,7 @@ struct ResolvedPatch {
   uint64_t address = 0;
   size_t on_len = 0;
   size_t off_len = 0;
+  std::vector<uint8_t> restore_bytes;
 };
 
 struct Snapshot {
@@ -173,6 +176,8 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         active_ranges_.end());
   }
 
+  const bool enabling = !entry.enabled;
+
   if (entry.module_name[0] == '\0' && game.process_name[0] != '\0') {
     std::snprintf(entry.module_name, sizeof(entry.module_name), "%s",
                   game.process_name);
@@ -206,24 +211,59 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   resolved.reserve(entry.patch_count);
   for (size_t i = 0; i < entry.patch_count; ++i) {
     auto &patch = entry.patches[i];
-    const size_t reserve_len = std::max(patch.on_len, patch.off_len);
+    ResolvedPatch candidate;
+    candidate.patch = &patch;
+    if (!is_ps2 && !patch.absolute &&
+        patch.offset > std::numeric_limits<uint64_t>::max() - base) {
+      status = status_tr("notify.cheats.invalid_patch", entry.name);
+      return -1;
+    }
+    candidate.address = resolveAddr(mod, patch, is_ps2, base);
+    candidate.on_len = patch.on_len;
+    candidate.off_len = patch.off_len;
+    if (!enabling && patch.restore_original) {
+      const auto active = std::find_if(
+          active_ranges_.begin(), active_ranges_.end(),
+          [&](const ActiveRange &range) {
+            return range.pid == pid && range.owner == owner &&
+                   range.cheat_index == index && range.patch_index == i &&
+                   range.start == candidate.address;
+          });
+      if (active == active_ranges_.end() ||
+          active->original.size() != patch.on_len || patch.on_len == 0) {
+        LOG_WARN("[Cheat] Refusing restore without active owner '%s' patch=%zu",
+                 entry.name, i);
+        status = status_tr("notify.cheats.invalid_patch", entry.name);
+        return -1;
+      }
+      candidate.restore_bytes = active->original;
+      candidate.off_len = candidate.restore_bytes.size();
+    }
+    const size_t reserve_len = std::max(candidate.on_len, candidate.off_len);
+    const bool address_overflow =
+        reserve_len != 0 && candidate.address >
+                                 std::numeric_limits<uint64_t>::max() - reserve_len;
     if (reserve_len == 0 || reserve_len > ONION_MAX_PATCH_BYTES ||
-        (!entry.enabled && patch.on_len == 0) ||
-        (entry.enabled && patch.off_len == 0)) {
+        address_overflow || (enabling && candidate.on_len == 0) ||
+        (!enabling && candidate.off_len == 0)) {
       const char *reason = "missing on bytes";
       if (reserve_len == 0) {
         reason = "empty patch";
       } else if (reserve_len > ONION_MAX_PATCH_BYTES) {
         reason = "patch exceeds byte limit";
-      } else if (entry.enabled) {
+      } else if (address_overflow) {
+        reason = "address range overflows";
+      } else if (!enabling) {
         reason = "missing off bytes";
       }
       LOG_ERROR(
           "[Cheat] Invalid patch for %s pid=%d patch=%zu/%zu reason=%s "
-          "on_len=%zu off_len=%zu limit=%d asm=%d",
-          entry.enabled ? "disable" : "enable", (int)pid, i + 1,
-          entry.patch_count, reason, patch.on_len, patch.off_len,
-          ONION_MAX_PATCH_BYTES, patch.is_asm);
+          "address=0x%llx on_len=%zu off_len=%zu limit=%d asm=%d",
+          enabling ? "enable" : "disable", (int)pid, i + 1,
+          entry.patch_count, reason,
+          static_cast<unsigned long long>(candidate.address),
+          candidate.on_len, candidate.off_len, ONION_MAX_PATCH_BYTES,
+          patch.is_asm);
       status = status_tr("notify.cheats.invalid_patch", entry.name);
       return -1;
     }
@@ -231,11 +271,9 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
       status = status_tr("notify.cheats.asm_unassembled", entry.name);
       return -1;
     }
-    resolved.push_back({&patch, resolveAddr(mod, patch, is_ps2, base),
-                        patch.on_len, patch.off_len});
+    resolved.push_back(std::move(candidate));
   }
 
-  const bool enabling = !entry.enabled;
   if (enabling) {
     for (const ResolvedPatch &candidate : resolved) {
       const size_t candidate_len =
@@ -289,12 +327,69 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
     snapshots.push_back(std::move(snapshot));
   }
 
+  if (!enabling) {
+    for (size_t i = 0; i < resolved.size(); ++i) {
+      const ResolvedPatch &patch = resolved[i];
+      if (patch.patch->restore_original &&
+          std::memcmp(snapshots[i].bytes.data(), patch.patch->on,
+                      patch.on_len) != 0) {
+        LOG_WARN("[Cheat] Refusing restore for '%s': live bytes changed",
+                 entry.name);
+        status = status_tr("notify.cheats.verify_failed", entry.name);
+        return -1;
+      }
+    }
+  }
+
+  std::vector<ActiveRange> pending_active_ranges;
+  if (enabling) {
+    try {
+      active_ranges_.reserve(active_ranges_.size() + resolved.size());
+      pending_active_ranges.reserve(resolved.size());
+      for (size_t i = 0; i < resolved.size(); ++i) {
+        const ResolvedPatch &patch = resolved[i];
+        ActiveRange active;
+        active.pid = pid;
+        active.start = patch.address;
+        active.length = std::max(patch.on_len, patch.off_len);
+        active.owner = owner;
+        active.source_key = source_key;
+        active.cheat_index = index;
+        active.patch_index = i;
+        active.cheat_name = entry.name;
+        if (patch.patch->restore_original) {
+          active.original.assign(snapshots[i].bytes.begin(),
+                                 snapshots[i].bytes.begin() + patch.on_len);
+        }
+        pending_active_ranges.push_back(std::move(active));
+      }
+    } catch (const std::exception &) {
+      status = status_tr("notify.cheats.activation_failed", entry.name);
+      return -1;
+    }
+  }
+
   size_t touched_count = 0;
   for (size_t i = 0; i < resolved.size(); ++i) {
     const ResolvedPatch &resolved_patch = resolved[i];
     auto &patch = *resolved_patch.patch;
-    const uint8_t *data = enabling ? patch.on : patch.off;
-    const size_t len = enabling ? patch.on_len : patch.off_len;
+    const uint8_t *data = enabling
+                              ? patch.on
+                              : (patch.restore_original
+                                     ? resolved_patch.restore_bytes.data()
+                                     : patch.off);
+    const size_t len = enabling ? resolved_patch.on_len : resolved_patch.off_len;
+
+    if (!enabling && patch.restore_original) {
+      uint8_t current[ONION_MAX_PATCH_BYTES];
+      if (backend->read(pid, resolved_patch.address, current, len) < 0 ||
+          std::memcmp(current, patch.on, len) != 0) {
+        LOG_WARN("[Cheat] Refusing restore for '%s': live bytes changed",
+                 entry.name);
+        status = status_tr("notify.cheats.verify_failed", entry.name);
+        break;
+      }
+    }
 
     /* Count the range before the write: a backend may report an error after a
      * partial copy, and the snapshot must still be restored. */
@@ -339,10 +434,8 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   entry.enabled = enabling;
   file.last_applied_pid = pid;
   if (enabling) {
-    for (const ResolvedPatch &patch : resolved) {
-      active_ranges_.push_back({pid, patch.address,
-                                std::max(patch.on_len, patch.off_len), owner,
-                                source_key, index, entry.name});
+    for (ActiveRange &active : pending_active_ranges) {
+      active_ranges_.push_back(std::move(active));
     }
   } else {
     active_ranges_.erase(

@@ -57,8 +57,8 @@ const char *onion_cheat_extension_for_rank(int rank);
 int onion_cheat_extension_rank(const char *name, size_t *extension_start);
 
 /**
- * If @p name ends with a known cheat extension (.json/.shn/.mc4/.ShnExt),
- * write the format tag ("json", "shn", "mc4", "ShnExt") to @p ext_out and
+ * If @p name ends with a known cheat extension
+ * (.json/.shn/.mc4/.ShnExt/.xml), write its format tag to @p ext_out and
  * return 1. Otherwise return 0.
  */
 int onion_cheat_match_ext(const char *name, char *ext_out, size_t ext_out_size);

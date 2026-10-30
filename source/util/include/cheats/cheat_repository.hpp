@@ -39,7 +39,7 @@ struct CheatSourceDescriptor {
 
 /**
  * Resolves flat cheat paths and loads format-specific files
- * via CheatParserFactory (Strategy: json / shn / mc4 / ShnExt).
+ * via CheatParserFactory (Strategy: json / shn / mc4 / ShnExt / Illusion XML).
  */
 class CheatRepository {
 public:

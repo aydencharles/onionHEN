@@ -15,6 +15,7 @@ namespace onion::cheats {
 /* Factories implemented in format translation units */
 std::unique_ptr<ICheatParser> makeJsonCheatParser();
 std::unique_ptr<ICheatParser> makeXmlCheatParser();
+std::unique_ptr<ICheatParser> makePsGamePatchXmlParser();
 std::unique_ptr<ICheatParser> makeMc4CheatParser();
 std::unique_ptr<ICheatParser> makeShnExtCheatParser();
 
@@ -37,6 +38,9 @@ CheatParserFactory::createByFormat(const std::string &format) {
   const std::string f = normalizeFormat(format);
   if (f == "shn") {
     return makeXmlCheatParser();
+  }
+  if (f == "xml") {
+    return makePsGamePatchXmlParser();
   }
   if (f == "mc4") {
     return makeMc4CheatParser();
@@ -87,6 +91,15 @@ int CheatParserFactory::loadFile(const std::string &path,
   }
 
   auto parser = createByPath(path);
+  if (std::strcmp(parser->name(), "xml") == 0) {
+    const size_t slash = path.find_last_of("/\\");
+    const std::string filename =
+        slash == std::string::npos ? path : path.substr(slash + 1);
+    onion_cheat_filename_t parts{};
+    if (onion_cheat_parse_filename(filename.c_str(), &parts) == 0) {
+      parser->setTargetGame(parts.title_id, parts.version);
+    }
+  }
   const int rc = parser->parse(reinterpret_cast<const uint8_t *>(buf),
                                static_cast<size_t>(size), out);
 

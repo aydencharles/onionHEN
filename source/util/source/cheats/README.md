@@ -60,8 +60,9 @@ module-relative offset as `Address - ImageBase`, with `ImageBase` defaulting to
 `0x00400000`. Direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`,
 `float32`, `float64`, `utf8`, and `utf16` are supported. `bytes` values may
 contain up to 255 bytes. `mask` and `mask_jump32` signatures use two-digit hex
-byte pairs with optional whitespace and `?` or `??` wildcard bytes, plus a
-signed `Offset` relative to the first signature byte. `mask` writes the hex
+byte pairs. Use `?` or `??` for wildcards; whitespace between pairs is optional.
+Both types accept a signed `Offset` relative to the first signature byte.
+`mask` writes the hex
 `Value` at the resolved address.
 `mask_jump32` uses `Target` as an exact byte sequence to locate a code cave,
 writes the hex `Value` there, and adds a return branch; optional `Size` (default

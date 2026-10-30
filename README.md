@@ -193,7 +193,7 @@ The direct types `byte`, `bytes16`, `bytes32`, `bytes64`, `bytes`, `float32`,
 `float64`, `utf8`, and `utf16` are supported; `bytes` values may contain up to
 255 bytes. Pattern types `mask` and `mask_jump32` support `?` and `??`
 wildcards in two-digit hex byte pairs, with whitespace optional between pairs,
-a signed `Offset` from the match start. `mask` must resolve uniquely in
+and accept a signed `Offset` from the match start. `mask` must resolve uniquely in
 readable module ranges. For `mask_jump32`, both the source pattern and exact
 `Target` code-cave signature must resolve uniquely in executable ranges, and
 both write ranges must remain executable. Its optional `Size` (minimum 5,

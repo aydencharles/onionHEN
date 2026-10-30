@@ -668,7 +668,10 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
   g.link("id_payloads", toolbox_i18n::tr("payloads.link"), "payloads.xml",
          toolbox_i18n::tr("payloads.link.sub"), kIconPlugins)
       .link("id_plugins", toolbox_i18n::tr("plugins.link"), "plugins.xml",
-            toolbox_i18n::tr("plugins.link.sub"), kIconPlugins);
+            toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
+      .link("id_usb_payloads", toolbox_i18n::tr("usb_payloads.title"),
+            "usb_payloads.xml", toolbox_i18n::tr("usb_payloads.link.sub"),
+            kIconPlugins);
   /* SPRX catalog UI is untested; restore id_sprx -> sprx.xml when it is. */
 }
 

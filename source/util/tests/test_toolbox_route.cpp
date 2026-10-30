@@ -46,6 +46,14 @@ static int test_payloads_page(void) {
   return 0;
 }
 
+static int test_usb_payloads_page(void) {
+  RouteResult r = resolve_resource(make_in(kUsbPayloadsXml));
+  TEST_ASSERT_TRUE(r.page == Page::UsbPayloads);
+  TEST_ASSERT_TRUE(onpress_domain_for_page(r.page) == OnPressDomain::UsbPayloads);
+  TEST_ASSERT_TRUE(toolbox_owns_settings_page(r.page));
+  return 0;
+}
+
 static int test_debug_settings_page(void) {
   RouteResult r = resolve_resource(make_in("debug_settings.xml"));
   TEST_ASSERT_TRUE(r.page == Page::DebugSettings);
@@ -465,6 +473,7 @@ extern "C" int test_toolbox_route_suite(void) {
   int fails = 0;
   fails += onion_test_run("route.unknown", test_unknown_passthrough);
   fails += onion_test_run("route.payloads", test_payloads_page);
+  fails += onion_test_run("route.usb_payloads", test_usb_payloads_page);
   fails += onion_test_run("route.debug", test_debug_settings_page);
   fails += onion_test_run("route.cheats", test_cheats_page);
   fails += onion_test_run("route.auto_payloads", test_auto_payloads);

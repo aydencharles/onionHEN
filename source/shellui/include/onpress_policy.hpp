@@ -14,6 +14,7 @@ enum class OnPressDomain : unsigned char {
   PassThrough = 0,
   Root,
   Payloads,
+  UsbPayloads,
   PayloadConfig,
   Sprx,
   Plugins,
@@ -36,6 +37,8 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
     return OnPressDomain::Root;
   case Page::Payloads:
     return OnPressDomain::Payloads;
+  case Page::UsbPayloads:
+    return OnPressDomain::UsbPayloads;
   case Page::PayloadConfig:
     return OnPressDomain::PayloadConfig;
   case Page::OverlayMetrics:

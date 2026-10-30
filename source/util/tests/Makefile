@@ -143,6 +143,7 @@ TEST_CXX_SRCS := \
 	test_ipc_harden.cpp \
 	test_ps5_settings_ui.cpp \
 	test_toolbox_route.cpp \
+	test_usb_payload_importer.cpp \
 	test_onpress_policy.cpp \
 	test_toolbox_helpers.cpp \
   test_toolbox_i18n.cpp \
@@ -194,6 +195,7 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/hook_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/settings_page_update.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/usb_payload_importer.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
@@ -283,6 +285,10 @@ $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o: $(REPO_ROOT)/source/shellui/src/ps5
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/shellui/toolbox_route.o: $(REPO_ROOT)/source/shellui/src/toolbox_route.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/usb_payload_importer.o: $(REPO_ROOT)/source/shellui/src/usb_payload_importer.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

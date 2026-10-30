@@ -44,6 +44,8 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::DebugSettings;
   } else if (out.flags.is_payloads) {
     out.page = Page::Payloads;
+  } else if (in.resource == kUsbPayloadsXml) {
+    out.page = Page::UsbPayloads;
   } else if (out.flags.is_payload_config) {
     out.page = Page::PayloadConfig;
   } else if (out.flags.is_overlay_metrics) {

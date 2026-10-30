@@ -15,6 +15,7 @@ enum class Page : unsigned char {
   None = 0,           /**< unknown → original stream */
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
+  UsbPayloads,
   PayloadConfig,      /**< per-Payload configuration page */
   OverlayMetrics,     /**< overlay metric list (overlay_metrics.xml) */
   OverlayMetricConfig, /**< per-overlay metric page (overlay_<id>.xml) */
@@ -90,6 +91,8 @@ inline constexpr std::string_view kAutoPayloadsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.auto_payloads.xml";
 inline constexpr std::string_view kPluginsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.plugins.xml";
+inline constexpr std::string_view kUsbPayloadsXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.usb_payloads.xml";
 inline constexpr std::string_view kSprxXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.sprx.xml";
 inline constexpr std::string_view kAccountXml =

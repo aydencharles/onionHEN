@@ -10,6 +10,7 @@
 #include "plugin_progress.hpp"
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
+#include "usb_payload_ui.hpp"
 #include "dynamic_ui_runtime.hpp"
 #include "external_plugin_ui.hpp"
 #include "external_sprx_ui.hpp"
@@ -126,6 +127,9 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     break;
   case toolbox::Page::Payloads:
     generate_payload_xml(new_xml_string);
+    break;
+  case toolbox::Page::UsbPayloads:
+    generate_usb_payload_xml(new_xml_string);
     break;
   case toolbox::Page::PayloadConfig: {
     std::string payload_id;

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
 #include <string_view>
@@ -90,7 +91,6 @@ ImportResult import_payload(const Entry &entry, const std::string &destination,
 
   const std::string final_path =
       destination + "/" + destination_name(entry.name);
-  const std::string temp_path = final_path + ".installing";
   const int source = open(entry.source_path.c_str(), O_RDONLY | O_NOFOLLOW);
   if (source < 0)
     return ImportResult::CannotOpenSource;
@@ -114,17 +114,20 @@ ImportResult import_payload(const Entry &entry, const std::string &destination,
     close(source);
     return ImportResult::DestinationAlreadyExists;
   }
-  const int target =
-      open(temp_path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0666);
+  std::string temp_path = destination + "/.usb-payload-XXXXXX";
+  const int target = mkstemp(temp_path.data());
   if (target < 0) {
     close(source);
     return ImportResult::CannotCreateDestination;
   }
 
   ImportResult result = ImportResult::Completed;
+  // mkstemp starts at 0600; the installed payload must be readable by the loader.
+  if (fchmod(target, 0644) != 0)
+    result = ImportResult::CannotCreateDestination;
   std::uint64_t copied = 0;
   char buffer[64 * 1024];
-  for (;;) {
+  while (result == ImportResult::Completed) {
     const ssize_t n = read(source, buffer, sizeof(buffer));
     if (n < 0 && errno == EINTR)
       continue;
@@ -159,13 +162,17 @@ ImportResult import_payload(const Entry &entry, const std::string &destination,
     result = ImportResult::WriteError;
   if (close(source) != 0 && result == ImportResult::Completed)
     result = ImportResult::ReadError;
-  if (result == ImportResult::Completed && !replace &&
-      lstat(final_path.c_str(), &destination_stat) == 0)
-    result = ImportResult::DestinationAlreadyExists;
-  if (result == ImportResult::Completed &&
-      rename(temp_path.c_str(), final_path.c_str()) != 0)
-    result = ImportResult::RenameError;
-  if (result != ImportResult::Completed)
+  if (result == ImportResult::Completed) {
+    if (replace) {
+      if (rename(temp_path.c_str(), final_path.c_str()) != 0)
+        result = ImportResult::RenameError;
+    } else if (link(temp_path.c_str(), final_path.c_str()) != 0) {
+      // A hard link publishes the copy only if the destination is still absent.
+      result = errno == EEXIST ? ImportResult::DestinationAlreadyExists
+                               : ImportResult::RenameError;
+    }
+  }
+  if (result != ImportResult::Completed || !replace)
     unlink(temp_path.c_str());
   return result;
 }

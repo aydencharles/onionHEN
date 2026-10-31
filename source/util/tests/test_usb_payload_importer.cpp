@@ -61,11 +61,14 @@ int test_scan_and_import() {
   TEST_ASSERT_TRUE(entries[0].usb_index == 1);
   TEST_ASSERT_TRUE(entries[0].name == "payload.ELF");
   TEST_ASSERT_TRUE(entries[0].size == 11 && !entries[0].installed);
+  const Entry payload_entry = entries[0];
 
+  std::ofstream(f.destination + "/payload.elf.installing") << "stale";
   TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, false) ==
                    ImportResult::Completed);
   TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf") == "new payload");
-  TEST_ASSERT_TRUE(!fs::exists(f.destination + "/payload.elf.installing"));
+  TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf.installing") ==
+                   "stale");
   entries = scan(f.usb_prefix, f.destination, &found);
   TEST_ASSERT_TRUE(entries.size() == 1 && entries[0].installed);
   TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, false) ==
@@ -73,22 +76,47 @@ int test_scan_and_import() {
 
   std::ofstream(f.usb_prefix + "1/payload.ELF", std::ios::binary)
       << "replacement";
-  std::ofstream(f.destination + "/payload.elf.installing") << "stale";
-  TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, true) ==
-                   ImportResult::CannotCreateDestination);
-  TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf") == "new payload");
-  fs::remove(f.destination + "/payload.elf.installing");
+  std::ofstream(f.destination + "/.usb-payload-ABCDEF") << "old staging";
   TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, true) ==
                    ImportResult::Completed);
   TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf") == "replacement");
-  TEST_ASSERT_TRUE(!fs::exists(f.destination + "/payload.elf.installing"));
+  TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf.installing") ==
+                   "stale");
+  TEST_ASSERT_TRUE(contents(f.destination + "/.usb-payload-ABCDEF") ==
+                   "old staging");
+  fs::remove(f.destination + "/payload.elf.installing");
+  fs::remove(f.destination + "/.usb-payload-ABCDEF");
+
+  std::ofstream(f.usb_prefix + "1/blocked.elf") << "blocked payload";
+  fs::create_directory(f.destination + "/blocked.elf");
+  Entry blocked{"blocked.elf", f.usb_prefix + "1/blocked.elf", 15, 1, true};
+  TEST_ASSERT_TRUE(import_payload(blocked, f.destination, true) ==
+                   ImportResult::RenameError);
+  for (const auto &file : fs::directory_iterator(f.destination))
+    TEST_ASSERT_TRUE(file.path().filename().string().find(".usb-payload-") !=
+                     0);
+  fs::remove(f.destination + "/blocked.elf");
+  fs::remove(f.usb_prefix + "1/blocked.elf");
+
+  const std::string long_name(251, 'a');
+  std::ofstream(f.usb_prefix + "1/" + long_name + ".ELF") << "long payload";
+  entries = scan(f.usb_prefix, f.destination, &found);
+  TEST_ASSERT_TRUE(entries.size() == 2);
+  const Entry long_entry = entries[0].name == long_name + ".ELF"
+                               ? entries[0]
+                               : entries[1];
+  TEST_ASSERT_TRUE(import_payload(long_entry, f.destination, false) ==
+                   ImportResult::Completed);
+  TEST_ASSERT_TRUE(contents(f.destination + "/" + long_name + ".elf") ==
+                   "long payload");
+  fs::remove(f.usb_prefix + "1/" + long_name + ".ELF");
 
   fs::remove(f.usb_prefix + "1/payload.ELF");
-  TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, true) ==
+  TEST_ASSERT_TRUE(import_payload(payload_entry, f.destination, true) ==
                    ImportResult::CannotOpenSource);
   TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf") == "replacement");
 
-  Entry invalid = entries[0];
+  Entry invalid = payload_entry;
   invalid.name = "../outside.elf";
   TEST_ASSERT_TRUE(import_payload(invalid, f.destination, true) ==
                    ImportResult::InvalidName);

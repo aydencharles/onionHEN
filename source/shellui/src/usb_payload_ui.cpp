@@ -3,11 +3,10 @@
 #include "onpress.hpp"
 #include "settings_page_refresh.hpp"
 #include "toolbox_i18n.hpp"
+#include "usb_payload_action.hpp"
 #include "usb_payload_importer.hpp"
 
-#include <algorithm>
 #include <cstdio>
-#include <cstdlib>
 #include <vector>
 
 namespace {
@@ -43,9 +42,7 @@ bool model(ps5ui::Node &root) {
     page.label("id_usb_payloads_empty",
                toolbox_i18n::tr("usb_payloads.no_elf"));
 
-  for (size_t i = 0; i < entries.size(); ++i) {
-    const Entry &entry = entries[i];
-    const std::string index = std::to_string(i);
+  for (const Entry &entry : entries) {
     const std::string source = "usb" + std::to_string(entry.usb_index);
     const std::string detail =
         std::string(toolbox_i18n::tr(entry.installed ? "usb_payloads.replace"
@@ -54,8 +51,7 @@ bool model(ps5ui::Node &root) {
         toolbox_i18n::tr(entry.installed ? "usb_payloads.installed"
                                          : "usb_payloads.not_installed");
     page.button(
-        "id_usb_payload_" +
-            std::string(entry.installed ? "replace_" : "import_") + index,
+        onion::shellui::usb_payloads::action_id(entry, entry.installed),
         entry.name, detail, std::nullopt, std::nullopt, ps5ui::Style::None,
         entry.installed ? std::optional<std::string>(
                               toolbox_i18n::tr("usb_payloads.replace_confirm"))
@@ -111,23 +107,17 @@ OnPressResult onpress_usb_payload(OnPressContext &ctx) {
     onion::shellui::settings::refresh(ctx.instance);
     return OnPressResult::Consumed;
   }
-  constexpr const char *kImport = "id_usb_payload_import_";
-  constexpr const char *kReplace = "id_usb_payload_replace_";
-  const bool replace = ctx.id.rfind(kReplace, 0) == 0;
-  const char *prefix = replace ? kReplace : kImport;
-  if (ctx.id.rfind(prefix, 0) != 0)
+  const std::string_view id = ctx.id;
+  const bool replace = id.starts_with(
+      onion::shellui::usb_payloads::kReplaceActionPrefix);
+  if (!replace && !id.starts_with(
+                      onion::shellui::usb_payloads::kImportActionPrefix))
     return OnPressResult::NotMine;
-  const std::string number =
-      ctx.id.substr(std::char_traits<char>::length(prefix));
-  if (number.empty() || !std::all_of(number.begin(), number.end(), [](char c) {
-        return c >= '0' && c <= '9';
-      }))
+  const Entry *found = onion::shellui::usb_payloads::find_action_entry(
+      entries, id, replace);
+  if (!found)
     return OnPressResult::Consumed;
-  const size_t index =
-      static_cast<size_t>(std::strtoul(number.c_str(), nullptr, 10));
-  if (index >= entries.size())
-    return OnPressResult::Consumed;
-  const Entry entry = entries[index];
+  const Entry entry = *found;
   const ImportResult result = onion::shellui::usb_payloads::import_payload(
       entry, onion::shellui::usb_payloads::kDestination, replace);
   message(result == ImportResult::Completed && replace ? "usb_payloads.replaced"

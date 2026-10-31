@@ -1,4 +1,5 @@
 #include "test_harness.h"
+#include "usb_payload_action.hpp"
 #include "usb_payload_importer.hpp"
 
 #include <cstdlib>
@@ -37,6 +38,33 @@ std::string contents(const std::string &path) {
   std::ifstream file(path, std::ios::binary);
   return {std::istreambuf_iterator<char>(file),
           std::istreambuf_iterator<char>()};
+}
+
+int test_action_identity_after_reorder() {
+  const Entry displayed{"first_name.elf", "/usb1/first_name.elf", 10, 1,
+                        true};
+  const Entry other{"other_name.elf", "/usb0/other_name.elf", 12, 0,
+                    true};
+  const std::string displayed_id = action_id(displayed, true);
+  const std::vector<Entry> refreshed{other, displayed};
+
+  const Entry *found = find_action_entry(refreshed, displayed_id, true);
+  TEST_ASSERT_TRUE(found != nullptr && found->name == displayed.name &&
+                   found->usb_index == displayed.usb_index);
+  TEST_ASSERT_TRUE(find_action_entry({other}, displayed_id, true) == nullptr);
+  TEST_ASSERT_TRUE(find_action_entry(refreshed, displayed_id, false) == nullptr);
+  TEST_ASSERT_TRUE(find_action_entry(refreshed, "id_usb_payload_replace_1_",
+                                     true) == nullptr);
+  TEST_ASSERT_TRUE(find_action_entry(refreshed,
+                                     "id_usb_payload_replace_9_first_name.elf",
+                                     true) == nullptr);
+
+  const Entry same_name_other_usb{"first_name.elf", "/usb0/first_name.elf",
+                                  10, 0, true};
+  const std::vector<Entry> duplicates{same_name_other_usb, displayed};
+  found = find_action_entry(duplicates, displayed_id, true);
+  TEST_ASSERT_TRUE(found != nullptr && found->usb_index == 1);
+  return 0;
 }
 
 int test_scan_and_import() {
@@ -140,6 +168,10 @@ int test_scan_and_import() {
 } // namespace
 
 extern "C" int test_usb_payload_importer_suite(void) {
-  return onion_test_run("usb_payloads.scan_import_replace",
-                        test_scan_and_import);
+  int failures = 0;
+  failures += onion_test_run("usb_payloads.action_identity_after_reorder",
+                             test_action_identity_after_reorder);
+  failures += onion_test_run("usb_payloads.scan_import_replace",
+                             test_scan_and_import);
+  return failures;
 }

@@ -69,7 +69,7 @@ uint64_t resolveAddr(const util_module_info_t &mod, const onion_patch_t &patch,
 }
 
 void fixMasterCode(const game_context_t &game, onion_cheat_file_t &file,
-                   onion_cheat_entry_t &entry, uint64_t base,
+                   onion_cheat_entry_t &entry, bool is_ps2, uint64_t base,
                    IMemoryBackend &mem) {
   if (file.master_code_id < 0 || !containsToken(entry.name, "MC") ||
       entry.patch_count != 1 || entry.patches[0].section == 0) {
@@ -82,7 +82,7 @@ void fixMasterCode(const game_context_t &game, onion_cheat_file_t &file,
   auto &mp = master.patches[0];
   auto &dp = entry.patches[0];
   const uint64_t mc_addr =
-      mp.absolute ? mp.offset : (base + mp.offset);
+      (is_ps2 || mp.absolute) ? mp.offset : (base + mp.offset);
   std::vector<uint8_t> buf(mp.on_len);
   if (mem.read(game.pid, mc_addr, buf.data(), mp.on_len) < 0) {
     return;
@@ -199,7 +199,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
        containsToken(entry.name, "Mastercode"))) {
     file.master_code_id = index;
   } else {
-    fixMasterCode(target, file, entry, base, *backend);
+    fixMasterCode(target, file, entry, is_ps2, base, *backend);
   }
 
   std::vector<ResolvedPatch> resolved;
@@ -210,6 +210,20 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
     if (reserve_len == 0 || reserve_len > ONION_MAX_PATCH_BYTES ||
         (!entry.enabled && patch.on_len == 0) ||
         (entry.enabled && patch.off_len == 0)) {
+      const char *reason = "missing on bytes";
+      if (reserve_len == 0) {
+        reason = "empty patch";
+      } else if (reserve_len > ONION_MAX_PATCH_BYTES) {
+        reason = "patch exceeds byte limit";
+      } else if (entry.enabled) {
+        reason = "missing off bytes";
+      }
+      LOG_ERROR(
+          "[Cheat] Invalid patch for %s pid=%d patch=%zu/%zu reason=%s "
+          "on_len=%zu off_len=%zu limit=%d asm=%d",
+          entry.enabled ? "disable" : "enable", (int)pid, i + 1,
+          entry.patch_count, reason, patch.on_len, patch.off_len,
+          ONION_MAX_PATCH_BYTES, patch.is_asm);
       status = status_tr("notify.cheats.invalid_patch", entry.name);
       return -1;
     }
@@ -254,13 +268,21 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
 
   std::vector<Snapshot> snapshots;
   snapshots.reserve(resolved.size());
-  for (const ResolvedPatch &patch : resolved) {
+  for (size_t i = 0; i < resolved.size(); ++i) {
+    const ResolvedPatch &patch = resolved[i];
     const size_t reserve_len = std::max(patch.on_len, patch.off_len);
     Snapshot snapshot;
     snapshot.address = patch.address;
     snapshot.bytes.resize(reserve_len);
-    if (backend->read(pid, snapshot.address, snapshot.bytes.data(),
-                      snapshot.bytes.size()) < 0) {
+    const int read_result = backend->read(
+        pid, snapshot.address, snapshot.bytes.data(), snapshot.bytes.size());
+    if (read_result < 0) {
+      LOG_ERROR(
+          "[Cheat] Snapshot read failed pid=%d patch=%zu/%zu addr=0x%llx "
+          "len=%zu rc=%d",
+          (int)pid, i + 1, resolved.size(),
+          (unsigned long long)snapshot.address, snapshot.bytes.size(),
+          read_result);
       status = status_tr("notify.cheats.snapshot_failed", entry.name);
       return -1;
     }

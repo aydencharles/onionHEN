@@ -68,6 +68,7 @@ inline constexpr int kUiLanguageTh = 14;
 
 inline constexpr int kStartupOpenNone = 0;
 inline constexpr int kStartupOpenHomeMenu = 1;
+inline constexpr std::size_t kMaxCustomPkgSearchPaths = 8;
 
 // Mirrors onion_log_level from <onion/log.h>. Duplicated rather than included
 // so libonion_settings stays independent of libonion_platform; the processes
@@ -281,6 +282,12 @@ struct Settings {
   // 5 = ja, 6 = fr, 7 = de, 8 = ko, 9 = es, 10 = pt-BR, 11 = it,
   // 12 = ru, 13 = pl
   int ui_lang = kUiLanguageSystem;
+
+  // [pkg]
+  // System-visible directories searched by the custom Toolbox PKG installer.
+  std::array<std::string, kMaxCustomPkgSearchPaths> custom_pkg_search_paths = {
+      "/data/OnionHEN/pkgs"};
+  std::size_t custom_pkg_search_path_count = 1;
 
   // [logging]
   // Runtime log threshold, matching onion_log_level (1=error .. 5=trace).

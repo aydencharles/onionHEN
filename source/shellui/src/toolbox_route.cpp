@@ -18,6 +18,7 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_cheats = (in.resource == in.names.cheats_xml);
   out.flags.is_auto_payload = (in.resource == kAutoPayloadsXml);
   out.flags.is_plugins = (in.resource == kPluginsXml);
+  const bool is_custom_pkg_installer = in.resource == kCustomPkgInstallerXml;
   out.flags.is_sprx = (in.resource == kSprxXml);
   out.flags.is_sprx_config = parse_sprx_config_resource(in.resource, nullptr);
   out.flags.is_payload_config =
@@ -54,6 +55,8 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::OverlayMetricConfig;
   } else if (out.flags.is_plugins) {
     out.page = Page::Plugins;
+  } else if (is_custom_pkg_installer) {
+    out.page = Page::CustomPkgInstaller;
   } else if (out.flags.is_sprx) {
     out.page = Page::Sprx;
   } else if (out.flags.is_sprx_config) {

@@ -89,6 +89,10 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
   case toolbox::OnPressDomain::RemotePlay:
     run_exact(onpress_network_exact);
     break;
+  case toolbox::OnPressDomain::CustomPkgInstaller:
+    run_exact(onpress_pkg_installer_exact);
+    run_prefix(onpress_pkg_installer_prefix);
+    break;
   case toolbox::OnPressDomain::PassThrough:
   case toolbox::OnPressDomain::DynamicPlugin:
     break;

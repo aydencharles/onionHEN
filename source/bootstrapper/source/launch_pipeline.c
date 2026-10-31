@@ -153,20 +153,30 @@ static void launch_kstuff(LaunchContext *context, uint32_t firmware_version,
                           bool autoload) {
   char probe[100] = {0};
   const bool disabled_by_usb = if_exists("/mnt/usb0/no_kstuff");
-  if (disabled_by_usb || !autoload) {
-    LOG_DEBUG("kstuff disabled (%s)",
-              disabled_by_usb ? "usb no_kstuff" : "kstuff.autoload=false");
-    onion_ready_signal(ONION_READY_KSTUFF);
-    return;
-  }
-
   if (firmware_version < 0x3000000) {
+    if (disabled_by_usb || !autoload) {
+      LOG_INFO("kstuff load skipped (%s; firmware=0x%08x)",
+               disabled_by_usb ? "usb no_kstuff" : "kstuff.autoload=false",
+               (unsigned)firmware_version);
+    }
     onion_ready_signal(ONION_READY_KSTUFF);
     return;
   }
 
-  if (kstuff_already_running()) {
-    LOG_WARN("kstuff already running / mprotect OK -- skip launch");
+  /* Report active mprotect capability even when autoload is disabled. */
+  if (kstuff_mprotect_available()) {
+    LOG_INFO("kstuff payload launch skipped; mprotect capability already "
+             "active "
+             "(firmware=0x%08x)",
+             (unsigned)firmware_version);
+    onion_ready_signal(ONION_READY_KSTUFF);
+    return;
+  }
+
+  if (disabled_by_usb || !autoload) {
+    LOG_INFO("kstuff load skipped (%s; firmware=0x%08x)",
+             disabled_by_usb ? "usb no_kstuff" : "kstuff.autoload=false",
+             (unsigned)firmware_version);
     onion_ready_signal(ONION_READY_KSTUFF);
     return;
   }
@@ -181,6 +191,9 @@ static void launch_kstuff(LaunchContext *context, uint32_t firmware_version,
 
   const uint8_t *elf = override_elf ? override_elf : kstuff_start;
   const size_t size = override_elf ? override_size : (size_t)kstuff_size;
+  LOG_INFO("Selected kstuff source: %s (%zu bytes) firmware=0x%08x",
+           override_elf ? "external override" : "bundled", size,
+           (unsigned)firmware_version);
   const bool sent =
       launch_blob(context, elf, size, "kstuff", "kstuff.elf");
   free(override_elf);

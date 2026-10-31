@@ -113,13 +113,17 @@ void Widget_Append_Child(MonoObject* widget, MonoObject* child)
     mono_runtime_invoke(appendChild, widget, args, nullptr);
 }
 
-uint64_t Get_Address_of_Method(MonoImage *Assembly_Image, const char *Name_Space, const char *Class_Name, const char *Method_Name, int Param_Count)
+uint64_t Get_Address_of_Method(MonoImage *Assembly_Image, const char *Name_Space,
+                               const char *Class_Name, const char *Method_Name,
+                               int Param_Count, bool log_failure)
 {
+  (void)log_failure;
   MonoClass *klass = mono_class_from_name(Assembly_Image, Name_Space, Class_Name);
   if (!klass)
   {
 #if SHELL_DEBUG == 1
-    LOG_ERROR("Get_Address_of_Method: failed to open class \"%s\" in namespace \"%s\"", Class_Name, Name_Space);
+    if (log_failure)
+      LOG_ERROR("Get_Address_of_Method: failed to open class \"%s\" in namespace \"%s\"", Class_Name, Name_Space);
 #endif
     return 0;
   }
@@ -128,7 +132,8 @@ uint64_t Get_Address_of_Method(MonoImage *Assembly_Image, const char *Name_Space
   if (!Method)
   {
 #if SHELL_DEBUG == 1
-    LOG_ERROR("Get_Address_of_Method: failed to find method \"%s\" in class \"%s\"", Method_Name, Class_Name);
+    if (log_failure)
+      LOG_ERROR("Get_Address_of_Method: failed to find method \"%s\" in class \"%s\"", Method_Name, Class_Name);
 #endif
     return 0;
   }

@@ -137,16 +137,23 @@ template <typename Fn>
 bool install_detour(const char* name, uint64_t target, void* hook, Fn& out_orig,
                     bool required) {
   if (!target) {
-    LOG_ERROR("Hook target missing: %s", name);
-    if (required)
+    if (required) {
+      LOG_ERROR("Hook target missing: %s", name);
       notify("notify.hook.target");
+    } else {
+      LOG_WARN("Optional hook target unavailable: %s", name);
+    }
     return !required;
   }
 
-  if (!InstallDetour(target, hook, reinterpret_cast<void**>(&out_orig))) {
-    LOG_ERROR("Detour failed: %s", name);
-    if (required)
+  if (!InstallDetour(target, hook, reinterpret_cast<void**>(&out_orig),
+                     required)) {
+    if (required) {
+      LOG_ERROR("Detour failed: %s", name);
       notify("notify.hook.install");
+    } else {
+      LOG_WARN("Optional hook detour failed: %s", name);
+    }
     return !required;
   }
 
@@ -483,21 +490,28 @@ struct MonoHookSpec {
   bool required;
 };
 
-bool install_mono_hook(const MonoHookSpec& h) {
+bool install_mono_hook(const MonoHookSpec& h, bool expected_missing = false) {
   const uint64_t addr =
-      Get_Address_of_Method(h.image, h.name_space, h.klass, h.method, h.argc);
+      Get_Address_of_Method(h.image, h.name_space, h.klass, h.method, h.argc,
+                            false);
   if (!addr) {
-    LOG_ERROR("Hook target missing: %s", h.name);
-    if (h.required)
+    if (h.required) {
+      LOG_ERROR("Hook target missing: %s", h.name);
       notify("notify.hook.target");
+    } else if (!expected_missing) {
+      LOG_WARN("Optional hook target unavailable: %s", h.name);
+    }
     return !h.required;
   }
   LOG_DEBUG("Installing mono hook: %s target=%#02lx hook=%p", h.name, addr,
               h.hook);
-  if (!InstallDetour(addr, h.hook, h.orig)) {
-    LOG_ERROR("Detour failed: %s", h.name);
-    if (h.required)
+  if (!InstallDetour(addr, h.hook, h.orig, h.required)) {
+    if (h.required) {
+      LOG_ERROR("Detour failed: %s", h.name);
       notify("notify.hook.install");
+    } else {
+      LOG_WARN("Optional hook detour failed: %s", h.name);
+    }
     return !h.required;
   }
   return true;
@@ -506,14 +520,19 @@ bool install_mono_hook(const MonoHookSpec& h) {
 bool install_optional_diag(const char* tag, MonoImage* image, const char* ns,
                            const char* klass, const char* method, int argc,
                            void* hook, void** orig) {
-  const uint64_t addr = Get_Address_of_Method(image, ns, klass, method, argc);
+  const uint64_t addr = Get_Address_of_Method(image, ns, klass, method, argc,
+                                               false);
   if (!addr) {
-    LOG_ERROR("%s not found", tag);
+    LOG_WARN("%s unavailable (non-fatal)", tag);
     return false;
   }
-  const bool installed = InstallDetour(addr, hook, orig);
-  LOG_DEBUG(installed ? "%s hooked" : "%s failed to detour", tag);
-  return installed;
+  const bool installed = InstallDetour(addr, hook, orig, false);
+  if (!installed) {
+    LOG_WARN("%s detour unavailable (non-fatal)", tag);
+    return false;
+  }
+  LOG_DEBUG("%s hooked", tag);
+  return true;
 }
 
 bool install_hooks(const ShellImages& img) {
@@ -602,10 +621,18 @@ bool install_hooks(const ShellImages& img) {
          "LaunchApp", 4, reinterpret_cast<void*>(&LaunchApp),
          reinterpret_cast<void**>(&LaunchApp_orig), false});
     const uint64_t kill_addr = Get_Address_of_Method(
-        img.lnc, "Sce.Vsh.LncUtil", "LncUtilWrapper", "KillAppWithReason", 2);
-    if (kill_addr &&
-        !DetourFunction(kill_addr, reinterpret_cast<void*>(&KillAppWithReason_Hook)))
+        img.lnc, "Sce.Vsh.LncUtil", "LncUtilWrapper", "KillAppWithReason", 2,
+        false);
+    if (!kill_addr) {
+      LOG_WARN("Optional hook target unavailable: "
+               "LncUtilWrapper.KillAppWithReason");
+    } else if (!DetourFunction(
+                   kill_addr,
+                   reinterpret_cast<void*>(&KillAppWithReason_Hook), false)) {
+      LOG_WARN("Optional hook detour failed: "
+               "LncUtilWrapper.KillAppWithReason");
       notify("notify.hook.kill_app");
+    }
   }
 
   // --- RNPS bundle decrypt path ---
@@ -624,14 +651,17 @@ bool install_hooks(const ShellImages& img) {
   // --- BootHelper.Boot: 3-arg then 2-arg ---
   if (!install_mono_hook({"BootHelper.Boot(3)", img.app_system, "Sce.Vsh.ShellUI.AppSystem",
                           "BootHelper", "Boot", 3, reinterpret_cast<void*>(&uri_boot_hook),
-                          reinterpret_cast<void**>(&boot_orig), false}) ||
+                          reinterpret_cast<void**>(&boot_orig), false}, true) ||
       !boot_orig) {
     if (!install_mono_hook(
             {"BootHelper.Boot(2)", img.app_system, "Sce.Vsh.ShellUI.AppSystem",
              "BootHelper", "Boot", 2, reinterpret_cast<void*>(&uri_boot_hook_2),
-             reinterpret_cast<void**>(&boot_orig_2), false}) ||
-        !boot_orig_2)
+             reinterpret_cast<void**>(&boot_orig_2), false}, true) ||
+        !boot_orig_2) {
+      LOG_WARN("No supported BootHelper.Boot overload could be hooked "
+               "(3 or 2 arguments)");
       notify("notify.hook.boot");
+    }
   }
 
   // --- CaptureScreen: 4-arg then 5-arg ---
@@ -639,15 +669,18 @@ bool install_hooks(const ShellImages& img) {
           {"CaptureScreen(4)", img.capture_menu, "Sce.Vsh.ShellUI.CaptureMenu",
            "CaptureController", "CaptureScreen", 4,
            reinterpret_cast<void*>(&CaptureScreen_old),
-           reinterpret_cast<void**>(&CaptureScreen_orig_old), false}) ||
+           reinterpret_cast<void**>(&CaptureScreen_orig_old), false}, true) ||
       !CaptureScreen_orig_old) {
     if (!install_mono_hook(
             {"CaptureScreen(5)", img.capture_menu, "Sce.Vsh.ShellUI.CaptureMenu",
              "CaptureController", "CaptureScreen", 5,
              reinterpret_cast<void*>(&CaptureScreen_new),
-             reinterpret_cast<void**>(&CaptureScreen_orig_new), false}) ||
-        !CaptureScreen_orig_new)
+             reinterpret_cast<void**>(&CaptureScreen_orig_new), false}, true) ||
+        !CaptureScreen_orig_new) {
+      LOG_WARN("No supported CaptureScreen overload could be hooked "
+               "(4 or 5 arguments)");
       notify("notify.hook.capture");
+    }
   }
 
   // --- GetManifestResourceStream (class name differs on 3.xx) ---

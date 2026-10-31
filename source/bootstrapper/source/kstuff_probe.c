@@ -7,7 +7,7 @@
 
 int sceKernelMprotect(void *addr, size_t len, int prot);
 
-bool kstuff_already_running(void) {
+bool kstuff_mprotect_available(void) {
   char probe[100];
   memset(probe, 0, sizeof(probe));
   return sceKernelMprotect(probe, sizeof(probe), 0x7) == 0;

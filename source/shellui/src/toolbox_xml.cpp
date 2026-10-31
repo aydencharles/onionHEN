@@ -36,6 +36,7 @@
 #include "shellui_payload_state.hpp"
 #include "toolbox_helpers.hpp"
 #include "overlay_metrics.hpp"
+#include "pkg_installer.hpp"
 #include "toolbox_route.hpp"
 
 #include <onion/payload_identity.h>
@@ -659,6 +660,9 @@ void append_toolbox_pkg_group(ps5ui::Group& g) {
   g.link("id_game_package_installer", toolbox_i18n::tr("pkg.installer"),
          "PkgInstaller/data/pkginstaller.xml",
          toolbox_i18n::tr("pkg.installer.sub"))
+      .link("id_custom_pkg_installer", toolbox_i18n::tr("pkg.custom.title"),
+            "custom_pkginstaller.xml",
+            toolbox_i18n::tr("pkg.custom.subtitle"))
       .link("id_game_add_content_manager", toolbox_i18n::tr("pkg.add_content"),
             "Addcontent/data/addcontent.xml",
             toolbox_i18n::tr("pkg.add_content.sub"));
@@ -1060,4 +1064,58 @@ void generate_toolbox_xml(std::string& new_xml) {
           ps5ui::Style::Center);
 
   new_xml = page.build();
+}
+
+void generate_custom_pkg_installer_xml(std::string &xml_buffer) {
+  const std::size_t path_count = std::min(
+      g_settings.custom_pkg_search_path_count,
+      onion::kMaxCustomPkgSearchPaths);
+  const PkgInstallerScan scan = scan_pkg_search_paths(
+      g_settings.custom_pkg_search_paths.data(), path_count);
+  ps5ui::Page page("custom_pkg_installer", toolbox_i18n::tr("pkg.custom.title"));
+  page.label("id_pkg_help", toolbox_i18n::tr("pkg.custom.help"));
+  page.text_field("id_pkg_path_input", toolbox_i18n::tr("pkg.custom.path_input"),
+                  toolbox_i18n::tr("pkg.custom.path_input_hint"), "url", "1",
+                  "512", std::nullopt, std::nullopt, std::nullopt,
+                  pkg_search_path_draft());
+  page.button("id_pkg_path_add", toolbox_i18n::tr("pkg.custom.add_path"));
+
+  page.group("id_pkg_paths", toolbox_i18n::tr("pkg.custom.saved_paths"),
+             [&](ps5ui::Group &group) {
+               for (std::size_t i = 0; i < path_count; ++i) {
+                 group.button("id_pkg_remove_" + std::to_string(i),
+                              g_settings.custom_pkg_search_paths[i],
+                              toolbox_i18n::tr("pkg.custom.remove"));
+               }
+               if (path_count == 0)
+                 group.label("id_pkg_no_paths",
+                             toolbox_i18n::tr("pkg.custom.no_paths"));
+             });
+
+  page.group("id_pkg_scan_results", toolbox_i18n::tr("pkg.custom.packages"),
+             [&](ps5ui::Group &group) {
+               if (path_count == 0)
+                 return;
+               if (!scan.accessible) {
+                 group.label("id_pkg_inaccessible",
+                             toolbox_i18n::tr("pkg.custom.inaccessible"));
+                 return;
+               }
+               if (scan.inaccessible_paths != 0)
+                 group.label("id_pkg_partial_inaccessible",
+                             toolbox_i18n::tr("pkg.custom.partial_inaccessible"));
+               if (scan.entries.empty() && !scan.truncated)
+                 group.label("id_pkg_empty",
+                             toolbox_i18n::tr("pkg.custom.empty"));
+               for (std::size_t i = 0; i < scan.entries.size(); ++i) {
+                 const PkgInstallerEntry &entry = scan.entries[i];
+                 group.button("id_pkg_install_" + std::to_string(i), entry.name,
+                              entry.search_path,
+                              toolbox_i18n::tr("pkg.custom.package_help"));
+               }
+               if (scan.truncated)
+                 group.label("id_pkg_truncated",
+                             toolbox_i18n::tr("pkg.custom.truncated"));
+             });
+  xml_buffer = page.build();
 }

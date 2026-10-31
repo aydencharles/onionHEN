@@ -11,10 +11,10 @@ extern "C" {
 #endif
 
 /**
- * True when userland mprotect succeeds with the kernel patches active. Process
- * names are not ownership evidence because user Payload names are unrestricted.
+ * True when userland mprotect accepts RWX. This is a capability signal and
+ * does not identify which payload or system component enabled it.
  */
-bool kstuff_already_running(void);
+bool kstuff_mprotect_available(void);
 
 #ifdef __cplusplus
 }

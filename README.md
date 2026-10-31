@@ -69,6 +69,7 @@ OnionHEN is a practical homebrew stack for jailbroken PS5 consoles.
 - **ShadowMount+** — available as the optional external `onionHEN-shadowmountplus-plugin`
 - **Remote Play pairing** — enable the native PS5 Remote Play service, generate a pairing PIN, and register a client from the Network section
 - **User payload manager** — start and stop user-provided `.elf` payloads, with optional auto-start
+- **Custom PKG Installer** — scan up to eight configured `/data` or `/mnt` folders for PS4 PKG files and submit them to the system installer
 - **Game overlay** — an in-game bar for FPS, CPU, GPU, RAM, temperatures, and network info
 - **Cheat engine** — local JSON, SHN, MC4, and ShnExt files that can be toggled at runtime
 - **DPI v2** — available as the optional external `onionHEN-dpiv2-plugin`
@@ -275,10 +276,15 @@ Most options can be changed in the Toolbox. The format is
 `schema_version=1`. If no file exists, OnionHEN writes a commented
 default from [`config.ini.example`](config.ini.example).
 
+The Custom PKG Installer stores folders as `pkg.search_path_0` through
+`pkg.search_path_7`. Installation progress is shown by the PS5 system
+installer. Firmware-specific package support still needs console validation.
+
 | Key | Default | Values |
 | --- | --- | --- |
 | `meta.schema_version` | `1` | `1` |
 | `toolbox.language` | `system` | `system`, `zh-Hans`, `zh-Hant`, `en`, `ja`, `ko`, `fr`, `de`, `it`, `es`, `pt-BR`, `pl`, `ru`, `ar`, `th` |
+| `pkg.search_path_count` / `pkg.search_path_N` | `1` / `/data/OnionHEN/pkgs` | Up to 8 absolute `/data` or `/mnt` folder paths |
 | `startup.open_after_load` | `none` | `none`, `home_menu` |
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
 | `game_menu.show_onionhen_options` | `true` | `true`, `false` |
@@ -318,7 +324,7 @@ default from [`config.ini.example`](config.ini.example).
 
 | Tool | Purpose |
 | --- | --- |
-| [`scripts/daemon_log.py`](scripts/daemon_log.py) | Stream daemon logs from the console |
+| [`scripts/daemon_log.py`](scripts/daemon_log.py) | Stream daemon logs; use [`scripts/capture_klog.py`](scripts/capture_klog.py) to capture kernel logs |
 | [`scripts/shutdown_onion.py`](scripts/shutdown_onion.py) | Shut down the OnionHEN userland stack without killing `kstuff` |
 | [`scripts/ps5_cmake.sh`](scripts/ps5_cmake.sh) | Run CMake through the PS5 payload SDK |
 | [`scripts/sync_dependencies.sh`](scripts/sync_dependencies.sh) | Fetch or build external payload inputs |

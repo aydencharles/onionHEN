@@ -17,6 +17,7 @@ General Public License for more details. */
 #include <onion/platform.h>
 #include <sha1.hpp>
 
+#include <atomic>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -35,6 +36,7 @@ constexpr size_t kHbcSourceHashOffset = 0x0c;
 constexpr size_t kHbcFileLengthOffset = 0x20;
 constexpr size_t kHbcFooterSha1Size = 20;
 constexpr size_t kMaxHermesHeaderScan = 0x2000;
+std::atomic<bool> g_logged_unsupported_legacy_settings{false};
 
 struct BundleView {
   unsigned char *data;
@@ -196,6 +198,14 @@ find_legacy_profile(const BundleView &payload) {
   return nullptr;
 }
 
+static bool looks_like_legacy_settings(const BundleView &payload) {
+  static constexpr char kSettingsTitleId[] = "NPXS40008";
+  return contains(payload, kSettingsTitleId, sizeof(kSettingsTitleId) - 1) &&
+         (contains(payload, kLegacyOldLabel, sizeof(kLegacyOldLabel)) ||
+          contains(payload, kLegacyNewLabel, sizeof(kLegacyNewLabel))) &&
+         contains(payload, kLegacyOldIcon, sizeof(kLegacyOldIcon));
+}
+
 static int apply_equal_length_patch(const BundleView &bundle, size_t offset,
                                     const unsigned char *stock,
                                     const unsigned char *replacement,
@@ -263,6 +273,14 @@ void patch_settings_bundle(unsigned char *buffer, int size) {
   if (locate_legacy_payload(buffer, static_cast<size_t>(size), &legacy)) {
     const LegacySettingsProfile *profile = find_legacy_profile(legacy);
     if (!profile) {
+      if (looks_like_legacy_settings(legacy) &&
+          !g_logged_unsupported_legacy_settings.exchange(
+              true, std::memory_order_relaxed)) {
+        LOG_WARN("settings_bundle_patch: recognized legacy Settings markers "
+                 "but no profile matched (payload_size=0x%llx); label was "
+                 "left unchanged",
+                 (unsigned long long)legacy.size);
+      }
       return;
     }
     const int label_count = apply_equal_length_patch(

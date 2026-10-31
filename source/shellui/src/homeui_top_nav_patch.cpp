@@ -336,10 +336,11 @@ static_assert(sizeof(kLegacy5x7xNewAppErrorSourcePrefix) <=
 static_assert(sizeof(kPlainJsNewAppErrorSourcePrefix) <=
               sizeof(kPlainJsOldAppErrorSource));
 
-#if SHELL_DEBUG == 1
-/* Latches so an unsupported HomeUI is reported once, not every reload. */
-std::atomic<bool> g_logged_non_homeui_skip{false};
+/* Latches keep bundle diagnostics from repeating on every RNPS reload. */
 std::atomic<bool> g_logged_unsupported_homeui_skip{false};
+std::atomic<bool> g_logged_unsupported_source_homeui_skip{false};
+#if SHELL_DEBUG == 1
+std::atomic<bool> g_logged_non_homeui_skip{false};
 #endif
 void (*g_react_button_set_icon_source_orig)(MonoObject *instance,
                                             MonoObject *source) = nullptr;
@@ -623,6 +624,26 @@ static bool source_bytes_at(const SourceBundleView &bundle, size_t offset,
          bytes_equal(bundle.data + offset, expected, len);
 }
 
+static bool source_contains_string(const SourceBundleView &bundle,
+                                   const char *expected) {
+  if (!bundle.data || !expected) {
+    return false;
+  }
+
+  const size_t expected_length = strlen(expected);
+  if (expected_length > bundle.size) {
+    return false;
+  }
+
+  for (size_t offset = 0; offset <= bundle.size - expected_length; ++offset) {
+    if (memcmp(bundle.data + offset, expected, expected_length) == 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static bool source_is_target(const SourceBundleView &bundle,
                              const SourceHomeUiProfile &profile) {
   const SourcePatchStrategy &strategy = *profile.strategy;
@@ -731,7 +752,6 @@ static bool hbc_source_hash_matches(const HbcView &hbc,
                      kHbcSourceHashSize);
 }
 
-#if SHELL_DEBUG == 1
 static void format_hbc_source_hash(const HbcView &hbc, char *out,
                                    size_t out_size) {
   static const char kHex[] = "0123456789abcdef";
@@ -752,7 +772,6 @@ static void format_hbc_source_hash(const HbcView &hbc, char *out,
   }
   out[kHbcSourceHashSize * 2] = '\0';
 }
-#endif
 
 static bool validate_homeui_profile_markers(const HbcView &hbc,
                                             const HomeUiPatchProfile &profile) {
@@ -781,20 +800,35 @@ find_homeui_patch_profile(const HbcView &hbc, size_t file_length,
   return nullptr;
 }
 
-#if SHELL_DEBUG == 1
-static bool looks_like_profiled_homeui(const HbcView &hbc) {
-  for (size_t i = 0;
-       i < sizeof(kHomeUiPatchProfiles) / sizeof(kHomeUiPatchProfiles[0]);
-       ++i) {
-    const HomeUiPatchProfile &profile = kHomeUiPatchProfiles[i];
-    if (validate_homeui_profile_markers(hbc, profile)) {
+static bool hbc_contains_string(const HbcView &hbc, size_t file_length,
+                                const char *expected) {
+  if (!hbc.data || !expected || file_length <= kHbcFooterSha1Size ||
+      file_length > hbc.size) {
+    return false;
+  }
+
+  const size_t expected_length = strlen(expected);
+  const size_t body_length = file_length - kHbcFooterSha1Size;
+  if (expected_length > body_length) {
+    return false;
+  }
+
+  for (size_t offset = 0; offset <= body_length - expected_length; ++offset) {
+    if (memcmp(hbc.data + offset, expected, expected_length) == 0) {
       return true;
     }
   }
 
   return false;
 }
-#endif
+
+static bool looks_like_homeui(const HbcView &hbc, size_t file_length) {
+  return hbc_contains_string(hbc, file_length, "NPXS40002") &&
+         hbc_contains_string(hbc, file_length,
+                             "ApplicationErrorEventTrigger") &&
+         hbc_contains_string(hbc, file_length,
+                             "pshomeui:navigateToHome");
+}
 
 static bool validate_patch(const HbcView &hbc, const BytePatch &patch,
                            bool *already_applied) {
@@ -962,8 +996,24 @@ static bool patch_source_homeui_top_nav(const SourceBundleView &bundle,
   const SourceHomeUiProfile *profile =
       find_source_homeui_profile(bundle, kind);
   if (!profile) {
+    const bool has_homeui_markers =
+        source_contains_string(bundle, "NPXS40002") &&
+        source_contains_string(bundle, "pshomeui:navigateToHome");
+    if (has_homeui_markers &&
+        !g_logged_unsupported_source_homeui_skip.exchange(
+            true, std::memory_order_relaxed)) {
+      const char *kind_name = kind == SourceBundleKind::LegacyRnps
+                                  ? "legacy-rnps"
+                                  : "plain-js";
+      LOG_WARN("homeui_top_nav_patch: unsupported source HomeUI "
+               "(kind=%s bundle_base=0x%llx payload_size=0x%llx)",
+               kind_name, (unsigned long long)bundle.base_offset,
+               (unsigned long long)bundle.size);
+    }
 #if SHELL_DEBUG == 1
-    LOG_WARN("homeui_top_nav_patch: skip unknown source HomeUI");
+    if (!has_homeui_markers) {
+      LOG_WARN("homeui_top_nav_patch: skip unknown source bundle");
+    }
 #endif
     return false;
   }
@@ -1036,27 +1086,33 @@ void install_homeui_top_nav_hooks(MonoImage *react_pui) {
       reinterpret_cast<void (*)(MonoObject *, MonoObject *)>(
           Get_Address_of_Method(react_pui, "ReactNative.Views.UI3.View",
                                 "ReactButtonShadowNode",
-                                "SetinvertedIconSource", 1));
+                                "SetinvertedIconSource", 1, false));
   if (!g_react_button_set_inverted_icon_source) {
-    LOG_ERROR("homeui_top_nav_patch: SetinvertedIconSource missing; "
-                "focused icon may be blank");
+    LOG_WARN("homeui_top_nav_patch: SetinvertedIconSource unavailable; "
+             "focused icon may be blank");
   }
 
   const uint64_t set_icon_source =
       Get_Address_of_Method(react_pui, "ReactNative.Views.UI3.View",
-                            "ReactButtonShadowNode", "SetIconSource", 1);
+                            "ReactButtonShadowNode", "SetIconSource", 1,
+                            false);
   if (!set_icon_source) {
-    LOG_ERROR("homeui_top_nav_patch: SetIconSource missing");
+    LOG_WARN("homeui_top_nav_patch: SetIconSource unavailable; "
+             "focused icon may be blank");
     return;
   }
 
   const bool installed = InstallDetour(
       set_icon_source,
       reinterpret_cast<void *>(&ReactButtonShadowNode_SetIconSource_Hook),
-      reinterpret_cast<void **>(&g_react_button_set_icon_source_orig));
-  LOG_DEBUG(installed ? "homeui_top_nav_patch: SetIconSource hooked "
-                          "(invertedIcon mirror for OnionHEN)"
-                        : "homeui_top_nav_patch: SetIconSource detour failed");
+      reinterpret_cast<void **>(&g_react_button_set_icon_source_orig), false);
+  if (installed) {
+    LOG_DEBUG("homeui_top_nav_patch: SetIconSource hooked "
+              "(invertedIcon mirror for OnionHEN)");
+  } else {
+    LOG_WARN("homeui_top_nav_patch: SetIconSource detour unavailable; "
+             "focused icon may be blank");
+  }
 #else
   (void)react_pui;
 #endif
@@ -1117,8 +1173,8 @@ void patch_homeui_top_nav(unsigned char *buffer, int *size_ptr,
   const HomeUiPatchProfile *profile =
       find_homeui_patch_profile(hbc, hbc_file_length, hbc_version);
   if (!profile) {
-#if SHELL_DEBUG == 1
-    if (looks_like_profiled_homeui(hbc)) {
+    const bool has_homeui_markers = looks_like_homeui(hbc, hbc_file_length);
+    if (has_homeui_markers) {
       if (!g_logged_unsupported_homeui_skip.exchange(
               true, std::memory_order_relaxed)) {
         char source_hash[kHbcSourceHashSize * 2 + 1];
@@ -1129,8 +1185,10 @@ void patch_homeui_top_nav(unsigned char *buffer, int *size_ptr,
                     (unsigned long long)hbc.base_offset, hbc_version,
                     (unsigned long long)hbc_file_length, source_hash);
       }
-    } else if (!g_logged_non_homeui_skip.exchange(true,
-                                                   std::memory_order_relaxed)) {
+    }
+#if SHELL_DEBUG == 1
+    if (!has_homeui_markers &&
+        !g_logged_non_homeui_skip.exchange(true, std::memory_order_relaxed)) {
       LOG_WARN("homeui_top_nav_patch: skip non-HomeUI HBC "
                   "(hbc_base=0x%llx version=%u file_length=0x%llx)",
                   (unsigned long long)hbc.base_offset, hbc_version,

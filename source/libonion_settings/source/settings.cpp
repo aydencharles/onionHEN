@@ -16,6 +16,7 @@ along with this program; see the file COPYING. If not, see
 
 #include <onion/settings.hpp>
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstdio>
@@ -279,6 +280,37 @@ std::string trim_copy(const std::string &value) {
     --last;
   }
   return value.substr(first, last - first);
+}
+
+bool valid_custom_pkg_search_path(const std::string &path) {
+  if (path.size() < 7 || path.size() > 512 || path.front() != '/' ||
+      path.find_first_of("\\\r\n") != std::string::npos) {
+    return false;
+  }
+  std::size_t start = std::string::npos;
+  if (path.rfind("/data/", 0) == 0) {
+    start = 6;
+  } else if (path.rfind("/mnt/", 0) == 0) {
+    start = 5;
+  } else {
+    return false;
+  }
+  while (start <= path.size()) {
+    const std::size_t slash = path.find('/', start);
+    const std::string_view part(path.data() + start,
+                                (slash == std::string::npos ? path.size()
+                                                            : slash) - start);
+    if (part.empty() && slash == std::string::npos && start == path.size())
+      return true;
+    if (part.empty() || part == "." || part == "..") {
+      return false;
+    }
+    if (slash == std::string::npos) {
+      break;
+    }
+    start = slash + 1;
+  }
+  return true;
 }
 
 bool is_upper_alnum(char c) {
@@ -608,6 +640,54 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->schema_version = version;
   out->ui_lang =
       parse_language(ini_get(parser, "toolbox.language"), out->ui_lang);
+  const char *pkg_path_count = ini_get(parser, "pkg.search_path_count");
+  const bool has_pkg_path_count = pkg_path_count != nullptr;
+  bool found_indexed_pkg_path = false;
+  std::array<std::string, kMaxCustomPkgSearchPaths> parsed_pkg_search_paths{};
+  std::size_t parsed_pkg_search_path_count = 0;
+  const bool explicitly_empty_pkg_search_paths =
+      has_pkg_path_count && trim_copy(pkg_path_count) == "0";
+  const int declared_path_count =
+      has_pkg_path_count ? std::max(0, std::min(
+                                  atoi_def(pkg_path_count, 0),
+                                  static_cast<int>(kMaxCustomPkgSearchPaths)))
+                         : static_cast<int>(kMaxCustomPkgSearchPaths);
+  for (int i = 0; i < declared_path_count; ++i) {
+    char key[32] = {};
+    std::snprintf(key, sizeof(key), "pkg.search_path_%d", i);
+    const char *raw_path = ini_get(parser, key);
+    if (!raw_path)
+      continue;
+    found_indexed_pkg_path = true;
+    const std::string candidate = trim_copy(raw_path);
+    if (!valid_custom_pkg_search_path(candidate))
+      continue;
+    bool duplicate = false;
+    for (std::size_t n = 0; n < parsed_pkg_search_path_count; ++n) {
+      if (parsed_pkg_search_paths[n] == candidate) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) {
+      parsed_pkg_search_paths[parsed_pkg_search_path_count++] = candidate;
+    }
+  }
+  if (parsed_pkg_search_path_count > 0) {
+    out->custom_pkg_search_paths = std::move(parsed_pkg_search_paths);
+    out->custom_pkg_search_path_count = parsed_pkg_search_path_count;
+  } else if (explicitly_empty_pkg_search_paths) {
+    out->custom_pkg_search_path_count = 0;
+  }
+  if (!has_pkg_path_count && !found_indexed_pkg_path) {
+    if (const char *legacy_path = ini_get(parser, "pkg.search_path")) {
+      const std::string candidate = trim_copy(legacy_path);
+      if (valid_custom_pkg_search_path(candidate)) {
+        out->custom_pkg_search_paths[0] = candidate;
+        out->custom_pkg_search_path_count = 1;
+      }
+    }
+  }
   out->startup_open_after_load = parse_startup_open_after_load(
       ini_get(parser, "startup.open_after_load"),
       out->startup_open_after_load);
@@ -743,6 +823,19 @@ std::string settings_serialize(const Settings &in) {
   b += "# Available values: system, zh-Hans, zh-Hant, en, ja, ko, fr, de, it, es, pt-BR, pl, ru, ar, th\n";
   b += "# system follows the PS5 system language when it can be detected.\n";
   b += "language=" + std::string(language_name(in.ui_lang)) + "\n";
+  b += "\n";
+  b += "[pkg]\n";
+  b += "# search_path_N is an absolute /data or /mnt directory scanned for PKG files.\n";
+  b += "search_path_count=" +
+       std::to_string(std::min(in.custom_pkg_search_path_count,
+                               kMaxCustomPkgSearchPaths)) +
+       "\n";
+  for (std::size_t i = 0;
+       i < in.custom_pkg_search_path_count && i < kMaxCustomPkgSearchPaths;
+       ++i) {
+    b += "search_path_" + std::to_string(i) + "=" +
+         in.custom_pkg_search_paths[i] + "\n";
+  }
   b += "\n";
   b += "[startup]\n";
   b += "# open_after_load chooses which page opens after OnionHEN finishes loading.\n";

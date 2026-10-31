@@ -30,6 +30,7 @@ enum class Page : unsigned char {
   RemotePlay,
   DynamicPlugin,     /**< SDK-provided UI contribution page */
   PluginProgress,    /**< external plugin start/stop progress transition page */
+  CustomPkgInstaller,
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
 };
@@ -79,6 +80,7 @@ RouteResult resolve_resource(const RouteInput &in);
 /** Child routes whose page-stack pop should restore the owning parent route. */
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
+         page == Page::CustomPkgInstaller ||
          page == Page::PayloadConfig || page == Page::OverlayMetricConfig ||
          page == Page::PluginConfig ||
          page == Page::SprxConfig ||
@@ -109,6 +111,8 @@ inline constexpr std::string_view kOgDebugXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.og_debug.xml";
 inline constexpr std::string_view kOverlayMetricsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.overlay_metrics.xml";
+inline constexpr std::string_view kCustomPkgInstallerXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkginstaller.xml";
 
 /** Sony Settings.Plugins module prefix shared by toolbox child resources. */
 inline constexpr std::string_view kSettingsPluginsPrefix =

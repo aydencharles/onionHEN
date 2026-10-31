@@ -145,7 +145,9 @@ void generate_overlay_metric_xml(std::string& xml_buffer,
 void generate_account_xml(std::string& xml_buffer);
 void generate_toolbox_xml(std::string& new_xml);
 void Patch_Main_thread_Check(MonoImage * image_core);
-uint64_t Get_Address_of_Method(MonoImage* Assembly_Image, const char* Name_Space, const char* Class_Name, const char* Method_Name, int Param_Count);
+uint64_t Get_Address_of_Method(MonoImage* Assembly_Image, const char* Name_Space,
+                               const char* Class_Name, const char* Method_Name,
+                               int Param_Count, bool log_failure = true);
 uint64_t Get_Address_of_Method(MonoImage* Assembly_Image, MonoClass* klass, const char* Method_Name, int Param_Count);
 uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString* FileName);
 void DebugSettings_GetModel_Hook(MonoObject* instance, MonoObject* param, MonoObject* promise);

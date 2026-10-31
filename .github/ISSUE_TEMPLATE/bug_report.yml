@@ -7,6 +7,7 @@ body:
     attributes:
       value: |
         Firmware, loader, and other running payloads matter more than a long write-up.
+        For a kernel panic or ShellUI crash/restart, load [klogsrv](https://github.com/ps5-payload-dev/klogsrv) before reproducing. From a PC on the same network, run `nc <PS5-IP> 3232 > klog.txt`, reproduce the problem, then stop capture with Ctrl+C. Windows users can run [`scripts/capture_klog.py`](https://github.com/aydencharles/onionHEN/blob/main/scripts/capture_klog.py) with `python scripts/capture_klog.py <PS5-IP> --output klog.txt` instead. `OnionHEN_crash.log` may be empty for these system crashes.
 
   - type: input
     id: version
@@ -34,6 +35,17 @@ body:
         - Other
     validations:
       required: true
+
+  - type: dropdown
+    id: kstuff
+    attributes:
+      label: Bundled kstuff state at startup
+      description: For boot or kernel-panic issues, note whether bundled kstuff was enabled or external kstuff was running.
+      options:
+        - Bundled kstuff enabled
+        - Bundled kstuff disabled; external kstuff was started before OnionHEN
+        - Bundled kstuff disabled; no external kstuff
+        - Not sure or not applicable
 
   - type: dropdown
     id: area
@@ -81,10 +93,19 @@ body:
         - label: Other
 
   - type: textarea
+    id: payload_timing
+    attributes:
+      label: Payload load order and timing
+      description: List other payloads/plugins in the order they start, the delay before OnionHEN is loaded, and whether external USB storage is connected.
+    validations:
+      required: false
+
+  - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: Attach `/data/OnionHEN/OnionHEN_crash.log` for a daemon crash, plus relevant lines from `OnionHEN.log` and `OnionHEN_util_daemon.log`.
+      description: >-
+        Attach `/data/OnionHEN/OnionHEN_crash.log` for a daemon crash, plus relevant lines from `OnionHEN.log` and `OnionHEN_util_daemon.log`. For a kernel panic or ShellUI crash/restart, attach the `klog.txt` captured from klogsrv TCP port `3232` if available.
       render: text
     validations:
       required: true

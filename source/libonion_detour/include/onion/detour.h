@@ -42,12 +42,21 @@ struct DetourHandle {
 };
 
 bool PrepareDetour(uint64_t address, void *destination, DetourHandle *handle);
+/* Optional hook probes report one caller-level warning; keep detail at DEBUG. */
+bool PrepareDetour(uint64_t address, void *destination, DetourHandle *handle,
+                   bool log_failure);
 bool CommitDetour(DetourHandle *handle);
+bool CommitDetour(DetourHandle *handle, bool log_failure);
 void AbortDetour(DetourHandle *handle);
 bool InstallDetour(uint64_t address, void *destination,
                    void **original_storage);
+/* Optional hook probes report one caller-level warning; keep detail at DEBUG. */
+bool InstallDetour(uint64_t address, void *destination,
+                   void **original_storage, bool log_failure);
 
 /* Compatibility API for hooks that never call an original function. */
 void PatchInJump(uint64_t address, void *destination);
 void *DetourFunction(uint64_t address, void *destination);
+/* Optional hook probes report one caller-level warning; keep detail at DEBUG. */
+void *DetourFunction(uint64_t address, void *destination, bool log_failure);
 void WriteMemory(uint64_t address, void *buffer, int length);

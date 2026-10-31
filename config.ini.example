@@ -15,6 +15,11 @@ schema_version=1
 # system follows the PS5 system language when it can be detected.
 language=system
 
+[pkg]
+# Configure up to eight absolute /data or /mnt folders for local PS4 PKG files.
+search_path_count=1
+search_path_0=/data/OnionHEN/pkgs
+
 [startup]
 # open_after_load chooses which page opens after OnionHEN finishes loading.
 # Available values: none, home_menu

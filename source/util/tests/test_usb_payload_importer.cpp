@@ -64,6 +64,29 @@ int test_action_identity_after_reorder() {
   const std::vector<Entry> duplicates{same_name_other_usb, displayed};
   found = find_action_entry(duplicates, displayed_id, true);
   TEST_ASSERT_TRUE(found != nullptr && found->usb_index == 1);
+
+  Entry newline = displayed;
+  newline.name = "line\nbreak.elf";
+  Entry literal_percent = displayed;
+  literal_percent.name = "line%0Abreak.elf";
+  Entry tab_and_return = displayed;
+  tab_and_return.name = "tab\treturn\r.elf";
+  const std::vector<Entry> unusual{newline, literal_percent, tab_and_return};
+  const std::string newline_id = action_id(newline, true);
+  TEST_ASSERT_TRUE(newline_id.find('\n') == std::string::npos);
+  TEST_ASSERT_TRUE(newline_id != action_id(literal_percent, true));
+  found = find_action_entry(unusual, newline_id, true);
+  TEST_ASSERT_TRUE(found != nullptr && found->name == newline.name);
+  found = find_action_entry(unusual, action_id(literal_percent, true), true);
+  TEST_ASSERT_TRUE(found != nullptr && found->name == literal_percent.name);
+  const std::string whitespace_id = action_id(tab_and_return, true);
+  TEST_ASSERT_TRUE(whitespace_id.find_first_of("\t\r\n") ==
+                   std::string::npos);
+  found = find_action_entry(unusual, whitespace_id, true);
+  TEST_ASSERT_TRUE(found != nullptr && found->name == tab_and_return.name);
+  TEST_ASSERT_TRUE(find_action_entry(
+                       unusual, "id_usb_payload_replace_1_line%0Xbreak.elf",
+                       true) == nullptr);
   return 0;
 }
 

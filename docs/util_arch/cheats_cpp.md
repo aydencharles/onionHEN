@@ -11,7 +11,7 @@
 | **Facade** | `CheatService` | IPC 只依赖一个入口：export / toggle / flatten / ensureDir |
 | **Strategy** | `IMemoryBackend` | mdbg vs kdirect 可替换写内存策略 |
 | **Factory Method** | `MemoryBackendFactory::create()` | 按 `util_system_fw_major()` 选后端 |
-| **Strategy + Factory** | `ICheatParser` / `CheatParserFactory` | json / shn / mc4 / ShnExt 解析路径统一 |
+| **Strategy + Factory** | `ICheatParser` / `CheatParserFactory` | json / shn / mc4 / ShnExt / Illusion XML 解析路径统一 |
 | **Adapter** | `ShnExtCheatParser` | 包装 `onion_cheat_parse_shnext_buffer` |
 | **RAII** | `std::mutex` + `lock_guard` | 锁与服务状态生命周期 |
 | **Singleton（进程级服务）** | `CheatService::instance()` | 与原全局 service 同生命周期，线程安全访问 |
@@ -32,6 +32,7 @@ onion::cheats
 ├── i_cheat_parser.hpp
 │   ├── JsonCheatParser
 │   ├── XmlCheatParser          # .shn Trainer XML
+│   ├── PsGamePatchXmlParser    # .xml Illusion direct-address and signature patches
 │   ├── Mc4CheatParser          # AES-256-CBC → XML
 │   └── ShnExtCheatParser       # Adapter → C parser
 ├── CheatParserFactory          # createByFormat / loadFile / loadBuffer
@@ -82,6 +83,7 @@ IPC handleIPC
 | `.shn` | `XmlCheatParser` | Trainer XML |
 | `.mc4` | `Mc4CheatParser` | Base64 + AES-256-CBC → XML |
 | `.ShnExt` | `ShnExtCheatParser` | deflate + AES + cJSON + 可选 keystone |
+| `.xml` | `PsGamePatchXmlParser` | Illusion PS-Game-Patch direct-address and unique-signature patches (`mask` / `mask_jump32`); accepts upstream `<TITLE_ID>.xml` and local versioned filenames, with title/version checked from XML metadata; jump sources and caves are constrained to executable ranges; one-way toggles capture and restore original bytes |
 
 加载入口：`CheatParserFactory::loadFile` / `loadBuffer`（`CheatRepository` 调用）。
 

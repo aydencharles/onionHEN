@@ -256,8 +256,9 @@ static int test_match_ext_known(void) {
   TEST_ASSERT_EQ_INT(15, (int)extension_start);
   TEST_ASSERT_STREQ("json", onion_cheat_extension_for_rank(0));
   TEST_ASSERT_STREQ("ShnExt", onion_cheat_extension_for_rank(3));
+  TEST_ASSERT_STREQ("xml", onion_cheat_extension_for_rank(4));
   TEST_ASSERT_TRUE(onion_cheat_extension_for_rank(-1) == NULL);
-  TEST_ASSERT_TRUE(onion_cheat_extension_for_rank(4) == NULL);
+  TEST_ASSERT_TRUE(onion_cheat_extension_for_rank(5) == NULL);
   return 0;
 }
 

@@ -84,7 +84,7 @@ source/util/
 │   ├── util_toolbox.cpp         # Toolbox 重注入请求
 │   └── cheats/                  # 金手指领域（C++ 编排 + 解析 + C 适配）
 │       ├── CheatService / Repository / Applier
-│       ├── ICheatParser + Factory (json/shn/mc4)
+│       ├── ICheatParser + Factory (json/shn/mc4/xml)
 │       ├── ShnExt adapter + C crypto/utils/flatten
 │       └── sync/ Catalog + Mirror + HTTPS + ZIP 安装
 ├── include/
@@ -251,7 +251,7 @@ cheat_engine_runtime
         │           │
         ▼           ▼
  CheatParserFactory  IMemoryBackend
-  json/shn/mc4/C++   Mdbg | Kdirect
+  json/shn/mc4/xml   Mdbg | Kdirect
   ShnExt → C adapter (Factory by FW)
         │           │
         └─────┬─────┘
@@ -263,10 +263,12 @@ cheat_engine_runtime
 
 ```text
 /data/OnionHEN/cheats/<TITLE_ID>_<VERSION>[_<PROCESS>][_<SOURCE_ID>].{json,shn,mc4,ShnExt}
+/data/OnionHEN/cheats/<TITLE_ID>_<VERSION>.xml
+/data/OnionHEN/cheats/<TITLE_ID>.xml
 ```
 
-`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。`SOURCE_ID` 只标识物理来源。同步安装把 catalog 的 `json/`、`shn/`、`mc4/` 文件按原名拷到该目录。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
-显示排序使用 `json` → `shn` → `mc4` → `ShnExt`，不会在独立来源之间择一。
+`PROCESS` 与 8 位十六进制 `SOURCE_ID` 均可省略。Illusion XML 可保留上游 `<TITLE_ID>.xml` 文件名，或使用带版本的本地 `<TITLE_ID>_<VERSION>.xml` 名称；加载时仍按 XML 内的 `TitleID` 和 `AppVer` 匹配当前游戏。`SOURCE_ID` 只标识物理来源。同步安装把 catalog 的 `json/`、`shn/`、`mc4/` 文件按原名拷到该目录。Repository 返回所有兼容来源，进程限定来源只匹配对应进程。
+显示排序使用 `json` → `shn` → `mc4` → `ShnExt` → `xml`，不会在独立来源之间择一。Illusion XML 手动安装，下载同步仍只处理 catalog 的 JSON/SHN/MC4 文件；XML 支持直接地址类型以及 `mask` / `mask_jump32` 签名类型：`mask` 在可读模块范围内唯一匹配，`mask_jump32` 的源签名和代码洞目标在可执行范围内唯一匹配，两个写入范围也须保持可执行。关闭时恢复启用前捕获的字节，检测到内存已变化则拒绝覆盖。
 
 #### 热重载
 

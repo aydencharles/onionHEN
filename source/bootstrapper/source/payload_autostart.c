@@ -149,7 +149,6 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
     }
 
     if (!if_exists(marker_path)) {
-      LOG_WARN("skipping auto start for payload: %s", path);
       continue;
     }
     char canonical[ONION_PAYLOAD_PATH_SIZE];

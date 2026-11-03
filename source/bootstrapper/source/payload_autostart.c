@@ -10,11 +10,13 @@
 #include <onion/payload_config.h>
 #include <onion/platform.h>
 
+#include <errno.h>
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 typedef struct PayloadEntry {
@@ -90,12 +92,26 @@ static bool is_elf_filename(const char *filename) {
 
 static void scan_payload_directory(PayloadList *list, const char *directory) {
   DIR *dir = opendir(directory);
-  if (!dir)
+  if (!dir) {
+    const int open_error = errno;
+    if (open_error != ENOENT && open_error != ENOTDIR)
+      LOG_WARN("cannot open auto start payload directory %s: %s", directory,
+               strerror(open_error));
     return;
+  }
 
-  struct dirent *entry;
-  while ((entry = readdir(dir)) != NULL) {
-    if (entry->d_type != DT_REG || !is_elf_filename(entry->d_name))
+  int scan_error = 0;
+  for (;;) {
+    errno = 0;
+    struct dirent *entry = readdir(dir);
+    if (!entry) {
+      if (errno == EINTR)
+        continue;
+      if (errno != 0 && scan_error == 0)
+        scan_error = errno;
+      break;
+    }
+    if (!is_elf_filename(entry->d_name))
       continue;
 
     char path[512];
@@ -111,6 +127,27 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
       continue;
     }
 
+    if (entry->d_type != DT_REG) {
+#ifdef DT_UNKNOWN
+      if (entry->d_type != DT_UNKNOWN)
+        continue;
+      struct stat info = {0};
+      int stat_result;
+      do {
+        stat_result = lstat(path, &info);
+      } while (stat_result != 0 && errno == EINTR);
+      if (stat_result != 0) {
+        if (errno != ENOENT && scan_error == 0)
+          scan_error = errno;
+        continue;
+      }
+      if (!S_ISREG(info.st_mode))
+        continue;
+#else
+      continue;
+#endif
+    }
+
     if (!if_exists(marker_path)) {
       LOG_WARN("skipping auto start for payload: %s", path);
       continue;
@@ -124,10 +161,16 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
     }
     if (!payload_list_append(list, canonical, entry->d_name)) {
       LOG_ERROR("failed to record payload for auto start: %s", path);
+      if (scan_error == 0)
+        scan_error = ENOMEM;
       break;
     }
   }
-  closedir(dir);
+  if (closedir(dir) != 0 && scan_error == 0)
+    scan_error = errno;
+  if (scan_error != 0)
+    LOG_WARN("auto start payload scan incomplete: directory=%s error=%d (%s)",
+             directory, scan_error, strerror(scan_error));
 }
 
 static int compare_payload_entries(const void *a, const void *b) {

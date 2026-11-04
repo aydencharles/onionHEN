@@ -87,6 +87,15 @@ static bool payload_list_append(PayloadList *list, const char *path,
   return true;
 }
 
+static bool is_regular_autostart_marker(const char *path) {
+  struct stat info = {0};
+  int result;
+  do {
+    result = stat(path, &info);
+  } while (result != 0 && errno == EINTR);
+  return result == 0 && S_ISREG(info.st_mode);
+}
+
 static bool is_elf_filename(const char *filename) {
   if (!filename)
     return false;
@@ -153,7 +162,7 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
 #endif
     }
 
-    if (!if_exists(marker_path)) {
+    if (!is_regular_autostart_marker(marker_path)) {
       continue;
     }
     char canonical[ONION_PAYLOAD_PATH_SIZE];

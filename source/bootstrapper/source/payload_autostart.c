@@ -63,6 +63,10 @@ static bool payload_list_contains_path(const PayloadList *list,
   return false;
 }
 
+/**
+ * Appends an entry with owned copies of its path and filename.
+ * Returns false on allocation failure without increasing the list count.
+ */
 static bool payload_list_append(PayloadList *list, const char *path,
                                 const char *filename) {
   PayloadEntry *entries = (PayloadEntry *)realloc(
@@ -87,6 +91,10 @@ static bool payload_list_append(PayloadList *list, const char *path,
   return true;
 }
 
+/**
+ * Accepts only regular marker files; stat() intentionally follows symlinks.
+ * Missing paths are opt-outs; unexpected errors go to scan logging.
+ */
 static bool is_regular_autostart_marker(const char *path, int *error) {
   struct stat info = {0};
   int result;
@@ -100,6 +108,9 @@ static bool is_regular_autostart_marker(const char *path, int *error) {
   return false;
 }
 
+/**
+ * Checks the shared ELF suffix rules and requires a nonempty filename stem.
+ */
 static bool is_elf_filename(const char *filename) {
   if (!filename)
     return false;
@@ -108,6 +119,10 @@ static bool is_elf_filename(const char *filename) {
          onion_elf_name_stem_n(filename, length) > 0;
 }
 
+/**
+ * Adds enabled payloads from one directory and logs unexpected scan errors.
+ * Missing directories and missing markers are treated as normal absences.
+ */
 static void scan_payload_directory(PayloadList *list, const char *directory) {
   DIR *dir = opendir(directory);
   if (!dir) {
@@ -190,6 +205,9 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
              directory, scan_error, strerror(scan_error));
 }
 
+/**
+ * Identifies the two built-in loaders by exact, case-insensitive filename.
+ */
 static bool is_loader_payload_filename(const char *filename) {
   if (!filename)
     return false;

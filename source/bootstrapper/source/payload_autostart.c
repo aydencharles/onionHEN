@@ -64,8 +64,11 @@ static bool payload_list_contains_path(const PayloadList *list,
 }
 
 /**
- * Appends an entry with owned copies of its path and filename.
- * Returns false on allocation failure without increasing the list count.
+ * @brief Appends an entry with owned copies of its path and filename.
+ * @param list Payload list to extend.
+ * @param path Canonical payload path stored in the entry.
+ * @param filename Payload filename used for display and loading.
+ * @return true when the entry is appended; false on allocation failure.
  */
 static bool payload_list_append(PayloadList *list, const char *path,
                                 const char *filename) {
@@ -92,8 +95,11 @@ static bool payload_list_append(PayloadList *list, const char *path,
 }
 
 /**
- * Accepts only regular marker files; stat() intentionally follows symlinks.
- * Missing paths are opt-outs; unexpected errors go to scan logging.
+ * @brief Checks whether an auto-start marker names a regular file.
+ * @param path Marker path; stat() follows symlinks to preserve existing behavior.
+ * @param error Optional destination for the first unexpected stat error.
+ * @return true for a regular marker file; false for absence, another file type,
+ *         or a stat error.
  */
 static bool is_regular_autostart_marker(const char *path, int *error) {
   struct stat info = {0};
@@ -109,7 +115,9 @@ static bool is_regular_autostart_marker(const char *path, int *error) {
 }
 
 /**
- * Checks the shared ELF suffix rules and requires a nonempty filename stem.
+ * @brief Checks the shared ELF suffix and nonempty-stem rules.
+ * @param filename Directory entry name to validate.
+ * @return true when the name identifies an eligible ELF payload.
  */
 static bool is_elf_filename(const char *filename) {
   if (!filename)
@@ -120,8 +128,12 @@ static bool is_elf_filename(const char *filename) {
 }
 
 /**
- * Adds enabled payloads from one directory and logs unexpected scan errors.
- * Missing directories and missing markers are treated as normal absences.
+ * @brief Adds enabled payloads from a directory to the scan list.
+ * @param list Destination list for discovered payloads.
+ * @param directory Directory to scan; absent directories and markers are normal.
+ *
+ * Other open, read, metadata, allocation, and close errors are logged so an
+ * incomplete scan is distinguishable from a directory with no enabled payloads.
  */
 static void scan_payload_directory(PayloadList *list, const char *directory) {
   DIR *dir = opendir(directory);
@@ -206,7 +218,9 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
 }
 
 /**
- * Identifies the two built-in loaders by exact, case-insensitive filename.
+ * @brief Identifies the built-in loaders excluded from user auto-start.
+ * @param filename Payload filename to compare.
+ * @return true only for elfldr.elf or onion_elfldr.elf, ignoring case.
  */
 static bool is_loader_payload_filename(const char *filename) {
   if (!filename)

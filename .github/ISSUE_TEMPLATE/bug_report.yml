@@ -85,7 +85,9 @@ body:
     id: steps
     attributes:
       label: What happened
-      description: Steps from loading OnionHEN, plus Title ID if a game is involved.
+      description: >-
+      Steps from loading OnionHEN, plus the Title ID and game version if a game is involved.
+      For cheat issues, paste the exact failing entry or attach its file; do not include an unrelated cheat collection.
     validations:
       required: true
 

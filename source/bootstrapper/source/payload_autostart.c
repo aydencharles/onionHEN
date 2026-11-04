@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -176,6 +177,13 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
              directory, scan_error, strerror(scan_error));
 }
 
+static bool is_loader_payload_filename(const char *filename) {
+  if (!filename)
+    return false;
+  return strcasecmp(filename, "elfldr.elf") == 0 ||
+         strcasecmp(filename, "onion_elfldr.elf") == 0;
+}
+
 static int compare_payload_entries(const void *a, const void *b) {
   const PayloadEntry *first = (const PayloadEntry *)a;
   const PayloadEntry *second = (const PayloadEntry *)b;
@@ -205,7 +213,7 @@ void bootstrap_payload_autostart(void) {
   int loaded = 0;
   for (size_t i = 0; i < list.count; ++i) {
     const PayloadEntry *entry = &list.entries[i];
-    if (strstr(entry->filename, "elfldr") != NULL)
+    if (is_loader_payload_filename(entry->filename))
       continue;
 
     char identity[ONION_PAYLOAD_IDENTITY_SIZE];

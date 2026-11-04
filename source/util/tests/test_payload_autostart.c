@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static char fixture[256];
@@ -33,6 +34,12 @@ static bool fixture_exists(const char *path) {
   char local[512];
   local_path(path, local, sizeof(local));
   return access(local, F_OK) == 0;
+}
+
+static int fixture_stat(const char *path, struct stat *info) {
+  char local[512];
+  local_path(path, local, sizeof(local));
+  return stat(local, info);
 }
 
 static bool fixture_config(const char *path, OnionPayloadConfig *config) {
@@ -83,6 +90,7 @@ static void fixture_notify(const char *key, ...) {
 /* Run the production scanner and loop against temporary files and a fake clock. */
 #define opendir fixture_opendir
 #define if_exists fixture_exists
+#define stat(path, info) fixture_stat(path, info)
 #define onion_payload_config_load fixture_config
 #define elfldr_remote_onion_available fixture_available
 #define onion_payload_running fixture_running
@@ -92,6 +100,7 @@ static void fixture_notify(const char *key, ...) {
 #include "../../bootstrapper/source/payload_autostart.c"
 #undef opendir
 #undef if_exists
+#undef stat
 #undef onion_payload_config_load
 #undef elfldr_remote_onion_available
 #undef onion_payload_running

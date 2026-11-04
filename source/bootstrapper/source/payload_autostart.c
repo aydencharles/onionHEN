@@ -5,6 +5,7 @@
 #include "bootstrap_notify.h"
 
 #include <elfldr_remote.h>
+#include <onion/elf_name.h>
 #include <onion/log.h>
 #include <onion/payload.h>
 #include <onion/payload_config.h>
@@ -86,8 +87,11 @@ static bool payload_list_append(PayloadList *list, const char *path,
 }
 
 static bool is_elf_filename(const char *filename) {
-  const char *extension = strrchr(filename, '.');
-  return extension && strcmp(extension, ".elf") == 0;
+  if (!filename)
+    return false;
+  const size_t length = strlen(filename);
+  return onion_elf_name_has_suffix(filename, length) &&
+         onion_elf_name_stem_n(filename, length) > 0;
 }
 
 static void scan_payload_directory(PayloadList *list, const char *directory) {

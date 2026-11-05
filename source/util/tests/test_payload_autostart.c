@@ -257,6 +257,10 @@ static int test_autostart_dt_unknown(void) {
 }
 #endif
 
+/**
+ * @brief Runs the payload auto-start schedule and entry-type regression cases.
+ * @return The first failed test result, or zero when the suite passes.
+ */
 int test_payload_autostart_suite(void) {
   int result =
       onion_test_run("payload.autostart_schedule", test_autostart_schedule);

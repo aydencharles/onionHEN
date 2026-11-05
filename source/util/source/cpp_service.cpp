@@ -64,6 +64,15 @@ void *ip_thread(void *arg) {
 
 void start_ip_thread(void) {
   pthread_t ip_thread_thr;
-  pthread_create(&ip_thread_thr, NULL, ip_thread, NULL);
-  pthread_detach(ip_thread_thr);
+  const int create_result =
+      pthread_create(&ip_thread_thr, NULL, ip_thread, NULL);
+  if (create_result != 0) {
+    LOG_WARN("failed to start network IP watcher thread rc=%d", create_result);
+    return;
+  }
+
+  const int detach_result = pthread_detach(ip_thread_thr);
+  if (detach_result != 0) {
+    LOG_WARN("failed to detach network IP watcher thread rc=%d", detach_result);
+  }
 }

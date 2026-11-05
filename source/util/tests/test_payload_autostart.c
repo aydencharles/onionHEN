@@ -54,10 +54,16 @@ static int fixture_lstat(const char *path, struct stat *info) {
   return lstat(local, info);
 }
 
+/**
+ * @brief Overrides selected fixture entry types while scanning.
+ * @param dir Open fixture directory stream.
+ * @return Next directory entry, with test-selected entries marked unknown.
+ */
 static struct dirent *fixture_readdir(DIR *dir) {
   struct dirent *entry = readdir(dir);
   if (force_unknown_entry && entry &&
-      strcmp(entry->d_name, "unknown.elf") == 0)
+      (strcmp(entry->d_name, "unknown.elf") == 0 ||
+       strcmp(entry->d_name, "not-regular.elf") == 0))
     entry->d_type = DT_UNKNOWN;
   return entry;
 }
@@ -205,13 +211,25 @@ static int test_autostart_schedule(void) {
 }
 
 #ifdef DT_UNKNOWN
+/**
+ * @brief Verifies unknown directory-entry types accept only regular payloads.
+ * @return Test status from the harness assertions.
+ */
 static int test_autostart_dt_unknown(void) {
   snprintf(fixture, sizeof(fixture), "/tmp/onion-autostart-unknown-XXXXXX");
   TEST_ASSERT_TRUE(mkdtemp(fixture) != NULL);
   TEST_ASSERT_EQ_INT(0, add_payload("unknown.elf", 0, 0, true));
 
+  char directory[512], marker[528];
+  local_path("not-regular.elf", directory, sizeof(directory));
+  TEST_ASSERT_EQ_INT(0, mkdir(directory, 0700));
+  local_path("not-regular.elf.auto_start", marker, sizeof(marker));
+  FILE *file = fopen(marker, "wb");
+  TEST_ASSERT_TRUE(file != NULL);
+  fclose(file);
+
   loader_available = true;
-  launch_count = invalid_launches = 0;
+  launch_count = event_count = invalid_launches = 0;
   fixture_lstat_calls = 0;
   force_unknown_entry = true;
   bootstrap_payload_autostart();
@@ -219,6 +237,8 @@ static int test_autostart_dt_unknown(void) {
 
   TEST_ASSERT_TRUE(fixture_lstat_calls > 0);
   TEST_ASSERT_EQ_INT(1, (int)launch_count);
+  TEST_ASSERT_EQ_INT(1, (int)event_count);
+  TEST_ASSERT_STREQ("load:unknown.elf", events[0]);
   TEST_ASSERT_EQ_INT(0, invalid_launches);
 
   DIR *dir = opendir(fixture);
@@ -229,7 +249,7 @@ static int test_autostart_dt_unknown(void) {
       continue;
     char path[512];
     local_path(entry->d_name, path, sizeof(path));
-    unlink(path);
+    remove(path);
   }
   closedir(dir);
   TEST_ASSERT_EQ_INT(0, rmdir(fixture));

@@ -114,9 +114,15 @@ PluginDirectoryWatcher &watcher() {
 void log_report(const char *operation, const plugin::ReconcileReport &report) {
   for (const plugin::DiscoveryIssue &issue : report.issues)
     LOG_WARN("[plugins] %s: %s", issue.path.c_str(), issue.message.c_str());
-  LOG_INFO("[plugins] %s: discovered=%zu running=%zu started=%zu failed=%zu",
-           operation, report.discovered, report.running, report.started,
-           report.failed);
+  if (std::strcmp(operation, "startup") == 0) {
+    LOG_INFO("[plugins] %s: discovered=%zu running=%zu started=%zu failed=%zu",
+             operation, report.discovered, report.running, report.started,
+             report.failed);
+  } else {
+    LOG_DEBUG("[plugins] %s: discovered=%zu running=%zu started=%zu failed=%zu",
+              operation, report.discovered, report.running, report.started,
+              report.failed);
+  }
 }
 
 } // namespace

@@ -96,6 +96,7 @@ bool LoadSettings() {
     return true;
 }
 
+/** Initializes the utility service and publishes readiness after IPC startup. */
 int main(void) {
     /* Raw elfldr uploads default to "payload.elf"; publish our stable name. */
     (void)syscall(SYS_thr_set_name, -1, "onion_util.elf");

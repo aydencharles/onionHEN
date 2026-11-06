@@ -142,6 +142,10 @@ namespace {
 
 using WorkerEntry = void *(*)(void *);
 
+/** Starts an optional worker and reports creation or detach failures.
+ * @param name Human-readable worker name included in diagnostics.
+ * @param entry Worker routine to start.
+ */
 void start_optional_worker(const char *name, WorkerEntry entry) {
   pthread_t thread{};
   const int create_error = pthread_create(&thread, nullptr, entry, nullptr);
@@ -166,6 +170,11 @@ void install_crash_handlers() {
     sigaction(i, &action, nullptr);
 }
 
+/** Starts daemon workers and requires the IPC worker to be created.
+ * @param app_jailbreak_thr Receives the application-jailbreak worker handle.
+ * @param msg_thr Receives the required IPC worker handle.
+ * @return true when required IPC startup succeeds; false otherwise.
+ */
 bool start_worker_threads(pthread_t *app_jailbreak_thr, pthread_t *msg_thr) {
   if (app_jailbreak_runtime_start(app_jailbreak_thr)) {
     pthread_t lifecycle_thr = nullptr;
@@ -205,7 +214,9 @@ bool start_worker_threads(pthread_t *app_jailbreak_thr, pthread_t *msg_thr) {
   return true;
 }
 
-/** Keep IPC_loop alive: rejoin + restart on exit. */
+/** Keeps IPC_loop alive by rejoining and restarting it after exit.
+ * @param msg_thr Receives the current IPC worker handle.
+ */
 [[noreturn]] void ipc_supervisor_loop(pthread_t* msg_thr) {
   while (true) {
     const int join_error = pthread_join(*msg_thr, nullptr);
@@ -279,6 +290,7 @@ void sig_handler(int signo) {
 
 bool is_800 = false;
 
+/** Initializes the daemon, starts its workers, and publishes readiness. */
 int main() {
   /* Raw elfldr uploads default to "payload.elf"; publish our stable name. */
   (void)syscall(SYS_thr_set_name, -1, "onion_daemon.elf");

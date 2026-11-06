@@ -62,6 +62,7 @@ void *ip_thread(void *arg) {
   }
 }
 
+/** Starts and detaches the optional network IP-change watcher. */
 void start_ip_thread(void) {
   pthread_t ip_thread_thr;
   const int create_result =

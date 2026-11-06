@@ -5,16 +5,20 @@
 #include "bootstrap_notify.h"
 
 #include <elfldr_remote.h>
+#include <onion/elf_name.h>
 #include <onion/log.h>
 #include <onion/payload.h>
 #include <onion/payload_config.h>
 #include <onion/platform.h>
 
+#include <errno.h>
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 typedef struct PayloadEntry {
@@ -59,6 +63,13 @@ static bool payload_list_contains_path(const PayloadList *list,
   return false;
 }
 
+/**
+ * @brief Appends an entry with owned copies of its path and filename.
+ * @param list Payload list to extend.
+ * @param path Canonical payload path stored in the entry.
+ * @param filename Payload filename used for display and loading.
+ * @return true when the entry is appended; false on allocation failure.
+ */
 static bool payload_list_append(PayloadList *list, const char *path,
                                 const char *filename) {
   PayloadEntry *entries = (PayloadEntry *)realloc(
@@ -83,19 +94,69 @@ static bool payload_list_append(PayloadList *list, const char *path,
   return true;
 }
 
-static bool is_elf_filename(const char *filename) {
-  const char *extension = strrchr(filename, '.');
-  return extension && strcmp(extension, ".elf") == 0;
+/**
+ * @brief Checks whether an auto-start marker names a regular file.
+ * @param path Marker path; stat() follows symlinks to preserve existing behavior.
+ * @param error Optional destination for the first unexpected stat error.
+ * @return true for a regular marker file; false for absence, another file type,
+ *         or a stat error.
+ */
+static bool is_regular_autostart_marker(const char *path, int *error) {
+  struct stat info = {0};
+  int result;
+  do {
+    result = stat(path, &info);
+  } while (result != 0 && errno == EINTR);
+  if (result == 0)
+    return S_ISREG(info.st_mode);
+  if (errno != ENOENT && errno != ENOTDIR && error && *error == 0)
+    *error = errno;
+  return false;
 }
 
+/**
+ * @brief Checks the shared ELF suffix and nonempty-stem rules.
+ * @param filename Directory entry name to validate.
+ * @return true when the name identifies an eligible ELF payload.
+ */
+static bool is_elf_filename(const char *filename) {
+  if (!filename)
+    return false;
+  const size_t length = strlen(filename);
+  return onion_elf_name_has_suffix(filename, length) &&
+         onion_elf_name_stem_n(filename, length) > 0;
+}
+
+/**
+ * @brief Adds enabled payloads from a directory to the scan list.
+ * @param list Destination list for discovered payloads.
+ * @param directory Directory to scan; absent directories and markers are normal.
+ *
+ * Other open, read, metadata, allocation, and close errors are logged so an
+ * incomplete scan is distinguishable from a directory with no enabled payloads.
+ */
 static void scan_payload_directory(PayloadList *list, const char *directory) {
   DIR *dir = opendir(directory);
-  if (!dir)
+  if (!dir) {
+    const int open_error = errno;
+    if (open_error != ENOENT && open_error != ENOTDIR)
+      LOG_WARN("cannot open auto start payload directory %s: %s", directory,
+               strerror(open_error));
     return;
+  }
 
-  struct dirent *entry;
-  while ((entry = readdir(dir)) != NULL) {
-    if (entry->d_type != DT_REG || !is_elf_filename(entry->d_name))
+  int scan_error = 0;
+  for (;;) {
+    errno = 0;
+    struct dirent *entry = readdir(dir);
+    if (!entry) {
+      if (errno == EINTR)
+        continue;
+      if (errno != 0 && scan_error == 0)
+        scan_error = errno;
+      break;
+    }
+    if (!is_elf_filename(entry->d_name))
       continue;
 
     char path[512];
@@ -111,8 +172,28 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
       continue;
     }
 
-    if (!if_exists(marker_path)) {
-      LOG_WARN("skipping auto start for payload: %s", path);
+    if (entry->d_type != DT_REG) {
+#ifdef DT_UNKNOWN
+      if (entry->d_type != DT_UNKNOWN)
+        continue;
+      struct stat info = {0};
+      int stat_result;
+      do {
+        stat_result = lstat(path, &info);
+      } while (stat_result != 0 && errno == EINTR);
+      if (stat_result != 0) {
+        if (errno != ENOENT && scan_error == 0)
+          scan_error = errno;
+        continue;
+      }
+      if (!S_ISREG(info.st_mode))
+        continue;
+#else
+      continue;
+#endif
+    }
+
+    if (!is_regular_autostart_marker(marker_path, &scan_error)) {
       continue;
     }
     char canonical[ONION_PAYLOAD_PATH_SIZE];
@@ -124,10 +205,28 @@ static void scan_payload_directory(PayloadList *list, const char *directory) {
     }
     if (!payload_list_append(list, canonical, entry->d_name)) {
       LOG_ERROR("failed to record payload for auto start: %s", path);
+      if (scan_error == 0)
+        scan_error = ENOMEM;
       break;
     }
   }
-  closedir(dir);
+  if (closedir(dir) != 0 && scan_error == 0)
+    scan_error = errno;
+  if (scan_error != 0)
+    LOG_WARN("auto start payload scan incomplete: directory=%s error=%d (%s)",
+             directory, scan_error, strerror(scan_error));
+}
+
+/**
+ * @brief Identifies the built-in loaders excluded from user auto-start.
+ * @param filename Payload filename to compare.
+ * @return true only for elfldr.elf or onion_elfldr.elf, ignoring case.
+ */
+static bool is_loader_payload_filename(const char *filename) {
+  if (!filename)
+    return false;
+  return strcasecmp(filename, "elfldr.elf") == 0 ||
+         strcasecmp(filename, "onion_elfldr.elf") == 0;
 }
 
 static int compare_payload_entries(const void *a, const void *b) {
@@ -159,7 +258,7 @@ void bootstrap_payload_autostart(void) {
   int loaded = 0;
   for (size_t i = 0; i < list.count; ++i) {
     const PayloadEntry *entry = &list.entries[i];
-    if (strstr(entry->filename, "elfldr") != NULL)
+    if (is_loader_payload_filename(entry->filename))
       continue;
 
     char identity[ONION_PAYLOAD_IDENTITY_SIZE];

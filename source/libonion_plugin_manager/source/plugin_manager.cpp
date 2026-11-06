@@ -41,6 +41,9 @@ bool write_auto_start_marker(std::string_view plugin_path, bool enabled) {
   return close(descriptor) == 0;
 }
 
+/**
+ * Reads a bounded regular ELF file, retrying interrupted reads and reporting I/O failures.
+ */
 bool read_file(const std::string &path, size_t limit, std::vector<uint8_t> &out,
                std::string &error) {
   struct stat entry {};

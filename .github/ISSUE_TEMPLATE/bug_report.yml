@@ -78,6 +78,16 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: cheat_context
+    attributes:
+      label: Cheat file and entry details
+      description: >-
+        For cheat issues, attach only the affected cheat file or paste one exact entry. Include its name, selected value or dropdown option, and whether the error happened while enabling or disabling. Do not attach game dumps.
+      render: text
+    validations:
+      required: false
+
   - type: checkboxes
     id: other_payloads
     attributes:

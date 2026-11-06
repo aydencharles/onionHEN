@@ -33,21 +33,51 @@ std::string pid_path(std::string_view plugin_id) {
 
 class DaemonRuntime final : public plugin::ProcessRuntime {
 public:
+  /**
+   * Recovers a process only from a complete, newline-terminated PID marker.
+   */
   pid_t recover(std::string_view plugin_id) override {
     const std::string path = pid_path(plugin_id);
+    if (path.empty()) return -1;
     const int descriptor = open(path.c_str(), O_RDONLY);
-    if (descriptor < 0) return -1;
+    if (descriptor < 0) {
+      if (errno != ENOENT)
+        LOG_WARN("[plugins] failed to open PID marker for %s: %s",
+                 std::string(plugin_id).c_str(), std::strerror(errno));
+      return -1;
+    }
     char value[32]{};
-    const ssize_t count = read(descriptor, value, sizeof(value) - 1);
+    size_t offset = 0;
+    while (offset < sizeof(value) - 1) {
+      const ssize_t count = read(descriptor, value + offset,
+                                 sizeof(value) - 1 - offset);
+      if (count < 0 && errno == EINTR) continue;
+      if (count < 0) {
+        const int error = errno;
+        close(descriptor);
+        LOG_WARN("[plugins] failed to read PID marker for %s: %s",
+                 std::string(plugin_id).c_str(), std::strerror(error));
+        return -1;
+      }
+      if (count == 0) break;
+      offset += static_cast<size_t>(count);
+    }
     close(descriptor);
-    if (count <= 0) return -1;
+    if (offset < 2 || value[offset - 1] != '\n') {
+      LOG_WARN("[plugins] invalid PID marker for %s; process recovery may relaunch it",
+               std::string(plugin_id).c_str());
+      return -1;
+    }
+    value[offset - 1] = '\0';
     char *end = nullptr;
     errno = 0;
     const long parsed = std::strtol(value, &end, 10);
-    return errno == 0 && end != value && (*end == '\0' || *end == '\n') &&
-                   parsed > 1
-               ? static_cast<pid_t>(parsed)
-               : -1;
+    if (errno != 0 || end != value + offset - 1 || parsed <= 1) {
+      LOG_WARN("[plugins] invalid PID marker for %s; process recovery may relaunch it",
+               std::string(plugin_id).c_str());
+      return -1;
+    }
+    return static_cast<pid_t>(parsed);
   }
 
   pid_t launch(const plugin::PluginFile &plugin_file) override {

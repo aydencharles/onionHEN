@@ -91,42 +91,55 @@ public:
     }
     mkdir(ONION_SYSTEM_TMP_ROOT, 0777);
     mkdir(ONION_SYSTEM_TMP_PID_ROOT, 0777);
-    const int descriptor = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    std::string temp_path = path + ".tmp.XXXXXX";
+    const int descriptor = mkstemp(temp_path.data());
     if (descriptor < 0) {
-      LOG_WARN("[plugins] failed to open PID marker for %.*s: %s; "
+      LOG_WARN("[plugins] failed to create temporary PID marker for %.*s: %s; "
                "process recovery may relaunch it",
                id_length, plugin_name, std::strerror(errno));
       return;
     }
     char value[32]{};
     const int length = std::snprintf(value, sizeof(value), "%d\n", pid);
+    if (length <= 0) {
+      close(descriptor);
+      unlink(temp_path.c_str());
+      LOG_WARN("[plugins] failed to format PID marker for %.*s; "
+               "process recovery may relaunch it",
+               id_length, plugin_name);
+      return;
+    }
     size_t offset = 0;
-    while (length > 0 && offset < static_cast<size_t>(length)) {
+    while (offset < static_cast<size_t>(length)) {
       const ssize_t written = write(descriptor, value + offset,
                                     static_cast<size_t>(length) - offset);
       if (written < 0 && errno == EINTR) continue;
       if (written <= 0) {
         const int error = written < 0 ? errno : EIO;
         close(descriptor);
-        unlink(path.c_str());
-        LOG_WARN("[plugins] failed to write PID marker for %.*s: %s; "
+        unlink(temp_path.c_str());
+        LOG_WARN("[plugins] failed to write temporary PID marker for %.*s: %s; "
                  "process recovery may relaunch it",
                  id_length, plugin_name, std::strerror(error));
         return;
       }
       offset += static_cast<size_t>(written);
     }
-    if (length <= 0) {
-      close(descriptor);
-      LOG_WARN("[plugins] failed to format PID marker for %.*s; "
+    if (close(descriptor) != 0) {
+      const int error = errno;
+      unlink(temp_path.c_str());
+      LOG_WARN("[plugins] failed to close temporary PID marker for %.*s: %s; "
                "process recovery may relaunch it",
-               id_length, plugin_name);
+               id_length, plugin_name, std::strerror(error));
       return;
     }
-    if (close(descriptor) != 0)
-      LOG_WARN("[plugins] failed to close PID marker for %.*s: %s; "
+    if (std::rename(temp_path.c_str(), path.c_str()) != 0) {
+      const int error = errno;
+      unlink(temp_path.c_str());
+      LOG_WARN("[plugins] failed to publish PID marker for %.*s: %s; "
                "process recovery may relaunch it",
-               id_length, plugin_name, std::strerror(errno));
+               id_length, plugin_name, std::strerror(error));
+    }
   }
 
   void stop(pid_t pid, uint32_t flags) override {

@@ -25,6 +25,15 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: console_model
+    attributes:
+      label: PS5 model
+      description: 'Include the family (base, Slim, or Pro) and CFI number if known; use Not sure if unknown.'
+      placeholder: 'PS5 Slim, CFI-20xx'
+    validations:
+      required: true
+
   - type: dropdown
     id: loader
     attributes:
@@ -47,6 +56,15 @@ body:
         - Bundled kstuff disabled; no external kstuff
         - Not sure or not applicable
 
+  - type: input
+    id: kstuff_build
+    attributes:
+      label: External kstuff version/build
+      description: If external kstuff was running, include its version and build type if known (for example, v1.10 lite or fpkg).
+      placeholder: 'v1.10 lite'
+    validations:
+      required: false
+
   - type: dropdown
     id: area
     attributes:
@@ -67,7 +85,9 @@ body:
     id: steps
     attributes:
       label: What happened
-      description: Steps from loading OnionHEN, plus Title ID if a game is involved.
+      description: >-
+        Steps from loading OnionHEN, plus the Title ID and game version if a game is involved.
+        For cheat issues, paste the exact failing entry or attach its file; do not include an unrelated cheat collection.
     validations:
       required: true
 

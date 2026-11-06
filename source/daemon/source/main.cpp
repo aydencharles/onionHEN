@@ -140,6 +140,27 @@ extern bool is_handler_enabled;
 
 namespace {
 
+using WorkerEntry = void *(*)(void *);
+
+/** Starts an optional worker and reports creation or detach failures.
+ * @param name Human-readable worker name included in diagnostics.
+ * @param entry Worker routine to start.
+ */
+void start_optional_worker(const char *name, WorkerEntry entry) {
+  pthread_t thread{};
+  const int create_error = pthread_create(&thread, nullptr, entry, nullptr);
+  if (create_error != 0) {
+    LOG_WARN("[daemon] %s worker unavailable: pthread_create rc=%d", name,
+             create_error);
+    return;
+  }
+
+  const int detach_error = pthread_detach(thread);
+  if (detach_error != 0)
+    LOG_WARN("[daemon] %s worker pthread_detach failed: rc=%d", name,
+             detach_error);
+}
+
 void install_crash_handlers() {
   struct sigaction action {};
   action.sa_handler = sig_handler;
@@ -149,52 +170,71 @@ void install_crash_handlers() {
     sigaction(i, &action, nullptr);
 }
 
-void start_worker_threads(pthread_t* app_jailbreak_thr, pthread_t* msg_thr) {
+/** Starts daemon workers and requires the IPC worker to be created.
+ * @param app_jailbreak_thr Receives the application-jailbreak worker handle.
+ * @param msg_thr Receives the required IPC worker handle.
+ * @return true when required IPC startup succeeds; false otherwise.
+ */
+bool start_worker_threads(pthread_t *app_jailbreak_thr, pthread_t *msg_thr) {
   if (app_jailbreak_runtime_start(app_jailbreak_thr)) {
     pthread_t lifecycle_thr = nullptr;
-    if (pthread_create(&lifecycle_thr, nullptr, app_lifecycle_listener_thread,
-                       nullptr) == 0) {
-      pthread_detach(lifecycle_thr);
+    const int lifecycle_error = pthread_create(
+        &lifecycle_thr, nullptr, app_lifecycle_listener_thread, nullptr);
+    if (lifecycle_error == 0) {
+      const int detach_error = pthread_detach(lifecycle_thr);
+      if (detach_error != 0)
+        LOG_WARN("[lifecycle] SceSysCore listener detach failed: rc=%d",
+                 detach_error);
     } else {
-      LOG_ERROR("[lifecycle] SceSysCore listener thread creation failed");
+      LOG_WARN("[lifecycle] SceSysCore listener unavailable: "
+               "pthread_create rc=%d",
+               lifecycle_error);
       onion::daemon::app_lifecycle::stop();
     }
   } else {
-    LOG_ERROR("[lifecycle] Big App listener disabled: AppJailbreak runtime is "
+    LOG_WARN("[lifecycle] Big App listener disabled: AppJailbreak runtime is "
               "not ready");
   }
-  pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
+
+  const int ipc_error = pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
+  if (ipc_error != 0) {
+    LOG_ERROR("[daemon] required IPC worker creation failed: rc=%d", ipc_error);
+    return false;
+  }
   if (!onion::daemon::plugin_ipc::start())
-    LOG_ERROR("plugin IPC server failed to start");
-  pthread_t ctrl_thr = nullptr;
-  pthread_create(&ctrl_thr, nullptr, control_tcp_loop, nullptr);
-  pthread_detach(ctrl_thr);
-  pthread_t supervisor_thr = nullptr;
-  pthread_create(&supervisor_thr, nullptr, runtime_supervisor_thread, nullptr);
-  pthread_detach(supervisor_thr);
-  pthread_t fan_thr = nullptr;
-  pthread_create(&fan_thr, nullptr, fan_maintenance_thread, nullptr);
-  pthread_detach(fan_thr);
-  pthread_t fps_thr = nullptr;
-  pthread_create(&fps_thr, nullptr, fps_sampler_thread, nullptr);
-  pthread_detach(fps_thr);
-  pthread_t vsync_fps_thr = nullptr;
-  pthread_create(&vsync_fps_thr, nullptr, vsync_fps_sampler_thread, nullptr);
-  pthread_detach(vsync_fps_thr);
-  pthread_t language_thr = nullptr;
-  pthread_create(&language_thr, nullptr, system_language_poll_thread, nullptr);
-  pthread_detach(language_thr);
-  pthread_t resume_thr = nullptr;
-  pthread_create(&resume_thr, nullptr, resume_recovery_thread, nullptr);
-  pthread_detach(resume_thr);
+    LOG_WARN("[daemon] plugin IPC server failed to start");
+
+  start_optional_worker("control TCP", control_tcp_loop);
+  start_optional_worker("runtime supervisor", runtime_supervisor_thread);
+  start_optional_worker("fan maintenance", fan_maintenance_thread);
+  start_optional_worker("FPS sampler", fps_sampler_thread);
+  start_optional_worker("vsync FPS sampler", vsync_fps_sampler_thread);
+  start_optional_worker("system language poll", system_language_poll_thread);
+  start_optional_worker("resume recovery", resume_recovery_thread);
+  return true;
 }
 
-/** Keep IPC_loop alive: rejoin + restart on exit. */
+/** Keeps IPC_loop alive by rejoining and restarting it after exit.
+ * @param msg_thr Receives the current IPC worker handle.
+ */
 [[noreturn]] void ipc_supervisor_loop(pthread_t* msg_thr) {
   while (true) {
-    pthread_join(*msg_thr, nullptr);
-    pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
-    sleep(1);
+    const int join_error = pthread_join(*msg_thr, nullptr);
+    if (join_error != 0) {
+      LOG_ERROR("[daemon] IPC worker join failed: rc=%d; retrying", join_error);
+      sleep(1);
+      continue;
+    }
+
+    int create_error = 0;
+    do {
+      create_error = pthread_create(msg_thr, nullptr, IPC_loop, nullptr);
+      if (create_error != 0) {
+        LOG_ERROR("[daemon] IPC worker restart failed: rc=%d; retrying",
+                  create_error);
+        sleep(1);
+      }
+    } while (create_error != 0);
   }
 }
 
@@ -250,6 +290,7 @@ void sig_handler(int signo) {
 
 bool is_800 = false;
 
+/** Initializes the daemon, starts its workers, and publishes readiness. */
 int main() {
   /* Raw elfldr uploads default to "payload.elf"; publish our stable name. */
   (void)syscall(SYS_thr_set_name, -1, "onion_daemon.elf");
@@ -310,7 +351,10 @@ int main() {
   // Big App lifecycle events then use reconcile() against this initialized
   // catalog, rather than racing a second initial start().
   onion::daemon::sprx_plugins::start();
-  start_worker_threads(&app_jailbreak_thr, &msg_thr);
+  if (!start_worker_threads(&app_jailbreak_thr, &msg_thr)) {
+    (void)onion_ready_clear(ONION_READY_DAEMON);
+    return 1;
+  }
   for (int attempt = 0;
        attempt < 20 && !onion::daemon::plugin_ipc::is_listening(); ++attempt)
     usleep(50 * 1000);
@@ -318,7 +362,11 @@ int main() {
     onion::daemon::plugins::start();
   else
     LOG_ERROR("[plugins] startup skipped because plugin IPC is not listening");
-  onion_ready_signal_pid(ONION_READY_DAEMON, getpid());
+  if (!onion_ready_signal_pid(ONION_READY_DAEMON, getpid())) {
+    LOG_ERROR("[daemon] failed to publish readiness marker");
+    (void)onion_ready_clear(ONION_READY_DAEMON);
+    return 1;
+  }
 
   LOG_DEBUG("is toolbox only: %s | ver: %x", toolbox_only ? "Yes" : "No",
             sys_ver.version);

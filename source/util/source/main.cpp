@@ -96,6 +96,7 @@ bool LoadSettings() {
     return true;
 }
 
+/** Initializes the utility service and publishes readiness after IPC startup. */
 int main(void) {
     /* Raw elfldr uploads default to "payload.elf"; publish our stable name. */
     (void)syscall(SYS_thr_set_name, -1, "onion_util.elf");
@@ -135,9 +136,20 @@ int main(void) {
     LoadSettings();
 
     start_ip_thread();
-    pthread_create(&ipc_server, NULL, IPC_loop, NULL);
-    /* IPC thread is up — publish ready for bootstrapper/daemon consumers */
-    onion_ready_signal_pid(ONION_READY_UTIL, getpid());
+    const int ipc_start_result =
+        pthread_create(&ipc_server, NULL, IPC_loop, NULL);
+    if (ipc_start_result != 0) {
+        LOG_ERROR("failed to start utility IPC server thread rc=%d",
+                  ipc_start_result);
+        onion_ready_clear(ONION_READY_UTIL);
+        return 1;
+    }
+    /* The IPC thread exists; publish readiness only after thread creation. */
+    if (!onion_ready_signal_pid(ONION_READY_UTIL, getpid())) {
+        LOG_ERROR("failed to publish utility readiness pid=%d", (int)getpid());
+        onion_ready_clear(ONION_READY_UTIL);
+        return 1;
+    }
 
     if (onion_ready_is_set(ONION_FLAG_UTIL_BOOTED)) {
         /* onion_util.elf restarted mid-session (crash recover / re-launch) — not rest. */

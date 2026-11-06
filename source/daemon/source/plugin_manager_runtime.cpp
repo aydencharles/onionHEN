@@ -69,6 +69,11 @@ public:
 
   bool alive(pid_t pid) override { return onion_proc_is_alive(pid); }
 
+  /**
+   * Maintains the PID marker used to recover managed plugins after restart.
+   * Reports failures because an unpersisted PID can cause recovery to relaunch
+   * a plugin that is already running.
+   */
   void persist(std::string_view plugin_id, pid_t pid) override {
     const std::string path = pid_path(plugin_id);
     const int id_length = static_cast<int>(plugin_id.size());

@@ -65,6 +65,7 @@ bool read_file(const std::string &path, size_t limit, std::vector<uint8_t> &out,
   size_t offset = 0;
   while (offset < out.size()) {
     const ssize_t count = read(descriptor, out.data() + offset, out.size() - offset);
+    if (count < 0 && errno == EINTR) continue;
     if (count <= 0) {
       error = std::string("read failed: ") + std::strerror(errno);
       close(descriptor);

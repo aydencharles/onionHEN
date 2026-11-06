@@ -111,6 +111,11 @@ PluginDirectoryWatcher &watcher() {
   return instance;
 }
 
+/**
+ * Logs plugin discovery problems as warnings and summarizes reconciliation.
+ * Startup summaries stay at INFO; routine watcher summaries use DEBUG to avoid
+ * repeating unchanged state in the normal daemon log.
+ */
 void log_report(const char *operation, const plugin::ReconcileReport &report) {
   for (const plugin::DiscoveryIssue &issue : report.issues)
     LOG_WARN("[plugins] %s: %s", issue.path.c_str(), issue.message.c_str());

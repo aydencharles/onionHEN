@@ -55,10 +55,6 @@ jobs:
     needs: check
     if: needs.check.outputs.build == 'true'
     runs-on: ubuntu-latest
-    env:
-      TOOLCHAIN_DIR: ${{ github.workspace }}/../toolchain # outside the checkout, cached below
-      PS5_PAYLOAD_SDK: ${{ github.workspace }}/../toolchain/ps5-payload-sdk
-      KEYSTONE_PREFIX: ${{ github.workspace }}/../toolchain/keystone
     steps:
       - uses: actions/checkout@v7
         with:
@@ -68,13 +64,18 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq "clang-$LLVM_VERSION" "lld-$LLVM_VERSION" "llvm-$LLVM_VERSION" ninja-build cmake xz-utils unzip librsvg2-bin
-          echo "LLVM_CONFIG=/usr/bin/llvm-config-$LLVM_VERSION" >> "$GITHUB_ENV"
+          {
+            echo "LLVM_CONFIG=/usr/bin/llvm-config-$LLVM_VERSION"
+            echo "TOOLCHAIN_DIR=$HOME/toolchain" # outside the checkout, cached below
+            echo "PS5_PAYLOAD_SDK=$HOME/toolchain/ps5-payload-sdk"
+            echo "KEYSTONE_PREFIX=$HOME/toolchain/keystone"
+          } >> "$GITHUB_ENV"
 
       - name: Cache toolchain
         id: cache
         uses: actions/cache@v6
         with:
-          path: ${{ env.TOOLCHAIN_DIR }}
+          path: ~/toolchain
           key: toolchain-sdk-${{ env.PS5_SDK_VERSION }}-pacbrew-${{ env.PACBREW_VERSION }}-keystone-${{ env.KEYSTONE_VERSION }}
 
       - name: Install PS5 payload SDK + pacbrew libs

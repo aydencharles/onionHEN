@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          submodules: recursive
+          submodules: true # kstuff-lite only; its nested submodules are not needed
 
       - name: Install host packages
         run: |

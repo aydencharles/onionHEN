@@ -304,7 +304,7 @@ bool resolve_mono_symbols(pid_t pid) {
   KERNEL_DLSYM(libmono, mono_assembly_setrootdir);
   KERNEL_DLSYM(libmono, mono_free);
   KERNEL_DLSYM(libmono, mono_gchandle_new);
-  KERNEL_DLSYM(libmono, mono_gchandle_free); /* optional; null if missing */
+  KERNEL_DLSYM(libmono, mono_gchandle_free);
   KERNEL_DLSYM(libmono, mono_image_open_from_data);
   KERNEL_DLSYM(libmono, mono_runtime_object_init);
   KERNEL_DLSYM(libmono, mono_domain_get);
@@ -330,7 +330,7 @@ bool resolve_mono_symbols(pid_t pid) {
       mono_thread_attach && mono_object_get_class && mono_vtable_get_static_field_data &&
       mono_class_get_method_from_name && mono_class_get_field_from_name &&
       mono_aot_get_method && mono_field_static_set_value && mono_assembly_setrootdir &&
-      mono_free && mono_gchandle_new && mono_image_open_from_data &&
+      mono_free && mono_gchandle_new && mono_gchandle_free && mono_image_open_from_data &&
       mono_runtime_object_init && mono_domain_get && mono_assembly_load_from &&
       mono_method_desc_new && mono_method_desc_search_in_class && mono_method_desc_free &&
       mono_object_new_specific && mono_thread_detach && mono_array_addr_with_size &&

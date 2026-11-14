@@ -25,7 +25,7 @@ make clean && make test
 Binary: `source/util/build/host-tests/onion-host-tests`
 
 Run USB regressions without Keystone with
-`make -C source/util/tests test-usb-payloads`.
+`make test-usb-payloads`.
 These cover imports without hard links and reading the native USB access directory.
 
 ## Coverage

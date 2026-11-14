@@ -359,6 +359,17 @@ void generate_payload_config_xml(std::string& xml_buffer,
                     toolbox_i18n::tr("payload.delay.sub"), "number", "1", "3",
                     std::nullopt, std::nullopt, std::nullopt,
                     std::to_string(found->config.delay_seconds));
+    struct stat installed {};
+    if (toolbox::is_installed_payload_path(found->shellui_path) &&
+        lstat(found->shellui_path.c_str(), &installed) == 0 &&
+        S_ISREG(installed.st_mode)) {
+      page.button("id_payload_delete_" + found->id,
+                  toolbox_i18n::tr("payload.delete"),
+                  toolbox_i18n::tr("payload.delete_running"),
+                  std::nullopt, std::nullopt, ps5ui::Style::None,
+                  toolbox_i18n::tr("payload.delete.confirm"),
+                  toolbox_i18n::tr("account.activate.confirm_phrase"));
+    }
     xml_buffer = page.build();
   }
 }

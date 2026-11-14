@@ -6,9 +6,11 @@
 #include <onion/elf_name.h>
 #include <elfldr_remote.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 void onion_test_elfldr_reset(void);
@@ -269,6 +271,130 @@ static int test_builtin_identity_payloads_allowed(void) {
   return 0;
 }
 
+static int write_marker(const char *path) {
+  FILE *file = fopen(path, "wb");
+  if (!file)
+    return -1;
+  const int written = fputs("marker", file);
+  return fclose(file) == 0 && written >= 0 ? 0 : -1;
+}
+
+static int test_remove_stopped_payload(void) {
+  char path[256], marker[300], config[300], neighbor[300], pid_path[256];
+  char identity[ONION_PAYLOAD_IDENTITY_SIZE];
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_file(".elf", "\x7f" "ELF", 4,
+                                                  path, sizeof(path)));
+  snprintf(marker, sizeof(marker), "%s.auto_start", path);
+  snprintf(config, sizeof(config), "%s.json", path);
+  snprintf(neighbor, sizeof(neighbor), "%s.neighbor.elf", path);
+  TEST_ASSERT_EQ_INT(0, write_marker(marker));
+  TEST_ASSERT_EQ_INT(0, write_marker(config));
+  TEST_ASSERT_EQ_INT(0, write_marker(neighbor));
+  TEST_ASSERT_TRUE(onion_payload_identity_from_path(path, identity, sizeof(identity)));
+  onion_payload_pid_path(pid_path, sizeof(pid_path), identity);
+  onion_payload_write_pid_file(pid_path, 4242);
+  onion_test_elfldr_reset();
+
+  TEST_ASSERT_TRUE(onion_payload_remove(path));
+  TEST_ASSERT_TRUE(access(path, F_OK) != 0 && access(marker, F_OK) != 0 &&
+                   access(config, F_OK) != 0 && access(pid_path, F_OK) != 0);
+  TEST_ASSERT_EQ_INT(0, access(neighbor, F_OK));
+  TEST_ASSERT_TRUE(onion_payload_remove(neighbor)); /* Missing sidecars are fine. */
+  return 0;
+}
+
+static int test_remove_long_basename(void) {
+  char directory[] = "/tmp/onion-payload-remove-XXXXXX";
+  char name[256], path[512];
+  TEST_ASSERT_TRUE(mkdtemp(directory) != NULL);
+  memset(name, 'x', 251);
+  memcpy(name + 251, ".elf", 5);
+  snprintf(path, sizeof(path), "%s/%s", directory, name);
+  TEST_ASSERT_EQ_INT(0, write_marker(path));
+  TEST_ASSERT_TRUE(onion_payload_remove(path));
+  TEST_ASSERT_TRUE(access(path, F_OK) != 0 && errno == ENOENT);
+  TEST_ASSERT_EQ_INT(0, rmdir(directory));
+  return 0;
+}
+
+static int test_remove_rejects_invalid_targets(void) {
+  char original[256], path[300], marker[320];
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_file(".elf", "ELF", 3,
+                                                  original, sizeof(original)));
+  const char *suffixes[] = {".link.elf", ".directory.elf", ".missing.elf", ".txt"};
+  for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); ++i) {
+    snprintf(path, sizeof(path), "%s%s", original, suffixes[i]);
+    snprintf(marker, sizeof(marker), "%s.auto_start", path);
+    if (i == 0)
+      TEST_ASSERT_EQ_INT(0, symlink(original, path));
+    if (i == 1)
+      TEST_ASSERT_EQ_INT(0, mkdir(path, 0700));
+    if (i == 3)
+      TEST_ASSERT_EQ_INT(0, write_marker(path));
+    TEST_ASSERT_EQ_INT(0, write_marker(marker));
+    TEST_ASSERT_TRUE(!onion_payload_remove(path));
+    TEST_ASSERT_EQ_INT(0, access(original, F_OK));
+    TEST_ASSERT_EQ_INT(0, access(marker, F_OK));
+    if (i != 2)
+      TEST_ASSERT_EQ_INT(0, access(path, F_OK));
+    unlink(marker);
+    if (i == 1)
+      rmdir(path);
+    else
+      unlink(path);
+  }
+  TEST_ASSERT_TRUE(!onion_payload_remove(NULL));
+  TEST_ASSERT_TRUE(!onion_payload_remove("relative.elf"));
+  TEST_ASSERT_TRUE(!onion_payload_remove("/tmp/.elf"));
+  snprintf(path, sizeof(path), "%s/../outside.elf", original);
+  TEST_ASSERT_TRUE(!onion_payload_remove(path));
+  TEST_ASSERT_EQ_INT(EINVAL, errno);
+  unlink(original);
+  return 0;
+}
+
+static int test_remove_preserves_running_payload(void) {
+  char path[256], marker[300], config[300], pid_path[256];
+  char identity[ONION_PAYLOAD_IDENTITY_SIZE];
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_file(".elf", "ELF", 3,
+                                                  path, sizeof(path)));
+  snprintf(marker, sizeof(marker), "%s.auto_start", path);
+  snprintf(config, sizeof(config), "%s.json", path);
+  TEST_ASSERT_EQ_INT(0, write_marker(marker));
+  TEST_ASSERT_EQ_INT(0, write_marker(config));
+  TEST_ASSERT_TRUE(onion_payload_identity_from_path(path, identity, sizeof(identity)));
+  onion_payload_pid_path(pid_path, sizeof(pid_path), identity);
+  onion_payload_write_pid_file(pid_path, 6262);
+  onion_test_live_pid(6262);
+
+  TEST_ASSERT_TRUE(!onion_payload_remove(path));
+  TEST_ASSERT_EQ_INT(EBUSY, errno);
+  TEST_ASSERT_EQ_INT(0, access(path, F_OK));
+  TEST_ASSERT_EQ_INT(0, access(marker, F_OK));
+  TEST_ASSERT_EQ_INT(0, access(config, F_OK));
+  TEST_ASSERT_EQ_INT(6262, onion_payload_read_pid_file(pid_path));
+  onion_test_elfldr_reset();
+  TEST_ASSERT_TRUE(onion_payload_remove(path));
+  return 0;
+}
+
+static int test_remove_reports_sidecar_failure(void) {
+  char path[256], marker[300], config[300];
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_file(".elf", "ELF", 3,
+                                                  path, sizeof(path)));
+  snprintf(marker, sizeof(marker), "%s.auto_start", path);
+  snprintf(config, sizeof(config), "%s.json", path);
+  TEST_ASSERT_EQ_INT(0, write_marker(marker));
+  TEST_ASSERT_EQ_INT(0, mkdir(config, 0700));
+  TEST_ASSERT_TRUE(!onion_payload_remove(path));
+  TEST_ASSERT_TRUE(errno != 0 && errno != ENOENT);
+  TEST_ASSERT_TRUE(access(path, F_OK) != 0 && access(marker, F_OK) != 0);
+  struct stat st;
+  TEST_ASSERT_TRUE(lstat(config, &st) == 0 && S_ISDIR(st.st_mode));
+  rmdir(config);
+  return 0;
+}
+
 int test_payload_suite(void) {
   int failures = 0;
   failures += onion_test_run("payload.is_elf", test_is_elf);
@@ -291,5 +417,10 @@ int test_payload_suite(void) {
                              test_load_with_explicit_key);
   failures += onion_test_run("payload.builtin_identity_payloads_allowed",
                              test_builtin_identity_payloads_allowed);
+  failures += onion_test_run("payload.remove_stopped", test_remove_stopped_payload);
+  failures += onion_test_run("payload.remove_long_basename", test_remove_long_basename);
+  failures += onion_test_run("payload.remove_invalid_targets", test_remove_rejects_invalid_targets);
+  failures += onion_test_run("payload.remove_running", test_remove_preserves_running_payload);
+  failures += onion_test_run("payload.remove_sidecar_failure", test_remove_reports_sidecar_failure);
   return failures;
 }

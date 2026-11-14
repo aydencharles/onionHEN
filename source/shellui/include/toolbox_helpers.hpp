@@ -42,6 +42,17 @@ inline bool is_payload_elf_name(const char *name) {
          onion_elf_name_stem_n(name, n) > 0;
 }
 
+inline bool is_installed_payload_path(const std::string &path) {
+  const std::string canonical = display_path_for_ui(path);
+  const std::size_t slash = canonical.find_last_of('/');
+  if (slash == std::string::npos || canonical.find('\0') != std::string::npos)
+    return false;
+  const std::string parent = canonical.substr(0, slash);
+  return (parent == "/data/OnionHEN/payloads" ||
+          parent == "/data/onionhen/payloads") &&
+         is_payload_elf_name(canonical.c_str() + slash + 1);
+}
+
 /**
  * Previous builds left runtime staging files in the visible /data payload
  * directory. Keep their reserved identity format out of the list after upgrade.

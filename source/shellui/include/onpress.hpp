@@ -64,6 +64,7 @@ const OnPressExactEntry *onpress_misc_root_exact(size_t *count);
 const OnPressExactEntry *onpress_account_exact(size_t *count);
 
 const OnPressPrefixEntry *onpress_payloads_prefix(size_t *count);
+void bind_payload_delete_control(MonoObject *element, const std::string &id);
 const OnPressPrefixEntry *onpress_cheats_prefix(size_t *count);
 const OnPressPrefixEntry *onpress_sprx_prefix(size_t *count);
 

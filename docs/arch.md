@@ -196,6 +196,11 @@ The Toolbox USB Payloads page scans ELF files at the root of `/usb0` through
 destination directory. A new payload is installed without overwriting a file
 created concurrently; replacing an installed payload requires confirmation.
 
+Installed payload details end with a confirmed Remove action, disabled while
+the payload is running or launching. Stopped internal payloads can be deleted
+with their auto-start, schedule and PID files; USB sources are excluded.
+Removing a payload returns to the refreshed payload list.
+
 Remote Play 由 `remote_play.cpp` 负责：通过 `libSceRemoteplay.sprx` 解析
 原生 `sceRemoteplay*` API，启用 Remote Play 注册表设置，生成 PIN，并在后台
 确认客户端注册。视频串流与客户端传输仍由 PS5 原生 Remote Play 服务处理；

@@ -57,6 +57,24 @@ static int test_payload_name_reject(void) {
   return 0;
 }
 
+static int test_installed_payload_paths(void) {
+  for (const char *path : {"/data/OnionHEN/payloads/tool.elf",
+                           "/user/data/OnionHEN/payloads/tool.elf",
+                           "/data/onionhen/payloads/tool.elf",
+                           "/user/data/onionhen/payloads/tool.elf"})
+    TEST_ASSERT_TRUE(is_installed_payload_path(path));
+  for (const char *path : {"/usb0/OnionHEN/payloads/tool.elf",
+                           "/mnt/usb1/OnionHEN/payloads/tool.elf",
+                           "/data/OnionHEN/plugins/tool.elf",
+                           "/data/OnionHEN/payloads/../tool.elf",
+                           "/data/OnionHEN/payloads/sub/tool.elf",
+                           "/data/OnionHEN/payloads/tool.elf.json",
+                           "/userdata/OnionHEN/payloads/tool.elf",
+                           "/data/OnionHEN/payloads/.elf", "tool.elf", ""})
+    TEST_ASSERT_TRUE(!is_installed_payload_path(path));
+  return 0;
+}
+
 static int test_legacy_payload_staging_name(void) {
   TEST_ASSERT_TRUE(is_legacy_payload_staging_name("p7d26c949e1b9045d.elf"));
   TEST_ASSERT_TRUE(!is_legacy_payload_staging_name("p7D26c949e1b9045d.elf"));
@@ -83,6 +101,7 @@ extern "C" int test_toolbox_helpers_suite(void) {
   fails += onion_test_run("toolbox.display_passthrough", test_display_passthrough);
   fails += onion_test_run("toolbox.payload_name_accept", test_payload_name_accept);
   fails += onion_test_run("toolbox.payload_name_reject", test_payload_name_reject);
+  fails += onion_test_run("toolbox.installed_payload_paths", test_installed_payload_paths);
   fails += onion_test_run("toolbox.payload_legacy_staging_name",
                           test_legacy_payload_staging_name);
   fails += onion_test_run("toolbox.elf_key_from_name", test_elf_key_from_name);

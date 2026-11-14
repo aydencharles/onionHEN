@@ -1,11 +1,19 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods — OnPress payloads / auto-start */
 #include "onpress.hpp"
 #include "shellui_payload_state.hpp"
+#include "settings_page_refresh.hpp"
+#include "toolbox_helpers.hpp"
+#include "toolbox_i18n.hpp"
+#include "toolbox_navigation.hpp"
+#include <onion/payload.h>
 #include <cerrno>
 #include <cstdlib>
 #include <fcntl.h>
 #include <pthread.h>
+#include <mutex>
+#include <set>
 #include <string>
+#include <sys/stat.h>
 #include <unistd.h>
 
 void *load_payload_thread(void *args);
@@ -16,6 +24,9 @@ constexpr const char *kRunPrefix = "id_payload_run_";
 constexpr const char *kAutoStartPrefix = "id_payload_autostart_";
 constexpr const char *kPriorityPrefix = "id_payload_priority_";
 constexpr const char *kDelayPrefix = "id_payload_delay_";
+constexpr const char *kDeletePrefix = "id_payload_delete_";
+std::mutex launching_mutex;
+std::set<std::string> launching_payloads;
 
 PayloadEntry *payload_for_control(const std::string &control_id,
                                   const char *prefix) {
@@ -33,18 +44,47 @@ bool control_enabled(const std::string &value) {
   return value == "1" || value == "true";
 }
 
+bool payload_busy(const PayloadEntry &entry) {
+  std::lock_guard lock(launching_mutex);
+  return launching_payloads.contains(entry.id) ||
+      onion_payload_running(entry.tid.c_str());
+}
+
+void *launch_payload(void *args) {
+  const std::string id = static_cast<PayloadEntry *>(args)->id;
+  load_payload_thread(args);
+  std::lock_guard lock(launching_mutex);
+  launching_payloads.erase(id);
+  return nullptr;
+}
+
 void start_payload(const PayloadEntry &entry) {
+  {
+    std::lock_guard lock(launching_mutex);
+    if (!launching_payloads.insert(entry.id).second)
+      return;
+  }
   pthread_t thread;
   auto *info = new PayloadEntry(entry);
-  if (pthread_create(&thread, nullptr, load_payload_thread, info) == 0) {
+  if (pthread_create(&thread, nullptr, launch_payload, info) == 0) {
     pthread_detach(thread);
     return;
   }
   delete info;
+  {
+    std::lock_guard lock(launching_mutex);
+    launching_payloads.erase(entry.id);
+  }
   notify("notify.payload.launch_failed", entry.path.c_str(), entry.tid.c_str());
 }
 
 } // namespace
+
+void bind_payload_delete_control(MonoObject *element, const std::string &id) {
+  const PayloadEntry *entry = payload_for_control(id, kDeletePrefix);
+  if (entry && !onion::shellui::settings::set_enabled(element, !payload_busy(*entry)))
+    LOG_ERROR("Failed to bind payload removal control");
+}
 
 static OnPressResult prefix_id_payload_run(OnPressContext &ctx) {
   if (ctx.id.rfind(kRunPrefix, 0) != 0) {
@@ -61,12 +101,17 @@ static OnPressResult prefix_id_payload_run(OnPressContext &ctx) {
     LOG_DEBUG("killing recorded payload pid: %d (%s)", pid,
               entry->tid.c_str());
     IPC_Client::getInstance(false).ForceKillPID(pid);
-    unlink(pid_path);
-    notify("notify.process.killed", entry->name.c_str());
+    if (!onion_proc_is_alive(pid)) {
+      unlink(pid_path);
+      notify("notify.process.killed", entry->name.c_str());
+    }
   } else if (control_enabled(ctx.value) && pid <= 1) {
     LOG_DEBUG("Payload %s not running", entry->tid.c_str());
     start_payload(*entry);
   }
+  if (toolbox::is_installed_payload_path(entry->shellui_path))
+    onion::shellui::settings::reset_element(
+        ctx.instance, std::string(kDeletePrefix) + entry->id);
   return OnPressResult::Consumed;
 }
 
@@ -135,7 +180,35 @@ static OnPressResult set_payload_schedule(OnPressContext &ctx, bool priority) {
   return OnPressResult::Consumed;
 }
 
+static OnPressResult delete_payload(OnPressContext &ctx) {
+  ctx.dirty = false;
+  const PayloadEntry *found = payload_for_control(ctx.id, kDeletePrefix);
+  if (!found || !toolbox::is_installed_payload_path(found->shellui_path))
+    return OnPressResult::Consumed;
+  const PayloadEntry entry = *found;
+  if (payload_busy(entry)) {
+    notify("%s", toolbox_i18n::tr("payload.delete_running"));
+    return OnPressResult::Consumed;
+  }
+  const bool removed = onion_payload_remove(entry.shellui_path.c_str());
+  const int error = errno;
+  if (!removed && error == EBUSY) {
+    notify("%s", toolbox_i18n::tr("payload.delete_running"));
+    return OnPressResult::Consumed;
+  }
+  const std::string message = toolbox_i18n::format(
+      removed ? "payload.deleted_fmt" : "payload.delete_failed_fmt",
+      entry.name.c_str());
+  notify("%s", message.c_str());
+  struct stat remaining {};
+  if (removed || (lstat(entry.shellui_path.c_str(), &remaining) != 0 &&
+                  errno == ENOENT))
+    toolbox_pop_page();
+  return OnPressResult::Consumed;
+}
+
 static const OnPressPrefixEntry kPrefix[] = {
+    {kDeletePrefix, delete_payload},
     {kPriorityPrefix, +[](OnPressContext &ctx) {
        return set_payload_schedule(ctx, true);
      }},

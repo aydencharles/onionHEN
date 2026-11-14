@@ -13,5 +13,7 @@ std::string publish(const ps5ui::Node &model, PageSource source);
 void bind(MonoObject *page);
 void refresh(MonoObject *page);
 void release(MonoObject *page);
+bool reset_element(MonoObject *page, const std::string &id);
+bool set_enabled(MonoObject *element, bool enabled);
 
 } // namespace onion::shellui::settings

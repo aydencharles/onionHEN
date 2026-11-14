@@ -111,6 +111,49 @@ bool onion_payload_running(const char *title_id) {
   return true;
 }
 
+bool onion_payload_remove(const char *path) {
+  char identity[ONION_PAYLOAD_IDENTITY_SIZE], pid_path[256];
+  const char *base = path ? strrchr(path, '/') : NULL;
+  if (!base || path[0] != '/' || strlen(path) >= ONION_PAYLOAD_PATH_SIZE ||
+      strlen(base + 1) <= ONION_ELF_SUFFIX_LEN ||
+      !onion_elf_name_has_suffix(base + 1, strlen(base + 1)) ||
+      strchr(base + 1, '\\') || strstr(path, "/../") || strstr(path, "/./") ||
+      strstr(path, "//") ||
+      !onion_payload_identity_from_path(path, identity, sizeof(identity))) {
+    errno = EINVAL;
+    return false;
+  }
+  struct stat st;
+  if (lstat(path, &st) != 0)
+    return false;
+  if (!S_ISREG(st.st_mode)) {
+    errno = EINVAL;
+    return false;
+  }
+  onion_payload_pid_path(pid_path, sizeof(pid_path), identity);
+  const pid_t pid = onion_payload_read_pid_file(pid_path);
+  if (pid > 1 && onion_proc_is_alive(pid)) {
+    errno = EBUSY;
+    return false;
+  }
+  if (unlink(path) != 0)
+    return false;
+
+  int error = 0;
+  const char *suffixes[] = {".auto_start", ".json"};
+  for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); ++i) {
+    char sidecar[ONION_PAYLOAD_PATH_SIZE + 12];
+    snprintf(sidecar, sizeof(sidecar), "%s%s", path, suffixes[i]);
+    // A valid ELF basename may leave no room for a sidecar suffix.
+    if (unlink(sidecar) != 0 && errno != ENOENT && errno != ENAMETOOLONG && !error)
+      error = errno;
+  }
+  if (unlink(pid_path) != 0 && errno != ENOENT && !error)
+    error = errno;
+  errno = error;
+  return error == 0;
+}
+
 static bool valid_payload_key(const char *title_id) {
   return title_id && title_id[0] && strcmp(title_id, ".") != 0 &&
          strcmp(title_id, "..") != 0 && strlen(title_id) < 64 &&

@@ -145,6 +145,7 @@ TEST_CXX_SRCS := \
 	test_ps5_settings_ui.cpp \
 	test_toolbox_route.cpp \
 	test_usb_payload_importer.cpp \
+	test_usb_storage.cpp \
 	test_onpress_policy.cpp \
 	test_toolbox_helpers.cpp \
   test_toolbox_i18n.cpp \
@@ -197,6 +198,7 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/settings_page_update.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/usb_payload_importer.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/usb_storage.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
@@ -223,12 +225,29 @@ ALL_OBJS := $(PROD_C_OBJS) $(CHEAT_SUPPORT_OBJS) $(PROD_CXX_OBJS) $(TEST_C_OBJS)
 THIRD_PARTY_FLAGS := -Wno-error -Wno-unused-function -Wno-sign-compare \
 	-Wno-unused-parameter -Wno-missing-field-initializers
 
-.PHONY: all test clean
+.PHONY: all test test-usb-payloads clean
 
 all: $(BIN)
 
 test: $(BIN)
 	cd $(CURDIR) && ONION_TEST_ROOT=$(CURDIR) $(BIN)
+
+USB_TEST_BIN := $(BUILD_DIR)/onion-usb-payload-tests
+USB_TEST_OBJS := $(BUILD_DIR)/tests/test_harness.o \
+	$(BUILD_DIR)/tests/test_usb_payload_importer_main.o \
+	$(BUILD_DIR)/tests/test_usb_storage.o \
+	$(BUILD_DIR)/prod/shellui/usb_payload_importer.o \
+	$(BUILD_DIR)/prod/shellui/usb_storage.o
+
+test-usb-payloads: $(USB_TEST_BIN)
+	$(USB_TEST_BIN)
+
+$(USB_TEST_BIN): $(USB_TEST_OBJS)
+	$(HOST_CXX) -o $@ $^
+
+$(BUILD_DIR)/tests/test_usb_payload_importer_main.o: test_usb_payload_importer.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -DONION_USB_PAYLOAD_TEST_MAIN -c -o $@ $<
 
 $(BIN): $(ALL_OBJS) | $(BUILD_DIR)
 	$(HOST_CXX) -o $@ $^ $(LDFLAGS)
@@ -289,7 +308,12 @@ $(BUILD_DIR)/prod/shellui/toolbox_route.o: $(REPO_ROOT)/source/shellui/src/toolb
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/prod/shellui/usb_payload_importer.o: $(REPO_ROOT)/source/shellui/src/usb_payload_importer.cpp | $(BUILD_DIR)
+$(BUILD_DIR)/prod/shellui/usb_payload_importer.o: $(REPO_ROOT)/source/shellui/src/usb_payload_importer.cpp usb_payload_test_io.hpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -DONION_USB_PAYLOAD_TEST_IO \
+		-include $(CURDIR)/usb_payload_test_io.hpp -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/usb_storage.o: $(REPO_ROOT)/source/shellui/src/usb_storage.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

@@ -8,6 +8,7 @@
 #include "external_symbols.hpp"
 #include "ipc.hpp"
 #include "onpress_policy.hpp"
+#include "onpress.hpp"
 #include "progress_dialog.hpp"
 #include "plugin_progress.hpp"
 #include "remote_play.hpp"
@@ -116,5 +117,7 @@ int OnPreCreate_Hook(MonoObject *Instance, MonoObject *element) {
     }
   }
 
-  return call_original(Instance, element);
+  const int result = call_original(Instance, element);
+  bind_payload_delete_control(element, id);
+  return result;
 }

@@ -190,29 +190,14 @@ OnionHEN/
 - 操作偏好（工具箱语言、手柄快捷键）
 - 高级调试 / 关于
 
-The Toolbox USB Payloads page scans ELF files at the root of each USB device
-using the access path returned by the native USB service. It imports them into
-`/user/data/OnionHEN/payloads`. Each import uses a unique staging file in the
-destination directory. A new payload is installed without overwriting a file
-created concurrently: after the USB copy is staged and synced, its contents are
-copied into a destination opened with `O_CREAT | O_EXCL | O_NOFOLLOW`. This
-avoids hard links, which cannot be relied on for PS5 storage. A failed install
-removes its partial destination and staging file. The new destination is visible
-during this local copy; installation is reported complete only after syncing
-and closing it. Replacing an installed payload requires confirmation and uses
-`rename()` to publish the fully staged copy.
-
-USB access follows the native Package Installer's scoped read lifecycle through
-the managed `Sce.Vsh.AutoMounterWrapper` class. Each scan enumerates device IDs,
-requests access with `requestUsbMap(deviceId, "/", 1, 0, ...)`, reads the returned
-directory, and releases that access with `requestUsbUnmap(deviceId, "/")`.
-The ShellCore mount path identifies the USB index; device IDs are opaque tokens.
-The page does not depend on `/usbN` remaining accessible after another page
-finishes its work. Import obtains a fresh access scope and keeps it until the
-source copy completes, because the scan's access has already been released.
-The adapter uses ShellUI's existing Mono assembly loader rather than resolving
-or loading a separate native USB module. It does not initialize or terminate
-the shared USB service, or mount or unmount the physical filesystem.
+USB Payloads uses `Sce.Vsh.AutoMounterWrapper`, following the native Package
+Installer: `requestUsbMap(deviceId, "/", 1, 0, ...)`, read the returned root,
+then `requestUsbUnmap(deviceId, "/")`. Scans and imports obtain separate access
+scopes; import keeps access until the copy to `/user/data/OnionHEN/payloads`
+finishes. New imports copy staged data into an exclusively created destination
+instead of using hard links, with partial-file cleanup on handled failures.
+The destination is visible during this copy. Replacement requires confirmation
+and publishes the staged copy with `rename()`.
 
 Remote Play 由 `remote_play.cpp` 负责：通过 `libSceRemoteplay.sprx` 解析
 原生 `sceRemoteplay*` API，启用 Remote Play 注册表设置，生成 PIN，并在后台

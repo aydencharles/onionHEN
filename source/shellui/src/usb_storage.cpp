@@ -1,102 +1,15 @@
 #include "usb_storage.hpp"
-
-#include <array>
-#include <cerrno>
-#include <utility>
-
-#ifndef ONION_HOST_TEST
 #include "external_symbols.hpp"
 #include "hooked_funcs.hpp"
 #include <onion/platform.h>
-#endif
+
+#include <cerrno>
+#include <utility>
 
 namespace onion::shellui::usb_storage {
 namespace {
 
-constexpr const char *kDirectory = "/";
-constexpr int kReadLock = 1;
-constexpr std::uint64_t kOptions = 0;
-constexpr std::size_t kDeviceLimit = 8;
-
-bool usb_index(const std::string &path, unsigned &index) {
-  constexpr std::size_t prefix_length = 8;
-  if (path.size() != prefix_length + 1 || path.compare(0, prefix_length, "/mnt/usb") != 0 ||
-      path.back() < '0' || path.back() > '7')
-    return false;
-  index = static_cast<unsigned>(path.back() - '0');
-  return true;
-}
-
-bool valid_mapped_path(const std::string &path) {
-  return path.size() > 1 && path.size() < 128 && path.front() == '/' &&
-         path.back() != '/' && path.find('\0') == std::string::npos &&
-         path.find("//") == std::string::npos &&
-         path.find("/../") == std::string::npos &&
-         path.find("/./") == std::string::npos &&
-         !path.ends_with("/..") && !path.ends_with("/.");
-}
-
-class ScopedUnmap {
-public:
-  ScopedUnmap(const Api &api, std::uint32_t id) : api_(api), id_(id) {}
-  ~ScopedUnmap() { if (active_) (void)api_.unmap(id_, kDirectory); }
-  int finish(int result) {
-    active_ = false;
-    const int released = api_.unmap(id_, kDirectory);
-    return result < 0 ? result : (released < 0 ? released : 0);
-  }
-private:
-  const Api &api_;
-  std::uint32_t id_;
-  bool active_ = true;
-};
-
-} // namespace
-
-Reader::Reader(Api api) : api_(std::move(api)) {}
-
-int Reader::list_devices(std::vector<Device> &devices) const {
-  devices.clear();
-  if (!api_.devices)
-    return -ENOSYS;
-  std::array<std::uint32_t, kDeviceLimit> ids {};
-  int count = 0;
-  const int result = api_.devices(ids.data(), &count);
-  if (result < 0)
-    return result;
-  if (count < 0 || count > static_cast<int>(ids.size()))
-    return -EOVERFLOW;
-  for (int i = 0; i < count; ++i)
-    devices.push_back({ids[static_cast<std::size_t>(i)]});
-  return 0;
-}
-
-int Reader::with_device(const Device &device,
-                        const std::function<void(const Mapping &)> &read) const {
-  if (!api_.map || !api_.mount_point || !api_.unmap || !read)
-    return -EINVAL;
-  std::string path;
-  std::uint64_t features = 0;
-  const int acquired = api_.map(device.id, kDirectory, kReadLock, kOptions,
-                                path, features);
-  if (acquired < 0)
-    return acquired;
-  ScopedUnmap scope(api_, device.id);
-  if (!valid_mapped_path(path))
-    return scope.finish(-EINVAL);
-  std::string system_mount;
-  const int queried = api_.mount_point(device.id, system_mount);
-  if (queried < 0 || system_mount.empty())
-    system_mount = "/mnt" + path;
-  unsigned index = 0;
-  if (!usb_index(system_mount, index))
-    return scope.finish(-EINVAL);
-  read({device, index, std::move(system_mount), std::move(path)});
-  return scope.finish(0);
-}
-
-#ifndef ONION_HOST_TEST
-namespace {
+constexpr unsigned kDeviceLimit = 8;
 
 class Pinned {
 public:
@@ -179,91 +92,80 @@ int invoke(MonoMethod *method, void **arguments, const char *operation) {
   return result;
 }
 
-int device_list(std::uint32_t *ids, int *count) {
-  MonoArray *array = mono_array_new(Root_Domain, managed.uint32_class, kDeviceLimit);
-  Pinned pinned(reinterpret_cast<MonoObject *>(array));
-  if (!pinned.get())
-    return -ENOMEM;
-  int actual = 0;
-  void *arguments[] = {array, &actual};
-  const int result = invoke(managed.devices, arguments, "getUsbDeviceList");
-  if (result < 0)
-    return result;
-  if (actual < 0 || actual > static_cast<int>(kDeviceLimit))
-    return -EOVERFLOW;
-  for (int i = 0; i < actual; ++i) {
-    const char *element = mono_array_addr_with_size(array, sizeof(std::uint32_t), i);
-    if (!element)
-      return -EIO;
-    std::uint32_t id;
-    __builtin_memcpy(&id, element, sizeof(id));
-    ids[i] = id;
+// Keep the directory string pinned until the matching unmap completes.
+struct ScopedAccess {
+  Device id;
+  MonoString *directory;
+  ~ScopedAccess() {
+    void *arguments[] = {&id, directory};
+    invoke(managed.unmap, arguments, "requestUsbUnmap");
   }
-  *count = actual;
-  return result;
-}
-
-int map_device(std::uint32_t id, const char *directory, int lock,
-                std::uint64_t options, std::string &path, std::uint64_t &features) {
-  MonoString *text = mono_string_new(Root_Domain, directory);
-  Pinned pinned(reinterpret_cast<MonoObject *>(text));
-  if (!pinned.get())
-    return -ENOMEM;
-  MonoString *mapped = nullptr;
-  void *arguments[] = {&id, text, &lock, &options, &mapped, &features};
-  const int result = invoke(managed.map, arguments, "requestUsbMap");
-  if (result >= 0 && mapped) {
-    Pinned output(reinterpret_cast<MonoObject *>(mapped));
-    if (output.get())
-      path = Mono_to_String(mapped);
-  }
-  // Preserve successful acquisition even if the path could not be copied:
-  // Reader must release the mapping it now owns.
-  return result;
-}
-
-int mount_point(std::uint32_t id, std::string &path) {
-  MonoString *value = nullptr;
-  void *arguments[] = {&id, &value};
-  const int result = invoke(managed.mount_point, arguments, "getUsbMountPointOfShellCore");
-  if (result >= 0 && value) {
-    Pinned output(reinterpret_cast<MonoObject *>(value));
-    if (output.get())
-      path = Mono_to_String(value);
-  }
-  return result;
-}
-
-int unmap_device(std::uint32_t id, const char *directory) {
-  MonoString *text = mono_string_new(Root_Domain, directory);
-  Pinned pinned(reinterpret_cast<MonoObject *>(text));
-  if (!pinned.get())
-    return -ENOMEM;
-  void *arguments[] = {&id, text};
-  return invoke(managed.unmap, arguments, "requestUsbUnmap");
-}
-
-Api production_api() {
-  return {device_list, map_device, mount_point, unmap_device};
-}
+};
 
 } // namespace
 
 int list_devices(std::vector<Device> &devices) {
   devices.clear();
-  if (!bind_managed_api()) {
-    LOG_WARN("USB storage: native Package Installer Mono API unavailable");
-    return -ENOSYS;
-  }
-  return Reader(production_api()).list_devices(devices);
-}
-
-int with_device(const Device &device,
-                const std::function<void(const Mapping &)> &read) {
   if (!bind_managed_api())
     return -ENOSYS;
-  return Reader(production_api()).with_device(device, read);
+  MonoArray *array = mono_array_new(Root_Domain, managed.uint32_class, kDeviceLimit);
+  Pinned pinned(reinterpret_cast<MonoObject *>(array));
+  if (!pinned.get())
+    return -ENOMEM;
+  int count = 0;
+  void *arguments[] = {array, &count};
+  const int result = invoke(managed.devices, arguments, "getUsbDeviceList");
+  if (result < 0)
+    return result;
+  if (count < 0 || count > static_cast<int>(kDeviceLimit))
+    return -EOVERFLOW;
+  for (int i = 0; i < count; ++i) {
+    const char *element = mono_array_addr_with_size(array, sizeof(Device), i);
+    if (!element) {
+      devices.clear();
+      return -EIO;
+    }
+    Device id;
+    __builtin_memcpy(&id, element, sizeof(id));
+    devices.push_back(id);
+  }
+  return 0;
 }
-#endif
+
+void with_device(Device id, const std::function<void(const Mapping &)> &read) {
+  if (!read || !bind_managed_api())
+    return;
+  MonoString *directory = mono_string_new(Root_Domain, "/");
+  Pinned pinned(reinterpret_cast<MonoObject *>(directory));
+  if (!pinned.get())
+    return;
+  int lock = 1;
+  std::uint64_t options = 0, features = 0;
+  MonoString *mapped = nullptr;
+  void *map_args[] = {&id, directory, &lock, &options, &mapped, &features};
+  if (invoke(managed.map, map_args, "requestUsbMap") < 0)
+    return;
+  ScopedAccess access{id, directory};
+  Pinned mapped_root(reinterpret_cast<MonoObject *>(mapped));
+  if (!mapped_root.get())
+    return;
+  std::string path = Mono_to_String(mapped);
+  if (path.size() <= 1 || path.size() >= 128 || path.front() != '/' ||
+      path.back() == '/' || path.find('\0') != std::string::npos ||
+      path.find("//") != std::string::npos || path.find("/../") != std::string::npos ||
+      path.find("/./") != std::string::npos || path.ends_with("/..") || path.ends_with("/."))
+    return;
+  MonoString *global = nullptr;
+  void *point_args[] = {&id, &global};
+  const int result = invoke(managed.mount_point, point_args, "getUsbMountPointOfShellCore");
+  Pinned global_root(reinterpret_cast<MonoObject *>(global));
+  std::string system_path = result >= 0 && global_root.get() ? Mono_to_String(global) : "";
+  if (system_path.empty())
+    system_path = "/mnt" + path;
+  if (system_path.size() != 9 || system_path.compare(0, 8, "/mnt/usb") != 0 ||
+      system_path.back() < '0' || system_path.back() > '7')
+    return;
+  read({static_cast<unsigned>(system_path.back() - '0'), std::move(path)});
+}
 
 } // namespace onion::shellui::usb_storage

@@ -24,19 +24,9 @@ make clean && make test
 
 Binary: `source/util/build/host-tests/onion-host-tests`
 
-The USB importer suite can also run independently without Keystone:
-
-```bash
-make -C source/util/tests test-usb-payloads
-```
-
-It rejects hard-link attempts and covers multi-buffer binary imports, concurrent
-destination creation, write/sync failure cleanup, replacement, and action IDs.
-The USB reader tests cover the native installer's scoped access lifecycle,
-fresh access after a previous scope has closed, failures, and USB path identity.
-The importer also verifies that files are read from the returned access
-directory even when a stale default USB directory remains empty. Host tests do
-not execute the managed Mono bindings or establish PS5 hardware compatibility.
+Run USB regressions without Keystone with
+`make -C source/util/tests test-usb-payloads`.
+These cover imports without hard links and reading the native USB access directory.
 
 ## Coverage
 

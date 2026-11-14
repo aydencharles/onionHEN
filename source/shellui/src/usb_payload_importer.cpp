@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
-#include <iterator>
+#include <utility>
 #include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -150,31 +150,6 @@ std::vector<Entry> scan_directory(const std::string &directory,
   closedir(dir);
   std::sort(entries.begin(), entries.end(), [](const Entry &a, const Entry &b) {
     return a.name < b.name;
-  });
-  return entries;
-}
-
-std::vector<Entry> scan(const std::string &usb_prefix,
-                        const std::string &destination, bool *device_found) {
-  std::vector<Entry> entries;
-  if (device_found)
-    *device_found = false;
-  for (unsigned index = 0; index < 8; ++index) {
-    bool opened = false;
-    auto device_entries = scan_directory(usb_prefix + std::to_string(index),
-                                          destination, index, &opened);
-    if (!opened && usb_prefix == kUsbPrefix)
-      device_entries = scan_directory("/mnt/usb" + std::to_string(index),
-                                        destination, index, &opened);
-    if (opened && device_found)
-      *device_found = true;
-    entries.insert(entries.end(),
-                   std::make_move_iterator(device_entries.begin()),
-                   std::make_move_iterator(device_entries.end()));
-  }
-  std::sort(entries.begin(), entries.end(), [](const Entry &a, const Entry &b) {
-    return a.usb_index != b.usb_index ? a.usb_index < b.usb_index
-                                      : a.name < b.name;
   });
   return entries;
 }

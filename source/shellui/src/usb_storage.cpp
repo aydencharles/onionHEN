@@ -39,11 +39,15 @@ ManagedApi managed;
 bool bind_managed_api() {
   if (managed.devices && managed.map && managed.mount_point && managed.unmap)
     return true;
+  // Optional at Toolbox startup; USB access needs paired GC handle operations.
+  if (!mono_gchandle_free) {
+    LOG_WARN("USB storage unavailable: mono_gchandle_free is missing");
+    return false;
+  }
   if (!Root_Domain || !mono_domain_assembly_open || !mono_assembly_get_image ||
       !mono_class_from_name || !mono_class_get_method_from_name ||
       !mono_runtime_invoke || !mono_object_unbox || !mono_array_new ||
-      !mono_array_addr_with_size || !mono_string_new || !mono_gchandle_new ||
-      !mono_gchandle_free)
+      !mono_array_addr_with_size || !mono_string_new || !mono_gchandle_new)
     return false;
   MonoImage *image = getDLLimage("Sce.Vsh.AutoMounterWrapper.dll");
   MonoImage *corlib = getDLLimage("mscorlib.dll");

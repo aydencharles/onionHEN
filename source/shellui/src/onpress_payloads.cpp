@@ -47,7 +47,7 @@ bool control_enabled(const std::string &value) {
 bool payload_busy(const PayloadEntry &entry) {
   std::lock_guard lock(launching_mutex);
   return launching_payloads.contains(entry.id) ||
-      onion_payload_running(entry.tid.c_str());
+      onion_payload_path_running(entry.shellui_path.c_str());
 }
 
 void *launch_payload(void *args) {
@@ -82,7 +82,9 @@ void start_payload(const PayloadEntry &entry) {
 
 void bind_payload_delete_control(MonoObject *element, const std::string &id) {
   const PayloadEntry *entry = payload_for_control(id, kDeletePrefix);
-  if (entry && !onion::shellui::settings::set_enabled(element, !payload_busy(*entry)))
+  if (entry && !onion::shellui::settings::set_enabled(
+                   element, toolbox::has_real_payload_directory(entry->shellui_path) &&
+                                !payload_busy(*entry)))
     LOG_ERROR("Failed to bind payload removal control");
 }
 
@@ -183,7 +185,8 @@ static OnPressResult set_payload_schedule(OnPressContext &ctx, bool priority) {
 static OnPressResult delete_payload(OnPressContext &ctx) {
   ctx.dirty = false;
   const PayloadEntry *found = payload_for_control(ctx.id, kDeletePrefix);
-  if (!found || !toolbox::is_installed_payload_path(found->shellui_path))
+  if (!found || !toolbox::is_installed_payload_path(found->shellui_path) ||
+      !toolbox::has_real_payload_directory(found->shellui_path))
     return OnPressResult::Consumed;
   const PayloadEntry entry = *found;
   if (payload_busy(entry)) {

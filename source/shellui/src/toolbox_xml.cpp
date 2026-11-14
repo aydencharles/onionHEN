@@ -361,6 +361,7 @@ void generate_payload_config_xml(std::string& xml_buffer,
                     std::to_string(found->config.delay_seconds));
     struct stat installed {};
     if (toolbox::is_installed_payload_path(found->shellui_path) &&
+        toolbox::has_real_payload_directory(found->shellui_path) &&
         lstat(found->shellui_path.c_str(), &installed) == 0 &&
         S_ISREG(installed.st_mode)) {
       page.button("id_payload_delete_" + found->id,

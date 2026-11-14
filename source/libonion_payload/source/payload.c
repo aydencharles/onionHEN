@@ -111,15 +111,37 @@ bool onion_payload_running(const char *title_id) {
   return true;
 }
 
+static size_t payload_pid_paths(const char *path, char paths[2][256]) {
+  char identity[ONION_PAYLOAD_IDENTITY_SIZE], basename_key[64];
+  if (!onion_payload_identity_from_path(path, identity, sizeof(identity)) ||
+      !onion_payload_elf_key_from_name(path, basename_key, sizeof(basename_key)))
+    return 0;
+  onion_payload_pid_path(paths[0], 256, identity);
+  if (strcmp(identity, basename_key) == 0)
+    return 1;
+  onion_payload_pid_path(paths[1], 256, basename_key);
+  return 2;
+}
+
+bool onion_payload_path_running(const char *path) {
+  char paths[2][256];
+  const size_t count = payload_pid_paths(path, paths);
+  for (size_t i = 0; i < count; ++i) {
+    const pid_t pid = onion_payload_read_pid_file(paths[i]);
+    if (pid > 1 && onion_proc_is_alive(pid))
+      return true;
+  }
+  return false;
+}
+
 bool onion_payload_remove(const char *path) {
-  char identity[ONION_PAYLOAD_IDENTITY_SIZE], pid_path[256];
+  char pid_paths[2][256];
   const char *base = path ? strrchr(path, '/') : NULL;
   if (!base || path[0] != '/' || strlen(path) >= ONION_PAYLOAD_PATH_SIZE ||
       strlen(base + 1) <= ONION_ELF_SUFFIX_LEN ||
       !onion_elf_name_has_suffix(base + 1, strlen(base + 1)) ||
       strchr(base + 1, '\\') || strstr(path, "/../") || strstr(path, "/./") ||
-      strstr(path, "//") ||
-      !onion_payload_identity_from_path(path, identity, sizeof(identity))) {
+      strstr(path, "//")) {
     errno = EINVAL;
     return false;
   }
@@ -130,11 +152,17 @@ bool onion_payload_remove(const char *path) {
     errno = EINVAL;
     return false;
   }
-  onion_payload_pid_path(pid_path, sizeof(pid_path), identity);
-  const pid_t pid = onion_payload_read_pid_file(pid_path);
-  if (pid > 1 && onion_proc_is_alive(pid)) {
-    errno = EBUSY;
+  const size_t pid_count = payload_pid_paths(path, pid_paths);
+  if (!pid_count) {
+    errno = EINVAL;
     return false;
+  }
+  for (size_t i = 0; i < pid_count; ++i) {
+    const pid_t pid = onion_payload_read_pid_file(pid_paths[i]);
+    if (pid > 1 && onion_proc_is_alive(pid)) {
+      errno = EBUSY;
+      return false;
+    }
   }
   if (unlink(path) != 0)
     return false;
@@ -148,8 +176,9 @@ bool onion_payload_remove(const char *path) {
     if (unlink(sidecar) != 0 && errno != ENOENT && errno != ENAMETOOLONG && !error)
       error = errno;
   }
-  if (unlink(pid_path) != 0 && errno != ENOENT && !error)
-    error = errno;
+  for (size_t i = 0; i < pid_count; ++i)
+    if (unlink(pid_paths[i]) != 0 && errno != ENOENT && !error)
+      error = errno;
   errno = error;
   return error == 0;
 }

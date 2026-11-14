@@ -36,6 +36,9 @@ void onion_payload_write_pid_file(const char *pid_path, pid_t pid);
  */
 bool onion_payload_running(const char *title_id);
 
+/** Check path-hash and default basename PID identities without removing records. */
+bool onion_payload_path_running(const char *path);
+
 /** Remove a stopped ELF and its sidecars; caller must restrict the installation root. */
 bool onion_payload_remove(const char *path);
 

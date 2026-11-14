@@ -1,6 +1,6 @@
 /* Copyright (C) 2025 OnionHEN / LightningMods
  *
- * Pure ShellUI helpers (host-testable, no Mono/PS5 I/O).
+ * Host-testable ShellUI helpers (no Mono or PS5-specific calls).
  */
 #pragma once
 
@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <sys/stat.h>
 
 namespace toolbox {
 
@@ -51,6 +52,20 @@ inline bool is_installed_payload_path(const std::string &path) {
   return (parent == "/data/OnionHEN/payloads" ||
           parent == "/data/onionhen/payloads") &&
          is_payload_elf_name(canonical.c_str() + slash + 1);
+}
+
+inline bool has_real_payload_directory(const std::string &path) {
+  const auto slash = path.find_last_of('/');
+  if (slash == std::string::npos)
+    return false;
+  const std::string directory = path.substr(0, slash);
+  const auto parent = directory.find_last_of('/');
+  if (parent == std::string::npos)
+    return false;
+  struct stat st {};
+  return lstat(directory.substr(0, parent).c_str(), &st) == 0 &&
+         S_ISDIR(st.st_mode) && lstat(directory.c_str(), &st) == 0 &&
+         S_ISDIR(st.st_mode);
 }
 
 /**

@@ -367,6 +367,7 @@ static int test_remove_preserves_running_payload(void) {
   onion_payload_write_pid_file(pid_path, 6262);
   onion_test_live_pid(6262);
 
+  TEST_ASSERT_TRUE(onion_payload_path_running(path));
   TEST_ASSERT_TRUE(!onion_payload_remove(path));
   TEST_ASSERT_EQ_INT(EBUSY, errno);
   TEST_ASSERT_EQ_INT(0, access(path, F_OK));
@@ -375,6 +376,46 @@ static int test_remove_preserves_running_payload(void) {
   TEST_ASSERT_EQ_INT(6262, onion_payload_read_pid_file(pid_path));
   onion_test_elfldr_reset();
   TEST_ASSERT_TRUE(onion_payload_remove(path));
+  return 0;
+}
+
+static int test_remove_after_default_launch(void) {
+  char path[256], marker[300], config[300], legacy_pid[256], hashed_pid[256];
+  char key[64], identity[ONION_PAYLOAD_IDENTITY_SIZE];
+  const unsigned char elf[] = {0x7f, 'E', 'L', 'F', 2, 1, 1, 0};
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_file(".elf", elf, sizeof(elf),
+                                                  path, sizeof(path)));
+  snprintf(marker, sizeof(marker), "%s.auto_start", path);
+  snprintf(config, sizeof(config), "%s.json", path);
+  TEST_ASSERT_EQ_INT(0, write_marker(marker));
+  TEST_ASSERT_EQ_INT(0, write_marker(config));
+  TEST_ASSERT_TRUE(onion_payload_elf_key_from_name(path, key, sizeof(key)));
+  TEST_ASSERT_TRUE(onion_payload_identity_from_path(path, identity, sizeof(identity)));
+  onion_payload_pid_path(legacy_pid, sizeof(legacy_pid), key);
+  onion_payload_pid_path(hashed_pid, sizeof(hashed_pid), identity);
+
+  onion_test_elfldr_reset();
+  onion_test_elfldr_configure(true, 5151);
+  TEST_ASSERT_TRUE(onion_payload_load(path, NULL));
+  onion_payload_write_pid_file(hashed_pid, 4242);
+  onion_test_live_pid(5151);
+  TEST_ASSERT_TRUE(onion_payload_path_running(path));
+  TEST_ASSERT_TRUE(!onion_payload_remove(path));
+  TEST_ASSERT_EQ_INT(EBUSY, errno);
+  TEST_ASSERT_EQ_INT(0, access(path, F_OK));
+  TEST_ASSERT_EQ_INT(0, access(marker, F_OK));
+  TEST_ASSERT_EQ_INT(0, access(config, F_OK));
+  TEST_ASSERT_EQ_INT(5151, onion_payload_read_pid_file(legacy_pid));
+  TEST_ASSERT_EQ_INT(4242, onion_payload_read_pid_file(hashed_pid));
+
+  onion_test_elfldr_reset();
+  TEST_ASSERT_TRUE(!onion_payload_path_running(path));
+  TEST_ASSERT_EQ_INT(5151, onion_payload_read_pid_file(legacy_pid));
+  TEST_ASSERT_EQ_INT(4242, onion_payload_read_pid_file(hashed_pid));
+  TEST_ASSERT_TRUE(onion_payload_remove(path));
+  TEST_ASSERT_TRUE(access(path, F_OK) != 0 && access(marker, F_OK) != 0 &&
+                   access(config, F_OK) != 0 && access(legacy_pid, F_OK) != 0 &&
+                   access(hashed_pid, F_OK) != 0);
   return 0;
 }
 
@@ -421,6 +462,7 @@ int test_payload_suite(void) {
   failures += onion_test_run("payload.remove_long_basename", test_remove_long_basename);
   failures += onion_test_run("payload.remove_invalid_targets", test_remove_rejects_invalid_targets);
   failures += onion_test_run("payload.remove_running", test_remove_preserves_running_payload);
+  failures += onion_test_run("payload.remove_after_default_launch", test_remove_after_default_launch);
   failures += onion_test_run("payload.remove_sidecar_failure", test_remove_reports_sidecar_failure);
   return failures;
 }

@@ -2,6 +2,7 @@
 #include "usb_payload_action.hpp"
 #include "usb_payload_importer.hpp"
 
+#include <cerrno>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -13,12 +14,15 @@ using namespace onion::shellui::usb_payloads;
 
 namespace {
 
+int link_calls = 0;
+
 struct Fixture {
   std::string root;
   std::string usb_prefix;
   std::string destination;
 
   Fixture() {
+    link_calls = 0;
     char path[] = "/tmp/onion-usb-payloads-XXXXXX";
     char *created = mkdtemp(path);
     if (created) {
@@ -29,6 +33,7 @@ struct Fixture {
     }
   }
   ~Fixture() {
+    link_calls = 0;
     if (!root.empty())
       fs::remove_all(root);
   }
@@ -38,6 +43,24 @@ std::string contents(const std::string &path) {
   std::ifstream file(path, std::ios::binary);
   return {std::istreambuf_iterator<char>(file),
           std::istreambuf_iterator<char>()};
+}
+
+int test_import_without_hard_links() {
+  Fixture f;
+  TEST_ASSERT_TRUE(!f.root.empty());
+  fs::create_directory(f.usb_prefix + "1");
+  const Entry entry{"kraken-mount.elf", f.usb_prefix + "1/kraken-mount.elf",
+                    0, 1, false};
+  std::string payload(4 * 1024 * 1024 + 13, 'K');
+  payload.replace(0, 4, "\x7f" "ELF");
+  payload[65536] = '\0';
+  std::ofstream(entry.source_path, std::ios::binary) << payload;
+
+  TEST_ASSERT_TRUE(import_payload(entry, f.destination, false) ==
+                   ImportResult::Completed);
+  TEST_ASSERT_TRUE(contents(f.destination + "/kraken-mount.elf") == payload);
+  TEST_ASSERT_EQ_INT(0, link_calls);
+  return 0;
 }
 
 int test_action_identity_after_reorder() {
@@ -94,11 +117,11 @@ int test_scan_and_import() {
   Fixture f;
   TEST_ASSERT_TRUE(!f.root.empty());
   bool found = true;
-  auto entries = scan(f.usb_prefix, f.destination, &found);
+  auto entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
   TEST_ASSERT_TRUE(!found && entries.empty());
 
   fs::create_directory(f.usb_prefix + "1");
-  entries = scan(f.usb_prefix, f.destination, &found);
+  entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
   TEST_ASSERT_TRUE(found && entries.empty());
   std::ofstream(f.usb_prefix + "1/payload.ELF", std::ios::binary)
       << "new payload";
@@ -107,7 +130,7 @@ int test_scan_and_import() {
   fs::create_directory(f.usb_prefix + "1/folder.elf");
   symlink((f.usb_prefix + "1/payload.ELF").c_str(),
           (f.usb_prefix + "1/link.elf").c_str());
-  entries = scan(f.usb_prefix, f.destination, &found);
+  entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
   TEST_ASSERT_TRUE(found && entries.size() == 1);
   TEST_ASSERT_TRUE(entries[0].usb_index == 1);
   TEST_ASSERT_TRUE(entries[0].name == "payload.ELF");
@@ -120,7 +143,7 @@ int test_scan_and_import() {
   TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf") == "new payload");
   TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf.installing") ==
                    "stale");
-  entries = scan(f.usb_prefix, f.destination, &found);
+  entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
   TEST_ASSERT_TRUE(entries.size() == 1 && entries[0].installed);
   TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, false) ==
                    ImportResult::DestinationAlreadyExists);
@@ -151,7 +174,7 @@ int test_scan_and_import() {
 
   const std::string long_name(251, 'a');
   std::ofstream(f.usb_prefix + "1/" + long_name + ".ELF") << "long payload";
-  entries = scan(f.usb_prefix, f.destination, &found);
+  entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
   TEST_ASSERT_TRUE(entries.size() == 2);
   const Entry long_entry = entries[0].name == long_name + ".ELF"
                                ? entries[0]
@@ -175,26 +198,64 @@ int test_scan_and_import() {
 
   fs::create_directory(f.usb_prefix + "0");
   std::ofstream(f.usb_prefix + "0/other.elf") << "other";
-  entries = scan(f.usb_prefix, f.destination, &found);
-  TEST_ASSERT_TRUE(entries.size() == 1 && entries[0].usb_index == 0);
+  entries = scan_directory(f.usb_prefix + "0", f.destination, 0, &found);
+  TEST_ASSERT_TRUE(found && entries.size() == 1 && entries[0].usb_index == 0);
   std::ofstream(f.usb_prefix + "1/second.elf") << "second";
-  entries = scan(f.usb_prefix, f.destination, &found);
-  TEST_ASSERT_TRUE(entries.size() == 2);
-  TEST_ASSERT_TRUE(entries[0].usb_index == 0 && entries[1].usb_index == 1);
+  entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
+  TEST_ASSERT_TRUE(found && entries.size() == 1 && entries[0].usb_index == 1);
   fs::remove_all(f.usb_prefix + "0");
   fs::remove_all(f.usb_prefix + "1");
-  entries = scan(f.usb_prefix, f.destination, &found);
+  entries = scan_directory(f.usb_prefix + "1", f.destination, 1, &found);
   TEST_ASSERT_TRUE(!found && entries.empty());
+  return 0;
+}
+
+int test_native_access_directory() {
+  Fixture f;
+  TEST_ASSERT_TRUE(!f.root.empty());
+  fs::create_directory(f.usb_prefix + "1");
+  const std::string native_view = f.root + "/native-reader-view";
+  fs::create_directory(native_view);
+  std::ofstream(native_view + "/payload.elf") << "native USB contents";
+  bool opened = false;
+  const auto stale_view =
+      scan_directory(f.usb_prefix + "1", f.destination, 1, &opened);
+  TEST_ASSERT_TRUE(opened && stale_view.empty());
+  auto entries = scan_directory(native_view, f.destination, 1, &opened);
+  TEST_ASSERT_TRUE(opened && entries.size() == 1);
+  TEST_ASSERT_EQ_INT(1, entries[0].usb_index);
+  TEST_ASSERT_TRUE(entries[0].source_path == native_view + "/payload.elf");
+  TEST_ASSERT_TRUE(import_payload(entries[0], f.destination, false) ==
+                   ImportResult::Completed);
+  TEST_ASSERT_TRUE(contents(f.destination + "/payload.elf") ==
+                   "native USB contents");
+
   return 0;
 }
 
 } // namespace
 
+extern "C" int onion_test_usb_link(const char *, const char *) {
+  ++link_calls;
+  errno = EOPNOTSUPP;
+  return -1;
+}
+
 extern "C" int test_usb_payload_importer_suite(void) {
   int failures = 0;
+  failures += onion_test_run("usb_payloads.import_without_hard_links",
+                             test_import_without_hard_links);
   failures += onion_test_run("usb_payloads.action_identity_after_reorder",
                              test_action_identity_after_reorder);
   failures += onion_test_run("usb_payloads.scan_import_replace",
                              test_scan_and_import);
+  failures += onion_test_run("usb_payloads.native_access_directory",
+                             test_native_access_directory);
   return failures;
 }
+
+#ifdef ONION_USB_PAYLOAD_TEST_MAIN
+int main() {
+  return test_usb_payload_importer_suite();
+}
+#endif

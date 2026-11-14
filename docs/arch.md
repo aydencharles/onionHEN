@@ -190,11 +190,14 @@ OnionHEN/
 - 操作偏好（工具箱语言、手柄快捷键）
 - 高级调试 / 关于
 
-The Toolbox USB Payloads page scans ELF files at the root of `/usb0` through
-`/usb7` (falling back to `/mnt/usb0` through `/mnt/usb7`). It imports them into
-`/user/data/OnionHEN/payloads`. Each import uses a unique staging file in the
-destination directory. A new payload is installed without overwriting a file
-created concurrently; replacing an installed payload requires confirmation.
+USB Payloads uses `Sce.Vsh.AutoMounterWrapper`, following the native Package
+Installer: `requestUsbMap(deviceId, "/", 1, 0, ...)`, read the returned root,
+then `requestUsbUnmap(deviceId, "/")`. Scans and imports obtain separate access
+scopes; import keeps access until the copy to `/user/data/OnionHEN/payloads`
+finishes. New imports copy staged data into an exclusively created destination
+instead of using hard links, with partial-file cleanup on handled failures.
+The destination is visible during this copy. Replacement requires confirmation
+and publishes the staged copy with `rename()`.
 
 Remote Play 由 `remote_play.cpp` 负责：通过 `libSceRemoteplay.sprx` 解析
 原生 `sceRemoteplay*` API，启用 Remote Play 注册表设置，生成 PIN，并在后台

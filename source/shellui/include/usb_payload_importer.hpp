@@ -25,12 +25,13 @@ enum class ImportResult {
   RenameError,
 };
 
-// Access paths are ShellUI mounts. The UI displays /mnt/usbX and /data/… .
-inline constexpr const char *kUsbPrefix = "/usb";
+// ShellUI path for installed payloads.
 inline constexpr const char *kDestination = "/user/data/OnionHEN/payloads";
 
-std::vector<Entry> scan(const std::string &usb_prefix,
-                        const std::string &destination, bool *device_found);
+// Scan only the directory returned by the native USB access request.
+std::vector<Entry> scan_directory(const std::string &directory,
+                                  const std::string &destination,
+                                  unsigned usb_index, bool *opened = nullptr);
 ImportResult import_payload(const Entry &entry, const std::string &destination,
                             bool replace);
 

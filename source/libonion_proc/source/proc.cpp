@@ -147,8 +147,14 @@ module_info_t* get_module_info(pid_t pid, const char* module_name)
 
 int get_module_handle(pid_t pid, const char* module_name)
 {
-    module_info_t* mod_info = get_module_info(pid, module_name);
-    return mod_info ? mod_info->handle : 0; 
+    if (!module_name || !*module_name)
+        return 0;
+
+    // Kernel lookup does not require process-wide debugger credentials.
+    uint32_t handle = 0;
+    if (kernel_dynlib_handle(pid, module_name, &handle) != 0)
+        return 0;
+    return static_cast<int>(handle);
 }
 
 

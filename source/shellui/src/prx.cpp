@@ -26,7 +26,6 @@ along with this program; see the file COPYING. If not, see
 #include "proc.h"
 #include "ps5/kernel.h"
 #include "toolbox_i18n.hpp"
-#include "ucred.h"
 #include "webserver.hpp"
 
 #include <onion/notify.h>
@@ -108,26 +107,6 @@ constexpr unsigned kKeepAliveSleepSec = 0x100000;
 
 // XOR key material used for version string + toolbox XML (base64 of "SISTR0_I_SEE_YOU").
 constexpr const char* kXorKeyB64 = "U0lTVFIwX0lfU0VFX1lPVQ==";
-
-// ---------------------------------------------------------------------------
-// RAII: restore process authid on every exit path
-// ---------------------------------------------------------------------------
-
-struct AuthIdGuard {
-  pid_t pid;
-  uintptr_t old_authid;
-  bool active = true;
-
-  AuthIdGuard(pid_t p, uintptr_t auth) : pid(p), old_authid(auth) {}
-  ~AuthIdGuard() {
-    if (active)
-      set_proc_authid(pid, old_authid);
-  }
-  void release() { active = false; }
-
-  AuthIdGuard(const AuthIdGuard&) = delete;
-  AuthIdGuard& operator=(const AuthIdGuard&) = delete;
-};
 
 // ---------------------------------------------------------------------------
 // Detour helpers
@@ -758,7 +737,6 @@ int main(int argc, char const* argv[]) {
     return 0;
 
   const pid_t pid = getpid();
-  AuthIdGuard auth(pid, set_ucred_to_ptrace());
 
   if (!resolve_native_symbols(pid))
     return -1;
@@ -818,14 +796,9 @@ int main(int argc, char const* argv[]) {
 
   LOG_DEBUG("Performing Magic ....");
 
-  // Drop elevated auth before long-running work
-  set_proc_authid(pid, auth.old_authid);
-  auth.release();
-
   LOG_DEBUG("Performed Magic");
   setup_proc_hooks();
 
-  /* SystemService cannot be queried under PTRACE_AUTHID. */
   toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
 
   shellui_hooks_publish_ready();

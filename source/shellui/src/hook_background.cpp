@@ -19,6 +19,5 @@ void *load_payload_thread(void *args) {
   }
 
   delete entry;
-  pthread_exit(nullptr);
   return nullptr;
 }

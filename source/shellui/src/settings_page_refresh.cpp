@@ -282,4 +282,17 @@ void release(MonoObject *page) {
   pages.erase(page);
 }
 
+bool reset_element(MonoObject *page, const std::string &id) {
+  Pinned name(text(id));
+  void *args[] = {name.get()};
+  return page && name.get() &&
+      success_code(string_overload("ResetElement"), page, args);
+}
+
+bool set_enabled(MonoObject *element, bool enabled) {
+  void *args[] = {&enabled};
+  return element &&
+      invoke(method("SettingElement", "set_Enabled", 1), element, args);
+}
+
 } // namespace onion::shellui::settings

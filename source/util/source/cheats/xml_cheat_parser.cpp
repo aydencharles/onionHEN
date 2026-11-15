@@ -34,7 +34,9 @@ const char *findXmlTagValue(const char *start, const char *tag, char *out,
 
   size_t len = static_cast<size_t>(close - open);
   if (len >= out_size) {
-    len = out_size - 1;
+    LOG_WARN("[engine] parse_xml tag value too long tag=%s", tag);
+    out[0] = '\0';
+    return nullptr;
   }
   std::memcpy(out, open, len);
   out[len] = '\0';
@@ -152,8 +154,8 @@ int parseXmlMutating(char *xml, onion_cheat_file_t &out) {
       const char *line_end = std::strstr(line_cursor, "</Cheatline>");
       char offset[64];
       char section[32];
-      char on[512];
-      char off[512];
+      char on[ONION_MAX_PATCH_BYTES * 3 + 1];
+      char off[ONION_MAX_PATCH_BYTES * 3 + 1];
       char absolute[32];
       onion_patch_t *patch = nullptr;
 

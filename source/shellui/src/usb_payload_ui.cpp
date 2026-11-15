@@ -5,8 +5,12 @@
 #include "toolbox_i18n.hpp"
 #include "usb_payload_action.hpp"
 #include "usb_payload_importer.hpp"
+#include "usb_storage.hpp"
 
+#include <algorithm>
 #include <cstdio>
+#include <iterator>
+#include <map>
 #include <vector>
 
 namespace {
@@ -14,6 +18,7 @@ namespace {
 using onion::shellui::usb_payloads::Entry;
 using onion::shellui::usb_payloads::ImportResult;
 std::vector<Entry> entries;
+std::map<unsigned, onion::shellui::usb_storage::Device> devices_by_index;
 
 std::string size_text(std::uint64_t bytes) {
   char buffer[48];
@@ -30,10 +35,33 @@ std::string size_text(std::uint64_t bytes) {
 }
 
 bool model(ps5ui::Node &root) {
+  using namespace onion::shellui;
+  entries.clear();
+  devices_by_index.clear();
   bool device_found = false;
-  entries = onion::shellui::usb_payloads::scan(
-      onion::shellui::usb_payloads::kUsbPrefix,
-      onion::shellui::usb_payloads::kDestination, &device_found);
+  std::vector<usb_storage::Device> devices;
+  if (usb_storage::list_devices(devices) >= 0) {
+    for (const auto &device : devices) {
+      usb_storage::with_device(device, [&](const usb_storage::Mapping &view) {
+        if (devices_by_index.contains(view.usb_index))
+          return;
+        bool opened = false;
+        auto found = usb_payloads::scan_directory(
+            view.path, usb_payloads::kDestination, view.usb_index, &opened);
+        if (!opened)
+          return;
+        device_found = true;
+        devices_by_index.emplace(view.usb_index, device);
+        entries.insert(entries.end(), std::make_move_iterator(found.begin()),
+                        std::make_move_iterator(found.end()));
+      });
+    }
+  }
+  std::sort(entries.begin(), entries.end(), [](const Entry &left,
+                                             const Entry &right) {
+    return left.usb_index != right.usb_index
+               ? left.usb_index < right.usb_index : left.name < right.name;
+  });
   ps5ui::Page page("id_usb_payloads", toolbox_i18n::tr("usb_payloads.title"));
   if (!device_found)
     page.label("id_usb_payloads_empty",
@@ -118,8 +146,20 @@ OnPressResult onpress_usb_payload(OnPressContext &ctx) {
   if (!found)
     return OnPressResult::Consumed;
   const Entry entry = *found;
-  const ImportResult result = onion::shellui::usb_payloads::import_payload(
-      entry, onion::shellui::usb_payloads::kDestination, replace);
+  ImportResult result = ImportResult::CannotOpenSource;
+  const auto owner = devices_by_index.find(entry.usb_index);
+  if (owner != devices_by_index.end()) {
+    const auto device = owner->second;
+    onion::shellui::usb_storage::with_device(
+        device, [&](const onion::shellui::usb_storage::Mapping &view) {
+          if (view.usb_index != entry.usb_index)
+            return;
+          Entry current = entry;
+          current.source_path = view.path + "/" + entry.name;
+          result = onion::shellui::usb_payloads::import_payload(
+              current, onion::shellui::usb_payloads::kDestination, replace);
+        });
+  }
   message(result == ImportResult::Completed && replace ? "usb_payloads.replaced"
                                                        : error_key(result),
           entry.name);

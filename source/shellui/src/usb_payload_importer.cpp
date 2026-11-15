@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 #include <dirent.h>
 #include <fcntl.h>
+#include <utility>
 #include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -36,46 +38,118 @@ bool is_regular(const std::string &path, struct stat *out = nullptr) {
   return true;
 }
 
+// Takes ownership of both descriptors, including on a copy or sync failure.
+ImportResult copy_payload(int source, int target, std::uint64_t expected_size) {
+  ImportResult result = ImportResult::Completed;
+  // mkstemp starts at 0600; the installed payload must be readable by the loader.
+  if (fchmod(target, 0644) != 0)
+    result = ImportResult::CannotCreateDestination;
+  std::uint64_t copied = 0;
+  char buffer[64 * 1024];
+  while (result == ImportResult::Completed) {
+    const ssize_t n = read(source, buffer, sizeof(buffer));
+    if (n < 0 && errno == EINTR)
+      continue;
+    if (n < 0) {
+      result = ImportResult::ReadError;
+      break;
+    }
+    if (n == 0)
+      break;
+    copied += static_cast<std::uint64_t>(n);
+    ssize_t offset = 0;
+    while (offset < n) {
+      const ssize_t written =
+          write(target, buffer + offset, static_cast<size_t>(n - offset));
+      if (written < 0 && errno == EINTR)
+        continue;
+      if (written <= 0) {
+        result = ImportResult::WriteError;
+        break;
+      }
+      offset += written;
+    }
+  }
+  if (result == ImportResult::Completed && copied != expected_size)
+    result = ImportResult::ReadError;
+  if (result == ImportResult::Completed && fsync(target) != 0)
+    result = ImportResult::WriteError;
+  if (close(target) != 0 && result == ImportResult::Completed)
+    result = ImportResult::WriteError;
+  if (close(source) != 0 && result == ImportResult::Completed)
+    result = ImportResult::ReadError;
+  return result;
+}
+
+ImportResult install_new_payload(const std::string &temp_path,
+                                 const std::string &final_path,
+                                 std::uint64_t size) {
+  const int source = open(temp_path.c_str(), O_RDONLY | O_NOFOLLOW);
+  if (source < 0)
+    return ImportResult::CannotOpenSource;
+  // PS5 storage cannot rely on hard links. O_EXCL keeps the no-replace
+  // decision atomic without a check-then-rename that could overwrite a file.
+  const int target = open(final_path.c_str(),
+                          O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+  if (target < 0) {
+    const int error = errno;
+    close(source);
+    return error == EEXIST ? ImportResult::DestinationAlreadyExists
+                           : ImportResult::CannotCreateDestination;
+  }
+  struct stat created {};
+  if (fstat(target, &created) != 0) {
+    close(target);
+    close(source);
+    unlink(final_path.c_str());
+    return ImportResult::CannotCreateDestination;
+  }
+  const ImportResult result = copy_payload(source, target, size);
+  if (result != ImportResult::Completed) {
+    // Do not remove a different file published by another writer during I/O.
+    struct stat current {};
+    if (lstat(final_path.c_str(), &current) == 0 &&
+        current.st_dev == created.st_dev && current.st_ino == created.st_ino)
+      unlink(final_path.c_str());
+  }
+  return result;
+}
+
 } // namespace
 
-std::vector<Entry> scan(const std::string &usb_prefix,
-                        const std::string &destination, bool *device_found) {
+std::vector<Entry> scan_directory(const std::string &directory,
+                                  const std::string &destination,
+                                  unsigned usb_index, bool *opened) {
   std::vector<Entry> entries;
-  if (device_found)
-    *device_found = false;
-  for (unsigned index = 0; index < 8; ++index) {
-    std::string mount = usb_prefix + std::to_string(index);
-    DIR *dir = opendir(mount.c_str());
-    if (!dir && usb_prefix == kUsbPrefix) {
-      mount = "/mnt/usb" + std::to_string(index);
-      dir = opendir(mount.c_str());
-    }
-    if (!dir)
+  if (opened)
+    *opened = false;
+  if (usb_index > 7)
+    return entries;
+  DIR *dir = opendir(directory.c_str());
+  if (!dir)
+    return entries;
+  if (opened)
+    *opened = true;
+  while (dirent *item = readdir(dir)) {
+    const std::string name(item->d_name);
+    if (!valid_name(name))
       continue;
-    if (device_found)
-      *device_found = true;
-    while (dirent *item = readdir(dir)) {
-      const std::string name(item->d_name);
-      if (!valid_name(name))
-        continue;
-      const std::string source = mount + "/" + name;
-      struct stat st {};
-      if (!is_regular(source, &st) || st.st_size < 0)
-        continue;
-      Entry entry;
-      entry.name = name;
-      entry.source_path = source;
-      entry.size = static_cast<std::uint64_t>(st.st_size);
-      entry.usb_index = index;
-      entry.installed =
-          lstat((destination + "/" + destination_name(name)).c_str(), &st) == 0;
-      entries.push_back(std::move(entry));
-    }
-    closedir(dir);
+    const std::string source = directory + "/" + name;
+    struct stat st {};
+    if (!is_regular(source, &st) || st.st_size < 0)
+      continue;
+    Entry entry;
+    entry.name = name;
+    entry.source_path = source;
+    entry.size = static_cast<std::uint64_t>(st.st_size);
+    entry.usb_index = usb_index;
+    entry.installed =
+        lstat((destination + "/" + destination_name(name)).c_str(), &st) == 0;
+    entries.push_back(std::move(entry));
   }
+  closedir(dir);
   std::sort(entries.begin(), entries.end(), [](const Entry &a, const Entry &b) {
-    return a.usb_index != b.usb_index ? a.usb_index < b.usb_index
-                                      : a.name < b.name;
+    return a.name < b.name;
   });
   return entries;
 }
@@ -121,55 +195,14 @@ ImportResult import_payload(const Entry &entry, const std::string &destination,
     return ImportResult::CannotCreateDestination;
   }
 
-  ImportResult result = ImportResult::Completed;
-  // mkstemp starts at 0600; the installed payload must be readable by the loader.
-  if (fchmod(target, 0644) != 0)
-    result = ImportResult::CannotCreateDestination;
-  std::uint64_t copied = 0;
-  char buffer[64 * 1024];
-  while (result == ImportResult::Completed) {
-    const ssize_t n = read(source, buffer, sizeof(buffer));
-    if (n < 0 && errno == EINTR)
-      continue;
-    if (n < 0) {
-      result = ImportResult::ReadError;
-      break;
-    }
-    if (n == 0)
-      break;
-    copied += static_cast<std::uint64_t>(n);
-    ssize_t offset = 0;
-    while (offset < n) {
-      const ssize_t written =
-          write(target, buffer + offset, static_cast<size_t>(n - offset));
-      if (written < 0 && errno == EINTR)
-        continue;
-      if (written <= 0) {
-        result = ImportResult::WriteError;
-        break;
-      }
-      offset += written;
-    }
-    if (result != ImportResult::Completed)
-      break;
-  }
-  if (result == ImportResult::Completed &&
-      copied != static_cast<std::uint64_t>(source_stat.st_size))
-    result = ImportResult::ReadError;
-  if (result == ImportResult::Completed && fsync(target) != 0)
-    result = ImportResult::WriteError;
-  if (close(target) != 0 && result == ImportResult::Completed)
-    result = ImportResult::WriteError;
-  if (close(source) != 0 && result == ImportResult::Completed)
-    result = ImportResult::ReadError;
+  const auto size = static_cast<std::uint64_t>(source_stat.st_size);
+  ImportResult result = copy_payload(source, target, size);
   if (result == ImportResult::Completed) {
     if (replace) {
       if (rename(temp_path.c_str(), final_path.c_str()) != 0)
         result = ImportResult::RenameError;
-    } else if (link(temp_path.c_str(), final_path.c_str()) != 0) {
-      // A hard link publishes the copy only if the destination is still absent.
-      result = errno == EEXIST ? ImportResult::DestinationAlreadyExists
-                               : ImportResult::RenameError;
+    } else {
+      result = install_new_payload(temp_path, final_path, size);
     }
   }
   if (result != ImportResult::Completed || !replace)

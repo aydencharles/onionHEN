@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <string>
 
@@ -18,6 +19,17 @@ int load_path(const char *path, onion_cheat_file_t &file) {
 int load_buf(const char *format, const char *data, onion_cheat_file_t &file) {
   return CheatParserFactory::loadBuffer(
       format, reinterpret_cast<const uint8_t *>(data), std::strlen(data), file);
+}
+
+std::string make_dashed_value(size_t byte_count) {
+  std::string value;
+  for (size_t i = 0; i < byte_count; ++i) {
+    char byte[4];
+    std::snprintf(byte, sizeof(byte), i == 0 ? "%02X" : "-%02X",
+                  static_cast<unsigned int>(i & 0xFF));
+    value += byte;
+  }
+  return value;
 }
 
 int test_parse_json_buffer_success() {
@@ -180,6 +192,46 @@ int test_parse_xml_buffer_success() {
                     sizeof(on_expected));
   TEST_ASSERT_MEMEQ(off_expected, file.cheats[0].patches[0].off,
                     sizeof(off_expected));
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
+int test_parse_xml_preserves_large_patch_values() {
+  const std::string value = make_dashed_value(393);
+  const std::string xml =
+      "<Trainer Process=\"eboot.bin\" Game=\"Demo\">"
+      "<Cheat Text=\"Large patch\">"
+      "<Cheatline><Offset>1234</Offset><ValueOn>" + value +
+      "</ValueOn><ValueOff>" + value +
+      "</ValueOff></Cheatline></Cheat></Trainer>";
+  static onion_cheat_file_t file;
+
+  TEST_ASSERT_EQ_INT(0, load_buf("shn", xml.c_str(), file));
+  TEST_ASSERT_EQ_INT(393,
+                     static_cast<int>(file.cheats[0].patches[0].on_len));
+  TEST_ASSERT_EQ_INT(393,
+                     static_cast<int>(file.cheats[0].patches[0].off_len));
+  for (size_t i = 0; i < 393; ++i) {
+    TEST_ASSERT_EQ_INT(static_cast<int>(i & 0xFF),
+                       file.cheats[0].patches[0].on[i]);
+    TEST_ASSERT_EQ_INT(static_cast<int>(i & 0xFF),
+                       file.cheats[0].patches[0].off[i]);
+  }
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
+int test_parse_xml_rejects_oversized_patch_values() {
+  const std::string value = make_dashed_value(ONION_MAX_PATCH_BYTES + 1);
+  const std::string xml =
+      "<Trainer Process=\"eboot.bin\" Game=\"Demo\">"
+      "<Cheat Text=\"Oversized patch\">"
+      "<Cheatline><Offset>1234</Offset><ValueOn>" + value +
+      "</ValueOn><ValueOff>AA</ValueOff></Cheatline></Cheat></Trainer>";
+  static onion_cheat_file_t file;
+
+  TEST_ASSERT_EQ_INT(-1, load_buf("shn", xml.c_str(), file));
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(file.cheat_count));
   onion_cheat_file_clear(&file);
   return 0;
 }
@@ -382,6 +434,10 @@ extern "C" int test_cheat_parsers_suite(void) {
                              test_parse_json_ignores_out_of_range_section);
   failures +=
       onion_test_run("cheat xml parse success", test_parse_xml_buffer_success);
+  failures += onion_test_run("cheat xml preserves large patch values",
+                             test_parse_xml_preserves_large_patch_values);
+  failures += onion_test_run("cheat xml rejects oversized patch values",
+                             test_parse_xml_rejects_oversized_patch_values);
   failures += onion_test_run("cheat xml unescapes ampersand",
                              test_parse_xml_unescapes_ampersand);
   failures += onion_test_run("cheat xml ignores out-of-range section",

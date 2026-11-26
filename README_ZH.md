@@ -383,6 +383,12 @@ OnionHEN 离不开 PS5 自制软件与逆向工程社区。
   </a>
 </p>
 
+- [bobrass](https://github.com/bobrass)
+- [Eskiell](https://github.com/Eskiell)
+- [kvnhrt](https://github.com/kvnhrt)
+- [Firat17aze](https://github.com/Firat17aze)
+- [Modmycon](https://github.com/Modmycon)
+
 ### 来源
 
 - [etaHEN](https://github.com/LightningMods/etaHEN) — LightningMods 与贡献者；本仓库的源码基线

@@ -441,6 +441,12 @@ OnionHEN exists because of the PS5 homebrew and reverse-engineering community.
   </a>
 </p>
 
+- [bobrass](https://github.com/bobrass)
+- [Eskiell](https://github.com/Eskiell)
+- [kvnhrt](https://github.com/kvnhrt)
+- [Firat17aze](https://github.com/Firat17aze)
+- [Modmycon](https://github.com/Modmycon)
+
 ### Based on
 
 - [etaHEN](https://github.com/LightningMods/etaHEN) — LightningMods and contributors; source base of this tree

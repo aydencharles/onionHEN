@@ -61,7 +61,7 @@ static int test_default_zh(void) {
                   "%s · 作者：麒麟/0xp0co") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.thanks"),
-                  "特别感谢：kvnhrt, Modmycon") == 0);
+                  "特别感谢：kvnhrt, Modmycon, bobrass, Eskiell, Firat17aze") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.conflict"),
                   "OnionHEN 已拒绝启动：%s 正在运行") == 0);
@@ -130,7 +130,7 @@ static int test_en(void) {
                   "%s made by Kylin/0xp0co") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.thanks"),
-                  "Special Thanks to: kvnhrt, Modmycon") == 0);
+                  "Special Thanks to: kvnhrt, Modmycon, bobrass, Eskiell, Firat17aze") == 0);
   TEST_ASSERT_TRUE(
       std::strcmp(onion_notify_tr("notify.boot.conflict"),
                   "OnionHEN refused to start: %s is already running") == 0);

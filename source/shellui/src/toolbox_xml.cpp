@@ -994,6 +994,17 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                        ps5ui::Style::Center)
                 .label("id_about_contributor", toolbox_i18n::tr("about.contributor"),
                        ps5ui::Style::Center)
+                .label("id_about_contributor_bobrass",
+                       "bobrass — github.com/bobrass", ps5ui::Style::Center)
+                .label("id_about_contributor_eskiell",
+                       "Eskiell — github.com/Eskiell", ps5ui::Style::Center)
+                .label("id_about_contributor_kvnhrt",
+                       "kvnhrt — github.com/kvnhrt", ps5ui::Style::Center)
+                .label("id_about_contributor_firat",
+                       "Firat17aze — github.com/Firat17aze",
+                       ps5ui::Style::Center)
+                .label("id_about_contributor_modmycon",
+                       "Modmycon — github.com/Modmycon", ps5ui::Style::Center)
                 .label("id_about_testers", toolbox_i18n::tr("about.testers"),
                        ps5ui::Style::Center)
                 .label("id_about_testers_intro",

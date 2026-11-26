@@ -1,6 +1,6 @@
 # Control Center SDK（11.6 / NPXS40003）
 
-当前 profile 把 11.6 里的 `accessibility`（协助工具）项转换成一个通用扩展宿主。该项仍进入原生 `controls/customControls` 数据流，因此"控制中心 → 自定义"的显示开关、拖动排序和 `controlCenterFunctionControlSettings` 用户持久化均继续由系统实现。
+当前 profile 把 11.6 里的 `accessibility`（协助工具）项转换成一个通用扩展宿主。该项仍进入原生 `controls/customControls` 数据流，因此"控制中心 → 自定义"的显示开关、拖动排序和 `controlCenterFunctionControlSettings` 用户持久化均继续由系统实现；但那一屏的行是由模块 193 的描述符另起一套渲染的，瓦片改写不会自动传播过去，见下方「控制中心『自定义/排序』页」。
 
 宿主瓦片的弹窗被改写成**进程内 WebView**：`getMenu` 钩子不再返回系统菜单，而是返回一个指向本机回环 HTTP 服务的原生 `WebViewPS`。服务由 ShellUI 自己拉起，地址固定，页面由 OnionHEN 路由，因此不经过系统 URI 处理器，也不跳出控制中心。
 
@@ -101,9 +101,9 @@ bool register_sample_control() {
 
 ## Profile 闸门
 
-补丁只接受 HBC v89、`fileLength=0x5e9350`、source hash `ff55cd8f3aea18a0b13363a640e56846e27148ab`，同时检查 `NPXS40003`、设置键和每个待改指令/字符串的原始字节（共 10 处探针）。补丁保持文件长度不变，完成后重算 HBC footer SHA-1。可通过 CMake 参数 `-DONIONHEN_SHELLUI_CONTROL_CENTER_PATCH=OFF` 关闭。
+补丁只接受 HBC v89、`fileLength=0x5e9350`、source hash `ff55cd8f3aea18a0b13363a640e56846e27148ab`，同时检查 `NPXS40003`、设置键和每个待改指令/字符串/函数头的原始字节（共 12 处探针）。补丁保持文件长度不变，完成后重算 HBC footer SHA-1。可通过 CMake 参数 `-DONIONHEN_SHELLUI_CONTROL_CENTER_PATCH=OFF` 关闭。
 
-改动补丁后请跑一遍 `References/ControlCenter/tools/07_verify_control_center_patch.py`：它从 `control_center_patch.cpp` 源码里正则抽出常量和字节数组，在真实 `bundle/rnps-control-center.hbc` 上重放四段校验（探针命中、fn #35901 用 v89 汇编器逐字节复现、**已不再改写的区域逐字节保持 stock**、文件长度与 footer SHA-1），失败即非零退出。
+改动补丁后请跑一遍 `References/ControlCenter/tools/07_verify_control_center_patch.py`：它从 `control_center_patch.cpp` 源码里正则抽出常量和字节数组，在真实 `bundle/rnps-control-center.hbc` 上重放六段校验（探针命中、fn #35901 用 v89 汇编器逐字节复现、fn #36469 行 label memo 的长度/尾部/分支位移、**已不再改写的区域逐字节保持 stock**、fn #36469 重定位后的函数头、文件长度与 footer SHA-1），失败即非零退出。
 
 ### `enabled_by_default`
 
@@ -143,7 +143,7 @@ bool register_sample_control() {
 |---|---|---|
 | fn #35901（80 B） | `I18nPS.t('msgid_accessibility')` → `label`，`'accessibility'` → `icon` | 字符串 `#310` → `label`，`menuHeight = kMenuHeight116(640)`，`{uri: #13094}` → `icon` |
 | fn #35903（689 B） | 模块 3479 的工厂（AccessibilityMenu） | 构造原生 `WebViewPS`，`source.uri = #13209` |
-| fn #35902（54 B） | 旧 `getMenu` 闭包 | **不动**（已不再被引用） |
+| fn #35902（54 B） | 旧 `getMenu` 闭包 | 征用为**自定义/排序页的行 label memo**（fn #36469 的新家），见下节 |
 
 `#35901` 的 `CreateEnvironment` + `CreateClosure #35903` 序列逐字节保留：`#35901` 的 `environmentSize` 为 0，新建的环境只是一条 parent 链接，所以 `#35903` 里的 `GetEnvironment r0, 1` 依然落在模块工厂环境上，和旧的 `#35902` 完全一致（工厂槽 0 = `require(1)` 原生组件注册表，槽 2 = `require(3)`/`jsx`）。
 
@@ -166,6 +166,53 @@ bool register_sample_control() {
 | `#13209` | `0x137a28` | 38 | `#13210` `turn off:ps vr` @ `0x137a4e`（无字节码引用） |
 
 `#16885`（`sender`）与 `#28944`（`tooltipTitleProps`）是**活跃标识符**——分别被 fn #11770/#11771/#11897/#17901/#17909/#23091 与 #11770/#11771 使用，与控制中心无关——所以 icon/URI 写入前先把它们搬迁进死串 `#9487`（`go to voice command settings`）。这段搬迁**必须保留**，它和 Voice Agent 半边是两回事。
+
+## 控制中心「自定义/排序」页
+
+主条带的瓦片改写**不会**传播到「控制中心 → 自定义」那一屏。那一屏不渲染模块 3478 的瓦片，而是从模块 193 的描述符另起一套行：
+
+```
+模块 193   defaultOrderControls = descriptors.map(d => ({id, label, description}))
+           ← 只有 label / description，连 iconId 都不带
+模块 3522   getControlInfo(id)    ← iconId 在运行时按 id 反查
+模块 3525   整屏 + 表头            ← 渲染每行的 label / description
+模块 3508   单个格
+模块 3515   格子上的按钮           ← 渲染图标
+```
+
+所以改写瓦片之后，排序页里那一行仍然显示 stock 的协助工具条目。两半都走这个 bundle 无法用字符串手术改掉的 native：
+
+- **label**：每行的 label 都是 `I18nPS.t(<描述符 label>)`，编译进 fn #36469（模块 3525）：
+
+  ```
+  r0 = _closure2_slot0;  return I18nPS.t(r0)
+  ```
+
+  `#12801`（`msgid_accessibility`）是协助工具描述符自己的 label 载体，它的存储与一个活跃标识符重叠，**不能**照 `#310` 的做法覆写；而且 bundle 里没有任何空闲槽能装下"`t()` 会翻译成 `registration.label`"的字符串。
+
+- **icon**：行把 `iconId` 交给 `IconPS.getImageSource(name, 56, 56)`（fn #36398）和 PUI Button 的 `icon` 属性（fn #36397）。本 bundle 里 39 个 `getImageSource` 实参**清一色是裸系统图标名，无一是路径**，原生库里也没有任何 `/system_ex/vsh_asset` 查表逻辑，因此没有任何 string id 能让这一行解析到 OnionHEN 的 PNG。要改图标必须带 `id === 'accessibility'` 守卫重写**共用的** 1130 字节按钮组件（模块 3515），当前**有意不做**。
+
+**label 半边已修。** fn #36469 在整个 bundle 里只有一处引用（模块 3525 里的一条 `CreateClosure`），而它自己 31 字节的槽塞不下守卫，所以函数体被搬进 accessibility 宿主本来就已经释放的 **54 字节 `#35902` 槽**，只重指函数头：
+
+```
+stock（31 B）                       改写后（52 B，位于 0x59bb70）
+  GetEnvironment r0, 1                GetEnvironment r0, 0
+  env[1][2].I18nPS.t(env[0][0])       LoadFromEnvironment r0, r0, 0      ; label
+  Ret                                 LoadConstString r1, #12801
+                                      JStrictNotEqual r0, r1, +10        ; 不是协助工具行就跳尾部
+                                      LoadConstString r0, #310           ; registration.label
+                                      Ret r0
+                                      ── 尾部 = stock 的 31 字节，逐字节相同 ──
+```
+
+- `env[0]` 是闭包环境，模块 3525 让 label 与 description 两个 memo **共用**它：槽 0 是 `label`、槽 1 是 `description`，对每一行都一样。
+- 比较对象是描述符自己的 label id（`#12801`，模块 193 为 registryId 7 生成的就是它），所以**不需要动描述符**。
+- 只有协助工具那一行被短路到 `#310`；其余 15 行和合成的「恢复默认」项继续走各自的 `t()`。
+- 因为短路分支直接返回字符串而**不经过 `t()`**，这里不依赖 `t()` 对未登记键的行为。
+- `JStrictNotEqual` 编码为 `[op, Addr8, Reg8, Reg8]`，两寄存器**不严格相等**时跳转，目标 = 指令自身地址 + Addr8；分支在 offset 11、尾部在 21，故位移为 10。这两点都在 hasm 清单里逐条核过。
+- 函数头只改 offset 与 bytecodeSize，`paramCount`、`frameSize` 和 `w1` 高位的函数标志位原样保留（`0x2aaa52` → `0x59bb70`，size 31 → 52）。
+
+**描述符的 description 未改**：它是另一个 memo（fn #36470，读槽 1），要同样处理需要第二个 ≥52 字节的死槽，当前没做，因此排序页那一行的副标题仍是协助工具的描述。同样，图标仍是协助工具图标。
 
 ## 与 HomeUI 顶部导航补丁的关系
 

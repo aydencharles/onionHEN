@@ -8,7 +8,7 @@
  * and User.setInfo serialization keep owning tile state.
  *
  * Verified against the 11.6 NPXS40003 profile (HBC v89, fileLength 0x5e9350,
- * source hash ff55cd8f...48ab).  Three groups of writes, all same-size:
+ * source hash ff55cd8f...48ab).  Four groups of writes, all same-size:
  *
  *   fn #35901 module 3478 render body, 80 bytes - rebuilt in place.
  *     Becomes jsx(FunctionControl, {label: #310, menuHeight: 640,
@@ -23,6 +23,12 @@
  *   String storage - #310 (label), #13094 (icon carrier) and #13209 (WebView
  *     URI) are the three slots the two bodies read.  Repointing #13094 needs
  *     two identifier relocations first; see the kIconStorage note below.
+ *
+ *   fn #36469, 31 bytes - module 3525's reorder-row label memo, relocated
+ *     into the 54-byte dead #35902 slot and rebuilt as a guarded body.  See
+ *     the customization-page note below: the grid draws its own rows from
+ *     module 193's descriptor strings, so neither the tile rewrite nor the
+ *     #310 label write reaches it on their own.
  *
  * Scope note: 11.6 exposes five feature-gated tiles (registryId 2..6:
  * notifications, gamingLounge, music, voiceAgent, broadcast) and ten
@@ -251,6 +257,65 @@ constexpr uint16_t kAccessibilitySpeakableIdentifierId = 75;
 constexpr uint16_t kPercentStringId = 1527;             // '100%'
 constexpr uint16_t kOnlySelfStringId = 11249;           // 'onlySelf'
 constexpr uint16_t kMenuClosureFunctionId = 35903;
+constexpr uint16_t kI18nPsIdentifierId = 28;            // 'I18nPS'
+constexpr uint16_t kTranslateIdentifierId = 10;         // 't'
+
+/*
+ * ---------------------------------------------------------------------------
+ * Customization ("reorder") page
+ * ---------------------------------------------------------------------------
+ * The control center's customize/reorder grid does not render module 3478's
+ * tile at all.  It builds its own rows from module 193's descriptor list:
+ *
+ *   module 193   defaultOrderControls = descriptors.map(d => ({id, label,
+ *                description}))           <- label/description only, no icon
+ *   module 3522  getControlInfo(id)       <- resolves iconId at run time
+ *   module 3525  the grid + its header    <- renders label / description
+ *   module 3508  one grid cell
+ *   module 3515  the cell's button        <- renders the icon
+ *
+ * so the accessibility row keeps showing the stock accessibility entry even
+ * after the tile itself has been rewritten.  Both of its halves are resolved
+ * through natives this bundle cannot retarget by string surgery:
+ *
+ *   label       every row's label is I18nPS.t(<descriptor label>), compiled
+ *               into function #36469 (module 3525):
+ *                   r0 = _closure2_slot0; return I18nPS.t(r0)
+ *               #12801 ("msgid_accessibility") is the accessibility
+ *               descriptor's own label carrier, and its storage is shared
+ *               with a live identifier, so it cannot be overwritten the way
+ *               #310 was; and no free slot in the bundle holds a string that
+ *               t() would translate to registration.label.
+ *
+ *   icon        rows hand their iconId to IconPS.getImageSource(name, 56, 56)
+ *               (function #36398) and to PUI Button's `icon` prop (function
+ *               #36397).  All 39 observed getImageSource arguments in this
+ *               bundle are bare system icon names -- never a path -- and the
+ *               native library has no /system_ex/vsh_asset lookup at all, so
+ *               no string id can make the row resolve OnionHEN's PNG.  Fixing
+ *               the icon means rewriting the shared 1130-byte button
+ *               component (module 3515) behind an `id === 'accessibility'`
+ *               guard, which is deliberately out of scope here.
+ *
+ * The label half is fixed by relocating function #36469's body.  #36469 is
+ * referenced exactly once in the whole bundle -- a CreateClosure inside module
+ * 3525 -- and its own 31-byte slot has no room for a guard, so the body moves
+ * into the 54-byte #35902 slot that the accessibility host already frees
+ * (see the kAccessibilityMenuBody note).  The rebuilt body keeps the stock
+ * t() path for every other row and short-circuits the accessibility row to
+ * string #310, which the label write above has already filled with
+ * registration.label -- so the grid row and the tile show the same text
+ * without depending on t()'s behaviour for a key that is not in the
+ * translation table.
+ */
+constexpr uint16_t kAccessibilityLabelStringId = 12801; // 'msgid_accessibility'
+/* Function header table entry (16 bytes per function) for function #36469. */
+constexpr size_t kLabelMemoHeader = 0x80 + 36469 * 16;
+/* The dead #35902 body: 0x59bb20 + 80 == 0x59bb70, ending at 0x59bba6. */
+constexpr size_t kLabelMemoSlot = kAccessibilityRenderBody +
+                                  kAccessibilityRenderBodySize;
+constexpr uint16_t kLabelMemoSize = 52;
+constexpr uint16_t kLabelMemoFrameSize = 74;
 
 /* Low/high byte of a 16-bit string or identifier operand. */
 constexpr uint8_t lo8(uint16_t value) {
@@ -272,6 +337,10 @@ static_assert(kLabelStringLengthByte == kSmallStringTable + 310 * 4 + 3,
               "label length byte must be string #310's entry high byte");
 static_assert(kUriStringLengthByte == kSmallStringTable + 13209 * 4 + 3,
               "URI length byte must be string #13209's entry high byte");
+static_assert(kAccessibilityMenuBody - kLabelMemoSlot == 54,
+              "the reclaimed #35902 slot is 54 bytes");
+static_assert(kLabelMemoSize <= kAccessibilityMenuBody - kLabelMemoSlot,
+              "the relocated label memo must fit the dead #35902 slot");
 
 struct HbcView {
   uint8_t *data;
@@ -284,6 +353,13 @@ uint32_t read_u32le(const uint8_t *data) {
          (static_cast<uint32_t>(data[1]) << 8) |
          (static_cast<uint32_t>(data[2]) << 16) |
          (static_cast<uint32_t>(data[3]) << 24);
+}
+
+void write_u32le(uint8_t *data, uint32_t value) {
+  data[0] = static_cast<uint8_t>(value);
+  data[1] = static_cast<uint8_t>(value >> 8);
+  data[2] = static_cast<uint8_t>(value >> 16);
+  data[3] = static_cast<uint8_t>(value >> 24);
 }
 
 bool contains(size_t size, size_t offset, size_t length) {
@@ -520,6 +596,59 @@ std::array<uint8_t, kAccessibilityMenuBodySize> make_webview_menu() {
   return body;
 }
 
+/*
+ * Module 3525's reorder-row label memo (function #36469), rebuilt at 52 of the
+ * dead #35902 slot's 54 bytes.
+ *
+ * Stock body (hasm #36469, 31 bytes):
+ *   GetEnvironment r0, 1
+ *   env[1][2].I18nPS.t(env[0][0])    ; env[0][0] is the row's descriptor label
+ *   Ret
+ *
+ * `env[0]` is the closure environment, which module 3525 shares between the
+ * label and the description memos: slot 0 holds `label` and slot 1 holds
+ * `description`, for every row of the grid.
+ *
+ * Ours keeps that t() path verbatim as the fall-through tail and prepends a
+ * four-instruction guard:
+ *
+ *   if (label !== 'msgid_accessibility') goto <tail>
+ *   return 'OnionHEN'                       ; string #310, written by the
+ *                                           ; label write above
+ *
+ * so only the accessibility row is short-circuited; the other fifteen rows and
+ * the synthetic "reset to default" entry keep their own t() lookups.  The
+ * comparison is against the descriptor's own label id (#12801), which is what
+ * module 193 emits for registryId 7, so no descriptor write is needed.
+ *
+ * Encoding notes, both verified against the hasm listing:
+ *   JStrictNotEqual is [op, Addr8, Reg8, Reg8] and jumps when the two
+ *   registers are NOT strictly equal; its target is the instruction's own
+ *   address plus Addr8.  The branch sits at offset 11 and the tail at 21, so
+ *   the displacement is 10.
+ */
+std::array<uint8_t, kLabelMemoSize> make_label_memo() {
+  return {
+      0x29, 0x00, 0x00,                   // GetEnvironment r0, 0
+      0x2e, 0x00, 0x00, 0x00,             // LoadFromEnvironment r0, r0, 0
+      0x71, 0x01, lo8(kAccessibilityLabelStringId),
+      hi8(kAccessibilityLabelStringId),   // LoadConstString r1, #12801
+      0xbc, 0x0a, 0x00, 0x01,             // JStrictNotEqual r0, r1, +10
+      0x71, 0x00, lo8(kLabelStringId), hi8(kLabelStringId),
+                                          // LoadConstString r0, #310
+      0x5a, 0x00,                         // Ret r0
+      0x29, 0x00, 0x01,                   // GetEnvironment r0, 1
+      0x2e, 0x00, 0x00, 0x02,             // LoadFromEnvironment r0, r0, 2
+      0x34, 0x02, 0x00, 0x01, lo8(kI18nPsIdentifierId),
+                                          // GetByIdShort r2, r0, #I18nPS
+      0x34, 0x01, 0x02, 0x02, lo8(kTranslateIdentifierId),
+                                          // GetByIdShort r1, r2, #t
+      0x29, 0x00, 0x00,                   // GetEnvironment r0, 0
+      0x2e, 0x00, 0x00, 0x00,             // LoadFromEnvironment r0, r0, 0
+      0x51, 0x00, 0x01, 0x02, 0x00,       // Call2 r0, r1, r2, r0
+      0x5a, 0x00};                        // Ret r0
+}
+
 void update_footer(HbcView &hbc) {
   const size_t footer = kProfileFileLength - kFooterSha1Size;
   SHA1_CTX context;
@@ -587,6 +716,14 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
       0x29, 0x00, 0x00, 0x2e, 0x01, 0x00, 0x02, 0x34};
   static constexpr uint8_t kAccessibilityMenuExpected[] = {
       0x32, 0x01, 0x6a, 0x02, 0x02, 0x6a, 0x06, 0x03, 0x74, 0x00};
+  /* The stock #35902 body: function #35901's only CreateClosure target, and
+   * therefore dead once the rebuilt render body points at #35903 directly. */
+  static constexpr uint8_t kLabelMemoSlotExpected[] = {
+      0x29, 0x00, 0x01, 0x2e, 0x02, 0x00, 0x03, 0x74};
+  /* Function #36469's header: offset 0x2aaa52, paramCount 1, size 31,
+   * frameSize 74 (the top byte of w1 carries unrelated function flags). */
+  static constexpr uint8_t kLabelMemoHeaderExpected[] = {
+      0x52, 0xaa, 0x2a, 0x02, 0x1f, 0x00, 0x25, 0x1d};
   static constexpr uint8_t kIconEntryExpected[] = {0x2a, 0x2d, 0x0c, 0x0d};
   static constexpr uint8_t kSenderEntryExpected[] = {0x60, 0x1f, 0x02, 0x06};
   static constexpr uint8_t kTooltipTitlePropsEntryExpected[] = {
@@ -634,7 +771,11 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
       !expect(hbc, kAccessibilityRenderBody, kAccessibilityRenderExpected,
               sizeof(kAccessibilityRenderExpected), "accessibility render") ||
       !expect(hbc, kAccessibilityMenuBody, kAccessibilityMenuExpected,
-              sizeof(kAccessibilityMenuExpected), "accessibility menu body")) {
+              sizeof(kAccessibilityMenuExpected), "accessibility menu body") ||
+      !expect(hbc, kLabelMemoSlot, kLabelMemoSlotExpected,
+              sizeof(kLabelMemoSlotExpected), "dead #35902 body") ||
+      !expect(hbc, kLabelMemoHeader, kLabelMemoHeaderExpected,
+              sizeof(kLabelMemoHeaderExpected), "label memo header")) {
     return;
   }
 
@@ -686,11 +827,32 @@ void patch_control_center(unsigned char *buffer, int *size_ptr,
   const auto menu = make_webview_menu();
   memcpy(hbc.data + kAccessibilityMenuBody, menu.data(), menu.size());
 
+  /*
+   * Customization page: the grid's label memo (#36469) is too small for a
+   * guard, so the body moves into the dead #35902 slot and only the function
+   * header is repointed.  paramCount, frameSize and the flag bits in the top
+   * byte of w1 are carried over from the stock header; the offset field is 25
+   * bits wide, which 0x59bb70 fits comfortably.
+   */
+  const auto label_memo = make_label_memo();
+  memcpy(hbc.data + kLabelMemoSlot, label_memo.data(), label_memo.size());
+  const uint32_t stock_header_w0 = read_u32le(hbc.data + kLabelMemoHeader);
+  const uint32_t stock_header_w1 = read_u32le(hbc.data + kLabelMemoHeader + 4);
+  write_u32le(hbc.data + kLabelMemoHeader,
+              static_cast<uint32_t>(kLabelMemoSlot) |
+                  (stock_header_w0 & 0xFE000000u));
+  write_u32le(hbc.data + kLabelMemoHeader + 4,
+              (stock_header_w1 & 0xFF000000u) |
+                  static_cast<uint32_t>(kLabelMemoSize) |
+                  (static_cast<uint32_t>(kLabelMemoFrameSize) << 15));
+
   update_footer(hbc);
   LOG_DEBUG("control_center_patch: activated '%s' registryId=%u "
-            "at NPXS40003 hbc_base=0x%llx (accessibility host, webview %s)",
+            "at NPXS40003 hbc_base=0x%llx (accessibility host, webview %s, "
+            "reorder row label 0x%llx)",
             registration.id.c_str(), registration.registry_id,
-            static_cast<unsigned long long>(hbc.base), web_uri.c_str());
+            static_cast<unsigned long long>(hbc.base), web_uri.c_str(),
+            static_cast<unsigned long long>(kLabelMemoSlot));
 #else
   (void)buffer;
   (void)size_ptr;

@@ -6,12 +6,11 @@
 
 #include <onion/fs.h>
 #include <onion/log.h>
+#include <onion/tree.h>
 
 #include <errno.h>
-#include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 bool bootstrap_cache_prepare_dir(void) {
   if (mkdir_tree(ONIONHEN_USER_DATA_DIR))
@@ -21,38 +20,59 @@ bool bootstrap_cache_prepare_dir(void) {
   return false;
 }
 
-bool bootstrap_cache_matches(const char *path, size_t expected_size,
-                             const uint8_t *expected_digest, size_t digest_size) {
-  struct stat st;
+bool bootstrap_cache_load(const char *path, size_t expected_size,
+                          const uint8_t *expected_sha1, uint8_t **out) {
   uint8_t digest[SHA1_DIGEST_SIZE];
+  uint8_t *buf = NULL;
+  size_t size = 0;
 
-  if (!path || path[0] != '/' || expected_size == 0 || !expected_digest ||
-      digest_size != SHA1_DIGEST_SIZE)
+  if (!path || path[0] != '/' || expected_size == 0 || !expected_sha1 || !out)
     return false;
 
-  const int fd = open(path, O_RDONLY);
-  if (fd < 0)
+  /* expected_size doubles as the read cap so a stale or unrelated file is
+   * rejected before it is pulled into RAM. */
+  if (!read_file_alloc(path, expected_size, &buf, &size))
     return false;
 
-  if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size < 0 ||
-      (size_t)st.st_size != expected_size) {
-    LOG_DEBUG("bootstrap cache: size mismatch or not a regular file");
-    close(fd);
-    return false;
-  }
-
-  if (!sha1_hash_fd(fd, digest)) {
-    LOG_DEBUG("bootstrap cache: sha1 read failed (%s)", strerror(errno));
-    close(fd);
+  if (size != expected_size) {
+    LOG_DEBUG("bootstrap cache: size mismatch (%zu != %zu)", size,
+              expected_size);
+    free(buf);
     return false;
   }
-  close(fd);
 
-  if (memcmp(digest, expected_digest, SHA1_DIGEST_SIZE) != 0) {
+  sha1_hash(buf, expected_size, digest);
+  if (memcmp(digest, expected_sha1, SHA1_DIGEST_SIZE) != 0) {
     LOG_DEBUG("bootstrap cache: sha1 mismatch");
+    free(buf);
     return false;
   }
+
+  LOG_DEBUG("bootstrap cache: loaded %zu bytes from %s", expected_size, path);
+  *out = buf;
   return true;
+}
+
+uint8_t *bootstrap_cache_try_load(const char *path, size_t expected_size,
+                                  const uint8_t *expected_sha1) {
+  uint8_t *elf = NULL;
+
+  if (!bootstrap_cache_load(path, expected_size, expected_sha1, &elf))
+    return NULL;
+
+  LOG_DEBUG("bootstrap cache hit (%zu bytes), skipping LZMA", expected_size);
+  return elf;
+}
+
+void bootstrap_cache_store_if_valid(const char *path, const uint8_t *elf,
+                                    size_t elf_size, size_t expected_size) {
+  if (elf_size != expected_size) {
+    LOG_WARN("decompressed size %zu != %zu; not caching", elf_size,
+             expected_size);
+    return;
+  }
+  if (!bootstrap_cache_commit(path, elf, elf_size))
+    LOG_WARN("bootstrap cache write failed; next boot will decompress");
 }
 
 bool bootstrap_cache_commit(const char *path, const uint8_t *elf, size_t size) {

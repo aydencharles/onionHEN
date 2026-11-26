@@ -322,7 +322,7 @@ installer. Firmware-specific package support still needs console validation.
 | Key | Default | Values |
 | --- | --- | --- |
 | `meta.schema_version` | `1` | `1` |
-| `toolbox.language` | `system` | `system`, `zh-Hans`, `zh-Hant`, `en`, `ja`, `ko`, `fr`, `de`, `it`, `es`, `pt-BR`, `pl`, `ru`, `ar`, `th` |
+| `toolbox.language` | `system` | `system`, `zh-Hans`, `zh-Hant`, `en`, `ja`, `ko`, `fr`, `de`, `it`, `es`, `pt-BR`, `pt-PT`, `pl`, `ru`, `ar`, `th`, `nl`, `fi`, `sv`, `da`, `no`, `tr`, `cs`, `hu`, `el`, `ro`, `vi`, `id`, `uk` |
 | `pkg.search_path_count` / `pkg.search_path_N` | `1` / `/data/OnionHEN/pkgs` | Up to 8 absolute `/data` or `/mnt` folder paths |
 | `startup.open_after_load` | `none` | `none`, `home_menu` |
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
@@ -468,7 +468,7 @@ OnionHEN exists because of the PS5 homebrew and reverse-engineering community.
 
 ### Testers
 
-即食面, 雨之声, 大饼电玩, 安定区, 随风, 麒麟, 尼克库尔曼, 云, 啊烦, 小小蔡, B站谢锡榆, 荆枫
+即食面, 雨之声, 大饼电玩, 安定区, 随风, 麒麟, 尼克库尔曼, 云, 啊烦, 小小蔡, B站谢锡榆, 荆枫, 苏打先森, 噢, 天天向上
 
 Thanks as well to everyone else who tested, researched, or sent usable feedback.
 

@@ -13,7 +13,7 @@ static atomic_int gLanguage = ATOMIC_VAR_INIT(ONION_NOTIFY_LANG_EN);
 
 static int language_is_known(onion_notify_language_t language) {
   return language >= ONION_NOTIFY_LANG_ZH_HANS &&
-         language <= ONION_NOTIFY_LANG_TH;
+         language <= ONION_NOTIFY_LANG_PT_PT;
 }
 
 static const char *locale_id_for_language(onion_notify_language_t language) {
@@ -44,6 +44,34 @@ static const char *locale_id_for_language(onion_notify_language_t language) {
     return "pl";
   case ONION_NOTIFY_LANG_TH:
     return "th";
+  case ONION_NOTIFY_LANG_NL:
+    return "nl";
+  case ONION_NOTIFY_LANG_FI:
+    return "fi";
+  case ONION_NOTIFY_LANG_SV:
+    return "sv";
+  case ONION_NOTIFY_LANG_DA:
+    return "da";
+  case ONION_NOTIFY_LANG_NO:
+    return "no";
+  case ONION_NOTIFY_LANG_TR:
+    return "tr";
+  case ONION_NOTIFY_LANG_CS:
+    return "cs";
+  case ONION_NOTIFY_LANG_HU:
+    return "hu";
+  case ONION_NOTIFY_LANG_EL:
+    return "el";
+  case ONION_NOTIFY_LANG_RO:
+    return "ro";
+  case ONION_NOTIFY_LANG_VI:
+    return "vi";
+  case ONION_NOTIFY_LANG_ID:
+    return "id";
+  case ONION_NOTIFY_LANG_UK:
+    return "uk";
+  case ONION_NOTIFY_LANG_PT_PT:
+    return "pt-PT";
   case ONION_NOTIFY_LANG_EN:
   default:
     return "en";
@@ -103,6 +131,34 @@ onion_notify_language_t onion_notify_resolve_language(int ui_language,
     return ONION_NOTIFY_LANG_PL;
   case 14:
     return ONION_NOTIFY_LANG_TH;
+  case 15:
+    return ONION_NOTIFY_LANG_NL;
+  case 16:
+    return ONION_NOTIFY_LANG_FI;
+  case 17:
+    return ONION_NOTIFY_LANG_SV;
+  case 18:
+    return ONION_NOTIFY_LANG_DA;
+  case 19:
+    return ONION_NOTIFY_LANG_NO;
+  case 20:
+    return ONION_NOTIFY_LANG_TR;
+  case 21:
+    return ONION_NOTIFY_LANG_CS;
+  case 22:
+    return ONION_NOTIFY_LANG_HU;
+  case 23:
+    return ONION_NOTIFY_LANG_EL;
+  case 24:
+    return ONION_NOTIFY_LANG_RO;
+  case 25:
+    return ONION_NOTIFY_LANG_VI;
+  case 26:
+    return ONION_NOTIFY_LANG_ID;
+  case 27:
+    return ONION_NOTIFY_LANG_UK;
+  case 28:
+    return ONION_NOTIFY_LANG_PT_PT;
   default:
     break;
   }
@@ -121,7 +177,10 @@ onion_notify_language_t onion_notify_resolve_language(int ui_language,
     return ONION_NOTIFY_LANG_DE;
   case 5: /* Italian */
     return ONION_NOTIFY_LANG_IT;
-  case 7:  /* Portuguese (Portugal) */
+  case 6: /* Dutch */
+    return ONION_NOTIFY_LANG_NL;
+  case 7: /* Portuguese (Portugal) */
+    return ONION_NOTIFY_LANG_PT_PT;
   case 17: /* Portuguese (Brazil) */
     return ONION_NOTIFY_LANG_PT_BR;
   case 8: /* Russian */
@@ -132,12 +191,36 @@ onion_notify_language_t onion_notify_resolve_language(int ui_language,
     return ONION_NOTIFY_LANG_ZH_HANT;
   case 11: /* Simplified Chinese */
     return ONION_NOTIFY_LANG_ZH_HANS;
+  case 12: /* Finnish */
+    return ONION_NOTIFY_LANG_FI;
+  case 13: /* Swedish */
+    return ONION_NOTIFY_LANG_SV;
+  case 14: /* Danish */
+    return ONION_NOTIFY_LANG_DA;
+  case 15: /* Norwegian */
+    return ONION_NOTIFY_LANG_NO;
   case 16: /* Polish */
     return ONION_NOTIFY_LANG_PL;
+  case 19: /* Turkish */
+    return ONION_NOTIFY_LANG_TR;
   case 21: /* Arabic */
     return ONION_NOTIFY_LANG_AR;
+  case 23: /* Czech */
+    return ONION_NOTIFY_LANG_CS;
+  case 24: /* Hungarian */
+    return ONION_NOTIFY_LANG_HU;
+  case 25: /* Greek */
+    return ONION_NOTIFY_LANG_EL;
+  case 26: /* Romanian */
+    return ONION_NOTIFY_LANG_RO;
   case 27: /* Thai */
     return ONION_NOTIFY_LANG_TH;
+  case 28: /* Vietnamese */
+    return ONION_NOTIFY_LANG_VI;
+  case 29: /* Indonesian */
+    return ONION_NOTIFY_LANG_ID;
+  case 30: /* Ukrainian */
+    return ONION_NOTIFY_LANG_UK;
   default:
     return ONION_NOTIFY_LANG_EN;
   }

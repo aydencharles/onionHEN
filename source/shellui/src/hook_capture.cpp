@@ -39,14 +39,10 @@ void CaptureScreen_old(MonoObject *inst, int userId, long deviceId, int capType,
     return;
   }
 
-#if SHELL_DEBUG == 1
   LOG_DEBUG("CaptureScreen: userId: %d, deviceId: %ld, capType: %d", userId, deviceId, capType);
-#endif
 
   if(CaptureScreen()){
-#if SHELL_DEBUG == 1
     LOG_DEBUG("CaptureScreen: Shortcut activated, redirecting");
-#endif
     return;
   }
   CaptureScreen_orig_old(inst, userId, deviceId, capType, capInfo);
@@ -60,13 +56,9 @@ void CaptureScreen_new(MonoObject * inst, int userId, long deviceId, int capType
     return;
   }
 
-#if SHELL_DEBUG == 1
   LOG_DEBUG("CaptureScreen_new: userId: %d, deviceId: %ld, capType: %d", userId, deviceId, capType);
-#endif
   if(CaptureScreen()){
-#if SHELL_DEBUG == 1
     LOG_DEBUG("CaptureScreen_new: Shortcut activated, redirecting");
-#endif
     return;
   }
   CaptureScreen_orig_new(inst, userId, deviceId, capType, format, capInfo);
@@ -79,9 +71,7 @@ void OnShareButton(MonoObject * data) {
     return;
   }
 
-#if SHELL_DEBUG == 1
   LOG_DEBUG("OnShareButton: data: %p", static_cast<void *>(data));
-#endif
 
   if( g_settings.cheats_shortcut_opt == CHEATS_SINGLE_SHARE) {
     // LOG_DEBUG("Share Shortcut: Redirecting to Cheats");

@@ -27,6 +27,14 @@ along with this program; see the file COPYING. If not, see
 #include <onion/log.h>
 
 int main(void) {
+  /*
+   * Best-effort file sink: /data/OnionHEN is only created a few lines below,
+   * so this first call may not open. It is re-applied once the directory
+   * exists; until then records still reach klog, stdout and the remote log.
+   */
+  onion_log_configure("Bootstrapper", "/data/OnionHEN/OnionHEN.log");
+  onion_log_configure_crash("/data/OnionHEN/OnionHEN_crash.log");
+
   BootstrapConfig config{};
   if (!bootstrap_config_load(&config))
     return -1;
@@ -44,6 +52,9 @@ int main(void) {
 
   LOG_DEBUG("============== Spawner (Bootstrapper) Started =================");
   bootstrap_filesystem_create_directories();
+  /* The directory exists now, so this pass is the one that sticks. */
+  onion_log_configure("Bootstrapper", "/data/OnionHEN/OnionHEN.log");
+  onion_log_configure_crash("/data/OnionHEN/OnionHEN_crash.log");
   if (!bootstrap_filesystem_mount_system())
     return -1;
 

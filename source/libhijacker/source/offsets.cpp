@@ -63,7 +63,7 @@ static constexpr uint32_t V1001 = 0x10010000;
 static constexpr uint32_t V1020 = 0x10200000;
 static constexpr uint32_t V1040 = 0x10400000;
 static constexpr uint32_t V1060 = 0x10600000;
-/* 11.x / 12.x — allproc from kstuff-lite prosper0gdb/offsets (root_vnode TBD). */
+/* 11.x–13.x — allproc from kstuff-lite prosper0gdb/offsets (root_vnode TBD). */
 static constexpr uint32_t V1100 = 0x11000000;
 static constexpr uint32_t V1120 = 0x11200000;
 static constexpr uint32_t V1140 = 0x11400000;
@@ -74,6 +74,11 @@ static constexpr uint32_t V1220 = 0x12200000;
 static constexpr uint32_t V1240 = 0x12400000;
 static constexpr uint32_t V1260 = 0x12600000;
 static constexpr uint32_t V1270 = 0x12700000;
+static constexpr uint32_t V1300 = 0x13000000;
+static constexpr uint32_t V1320 = 0x13200000;
+static constexpr uint32_t V1340 = 0x13400000;
+static constexpr uint32_t V1342 = 0x13420000;
+static constexpr uint32_t V1360 = 0x13600000;
 
 
 
@@ -137,6 +142,12 @@ namespace offsets {
             case V1200: case V1202: case V1220: case V1240: case V1260:
             case V1270:
                 allprocOffset = 0x2885E00; /* kstuff 12_00..12_70 */
+                break;
+            case V1300: case V1320:
+                allprocOffset = 0x28C5E00; /* kstuff 13_00..13_20 */
+                break;
+            case V1340: case V1342: case V1360:
+                allprocOffset = 0x28C9E80; /* kstuff 13_40..13_60 */
                 break;
             default:
                 LOG_WARN("Unsupported firmware version: 0x%x", getSystemSwVersion() & VERSION_MASK);

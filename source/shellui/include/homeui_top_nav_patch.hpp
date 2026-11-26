@@ -16,8 +16,6 @@ along with this program; see the file COPYING. If not, see
 
 #pragma once
 
-struct MonoImage;
-
 /*
  * HomeUI RNPS/Hermes top-nav patch:
  * inserts the OnionHEN icon-button slot between Search and Settings by reusing
@@ -26,6 +24,10 @@ struct MonoImage;
  * Disable for A/B crash isolation (must recompile shellui):
  *   -D SHELLUI_HOMEUI_TOP_NAV_PATCH=0
  * or CMake: -DONIONHEN_SHELLUI_HOMEUI_TOP_NAV_PATCH=OFF
+ *
+ * The SetIconSource focus-icon mirror lives in onion_icon_source_hook.hpp now:
+ * the Control Center host needs it too, and neither A/B switch may blank the
+ * other feature's focused icon.
  */
 #ifndef SHELLUI_HOMEUI_TOP_NAV_PATCH
 #define SHELLUI_HOMEUI_TOP_NAV_PATCH 1
@@ -33,4 +35,3 @@ struct MonoImage;
 
 void patch_homeui_top_nav(unsigned char *buffer, int *size_ptr,
                           int buffer_capacity);
-void install_homeui_top_nav_hooks(MonoImage *react_pui);

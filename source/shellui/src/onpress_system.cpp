@@ -51,6 +51,40 @@ static OnPressResult id_log_level(OnPressContext &ctx) {
   return OnPressResult::Handled;
 }
 
+static OnPressResult id_log_max_bytes(OnPressContext &ctx) {
+  char *end = nullptr;
+  const long long selected = std::strtoll(ctx.value.c_str(), &end, 10);
+  if (end == ctx.value.c_str() || *end != '\0') {
+    LOG_WARN("Rejected log file cap: %s", ctx.value.c_str());
+    return OnPressResult::EarlyReturn;
+  }
+
+  /* The list only offers sane presets, but the cap is clamped anyway so a
+     hand-edited config cannot arrive here out of range. */
+  const int bytes = onion::clamp_log_max_bytes(selected);
+  if (bytes == g_settings.log_max_bytes) {
+    return OnPressResult::EarlyReturn;
+  }
+
+  /* Three backups are kept, so the retained history is four times the cap. */
+  LOG_INFO("Log file cap: %d bytes (%d KiB per file, %d KiB retained)", bytes,
+           bytes / 1024, bytes / 1024 * 4);
+  g_settings.log_max_bytes = bytes;
+  ctx.reload_main = true;
+  ctx.reload_util = true;
+  return OnPressResult::Handled;
+}
+
+static OnPressResult id_boot_thanks(OnPressContext &ctx) {
+  const bool enabled = value_as_int(ctx);
+  if (enabled == g_settings.show_boot_thanks) {
+    return OnPressResult::EarlyReturn;
+  }
+  g_settings.show_boot_thanks = enabled;
+  ctx.reload_main = true;
+  return OnPressResult::Handled;
+}
+
 static OnPressResult id_debug_jb(OnPressContext &ctx) {
   if (atoi(ctx.value.c_str()) == g_settings.debug_app_jb_msg) {
     LOG_WARN("Debug JB already %s",
@@ -88,7 +122,7 @@ static OnPressResult id_custom_game_opts(OnPressContext &ctx) {
 
 static OnPressResult id_ui_lang(OnPressContext &ctx) {
   int v = atoi(ctx.value.c_str());
-  if (v < onion::kUiLanguageSystem || v > onion::kUiLanguageTh)
+  if (v < onion::kUiLanguageSystem || v > onion::kUiLanguageMax)
     v = onion::kUiLanguageSystem;
   if (v == g_settings.ui_lang)
     return OnPressResult::EarlyReturn;
@@ -216,6 +250,8 @@ static OnPressResult id_toolbox_shortcut(OnPressContext &ctx) {
 static const OnPressExactEntry kExact[] = {
     {"id_start_opt", id_start_opt},
     {"id_log_level", id_log_level},
+    {"id_log_max_bytes", id_log_max_bytes},
+    {"id_boot_thanks", id_boot_thanks},
     {"id_app_jailbreak_enabled", id_app_jailbreak_enabled},
     {"id_debug_jb", id_debug_jb},
     {"id_custom_game_opts", id_custom_game_opts},

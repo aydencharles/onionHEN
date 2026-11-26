@@ -6,6 +6,7 @@
  * This file only supplies symbols that are PS5-runtime-only.
  */
 #include <elfldr_remote.h>
+#include <onion/fs.h>
 #include <ps5/net_ctl.h>
 
 #include <stdarg.h>
@@ -58,12 +59,6 @@ bool elfldr_remote_send_bytes_to(uint16_t port, const uint8_t *elf,
   (void)port;
   (void)elf;
   (void)size;
-  return false;
-}
-
-bool elfldr_remote_send_file_to(uint16_t port, const char *abs_path) {
-  (void)port;
-  (void)abs_path;
   return false;
 }
 
@@ -179,12 +174,14 @@ __attribute__((constructor)) static void host_bind_notify_send(void) {
  * defining OnionHEN_log here.
  */
 
+/* util_platform.c pulls in the PS5 kernel SDK, so it cannot be compiled for
+ * host tests. Reimplement its one helper the tests need on top of the shared
+ * reader rather than keeping a second copy of the file-reading logic here.
+ */
 int util_file_read_alloc(const char *path, char **buf_out, size_t *size_out,
                          size_t max_size) {
-  FILE *fp = NULL;
-  long file_size = 0;
+  size_t size = 0;
   char *buf = NULL;
-  size_t read_size = 0;
 
   if (path == NULL || buf_out == NULL) {
     return -1;
@@ -195,42 +192,15 @@ int util_file_read_alloc(const char *path, char **buf_out, size_t *size_out,
   }
   if (max_size == 0) {
     max_size = 1024u * 1024u;
+  } else if (max_size == (size_t)-1) {
+    max_size = 0;
   }
-
-  fp = fopen(path, "rb");
-  if (fp == NULL) {
+  if (!read_file_alloc_str(path, max_size, &buf, &size)) {
     return -1;
   }
-  if (fseek(fp, 0, SEEK_END) != 0) {
-    fclose(fp);
-    return -1;
-  }
-  file_size = ftell(fp);
-  if (file_size <= 0 ||
-      (max_size != (size_t)-1 && (size_t)file_size > max_size)) {
-    fclose(fp);
-    return -1;
-  }
-  if (fseek(fp, 0, SEEK_SET) != 0) {
-    fclose(fp);
-    return -1;
-  }
-
-  buf = (char *)malloc((size_t)file_size + 1);
-  if (buf == NULL) {
-    fclose(fp);
-    return -1;
-  }
-  read_size = fread(buf, 1, (size_t)file_size, fp);
-  fclose(fp);
-  if (read_size != (size_t)file_size) {
-    free(buf);
-    return -1;
-  }
-  buf[file_size] = '\0';
   *buf_out = buf;
   if (size_out != NULL) {
-    *size_out = (size_t)file_size;
+    *size_out = size;
   }
   return 0;
 }

@@ -446,18 +446,49 @@ int test_bridge_protocol_and_actions(void) {
   return 0;
 }
 
+/*
+ * Firmware outside every validated profile must fail closed: rendering against
+ * a profile whose node shapes were never checked is worse than a blank page.
+ * This used to probe 13.00, which is now covered — probe 14.x instead, and see
+ * test_firmware_13x_supported for the other half of the boundary.
+ */
 int test_unknown_firmware_fails_closed(void) {
   onion::plugin_ui::Document document;
   TEST_ASSERT_EQ_INT(
       static_cast<int>(onion::plugin_ui::Status::Ok),
       static_cast<int>(onion::plugin_ui::decode_document(make_document(), document)));
   const auto profile =
-      onion::shellui::dynamic_ui::FirmwareProfile::for_system_version(0x13000000);
+      onion::shellui::dynamic_ui::FirmwareProfile::for_system_version(0x14000000);
   const auto rendered =
       onion::shellui::dynamic_ui::render_page(document, "main", profile);
   TEST_ASSERT_EQ_INT(
       static_cast<int>(onion::shellui::dynamic_ui::RenderStatus::UnsupportedFirmware),
       static_cast<int>(rendered.status));
+  return 0;
+}
+
+/*
+ * Every 13.x point release must render. The gate ended at 0x12ffffff, so
+ * 13.00-13.60 fell through to the default profile and plugin pages came up
+ * blank; the upper bound is 0x13ffffff now.
+ */
+int test_firmware_13x_supported(void) {
+  onion::plugin_ui::Document document;
+  TEST_ASSERT_EQ_INT(
+      static_cast<int>(onion::plugin_ui::Status::Ok),
+      static_cast<int>(onion::plugin_ui::decode_document(make_document(), document)));
+
+  const uint32_t versions[] = {0x13000000u, 0x13200000u, 0x13400000u,
+                               0x13420000u, 0x13600000u, 0x13ffffffu};
+  for (uint32_t version : versions) {
+    const auto profile =
+        onion::shellui::dynamic_ui::FirmwareProfile::for_system_version(version);
+    const auto rendered =
+        onion::shellui::dynamic_ui::render_page(document, "main", profile);
+    TEST_ASSERT_EQ_INT(
+        static_cast<int>(onion::shellui::dynamic_ui::RenderStatus::Ok),
+        static_cast<int>(rendered.status));
+  }
   return 0;
 }
 
@@ -897,6 +928,8 @@ extern "C" int test_plugin_ui_suite(void) {
                              test_bridge_protocol_and_actions);
   failures += onion_test_run("plugin_ui_unknown_firmware",
                              test_unknown_firmware_fails_closed);
+  failures += onion_test_run("plugin_ui_firmware_13x",
+                             test_firmware_13x_supported);
   failures += onion_test_run("plugin_ui_registration_transaction",
                              test_registration_transaction_and_disconnect);
   failures += onion_test_run("plugin_ui_protocol_broker",

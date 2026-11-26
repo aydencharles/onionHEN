@@ -458,7 +458,7 @@ int onion_cheat_parse_shnext_buffer(const char *data, size_t size,
   if (cJSON_IsString(field) && field->valuestring != NULL) {
     proc_name = shnext_decrypt_process_name(field->valuestring);
     if (proc_name != NULL) {
-      snprintf(out->process, sizeof(out->process), "%s", proc_name);
+      onion_cheat_copy_utf8(out->process, sizeof(out->process), proc_name);
       onion_cheat_secure_zero(proc_name, strlen(proc_name));
       free(proc_name);
     }
@@ -466,7 +466,7 @@ int onion_cheat_parse_shnext_buffer(const char *data, size_t size,
 
   field = cJSON_GetObjectItem(root, "Game");
   if (cJSON_IsString(field) && field->valuestring != NULL) {
-    snprintf(out->name, sizeof(out->name), "%s", field->valuestring);
+    onion_cheat_copy_utf8(out->name, sizeof(out->name), field->valuestring);
   }
 
   entries_arr = cJSON_GetObjectItem(root, "patchEntries");
@@ -502,20 +502,22 @@ int onion_cheat_parse_shnext_buffer(const char *data, size_t size,
 
     entry_field = cJSON_GetObjectItem(entry_json, "name");
     if (cJSON_IsString(entry_field) && entry_field->valuestring != NULL) {
-      snprintf(cheat->name, sizeof(cheat->name), "%s",
-               entry_field->valuestring);
+      onion_cheat_copy_utf8(cheat->name, sizeof(cheat->name),
+                            entry_field->valuestring);
     }
 
     entry_field = cJSON_GetObjectItem(entry_json, "author");
     if (cJSON_IsString(entry_field) && entry_field->valuestring != NULL) {
       snprintf(cheat->description, sizeof(cheat->description), "by %s",
                entry_field->valuestring);
+      onion_cheat_copy_utf8(cheat->description, sizeof(cheat->description),
+                            cheat->description);
       onion_cheat_file_add_author(out, entry_field->valuestring);
     }
 
     if (out->process[0] != '\0') {
-      snprintf(cheat->module_name, sizeof(cheat->module_name), "%s",
-               out->process);
+      onion_cheat_copy_utf8(cheat->module_name, sizeof(cheat->module_name),
+                            out->process);
     }
 
     vars_arr = cJSON_GetObjectItem(entry_json, "Variables");

@@ -1,3 +1,4 @@
+#include <onion/fs.h>
 #include <onion/log.h>
 #include "util_platform.h"
 
@@ -5,6 +6,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,10 +69,8 @@ uint32_t util_system_fw_major(void) {
 
 int util_file_read_alloc(const char *path, char **buf_out, size_t *size_out,
                          size_t max_size) {
-  FILE *fp = NULL;
-  long file_size = 0;
+  size_t size = 0;
   char *buf = NULL;
-  size_t read_size = 0;
 
   if (path == NULL || buf_out == NULL) {
     return -1;
@@ -79,51 +79,23 @@ int util_file_read_alloc(const char *path, char **buf_out, size_t *size_out,
   if (size_out != NULL) {
     *size_out = 0;
   }
+
+  /* This helper's cap convention predates onion/fs.h: 0 means "1 MiB default"
+   * and (size_t)-1 means unlimited, whereas read_file_alloc() uses 0 for
+   * unlimited. Translate at the boundary so callers keep their meaning. */
   if (max_size == 0) {
     max_size = 1024u * 1024u;
+  } else if (max_size == (size_t)-1) {
+    max_size = 0;
   }
 
-  fp = fopen(path, "rb");
-  if (fp == NULL) {
-    return -1;
-  }
-  if (fseek(fp, 0, SEEK_END) != 0) {
-    fclose(fp);
-    return -1;
-  }
-  file_size = ftell(fp);
-  if (file_size <= 0 ||
-      (max_size != (size_t)-1 && (size_t)file_size > max_size)) {
-    fclose(fp);
-    return -1;
-  }
-  if (fseek(fp, 0, SEEK_SET) != 0) {
-    fclose(fp);
+  if (!read_file_alloc_str(path, max_size, &buf, &size)) {
     return -1;
   }
 
-  buf = (char *)calloc((size_t)file_size + 1, 1);
-  if (buf == NULL) {
-    fclose(fp);
-    return -1;
-  }
-  while (read_size < (size_t)file_size) {
-    size_t chunk =
-        fread(buf + read_size, 1, (size_t)file_size - read_size, fp);
-    if (chunk == 0) {
-      break;
-    }
-    read_size += chunk;
-  }
-  fclose(fp);
-  if (read_size != (size_t)file_size) {
-    free(buf);
-    return -1;
-  }
-  buf[file_size] = '\0';
   *buf_out = buf;
   if (size_out != NULL) {
-    *size_out = (size_t)file_size;
+    *size_out = size;
   }
   return 0;
 }
@@ -249,7 +221,19 @@ static int extract_sfo_string(const unsigned char *buffer, size_t buffer_size,
   return -1;
 }
 
-int util_resolve_game_version(const char *title_id, char *out, size_t out_size) {
+static int read_regular_capped(const char *path, char **buf, size_t *buf_size,
+                               size_t max_size) {
+  struct stat st;
+
+  if (stat(path, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size <= 0 ||
+      (max_size > 0 && (size_t)st.st_size > max_size)) {
+    return -1;
+  }
+  return util_file_read_alloc(path, buf, buf_size, max_size);
+}
+
+static int resolve_game_version_body(const char *title_id, char *out,
+                                    size_t out_size) {
   char path[256];
   char *buf = NULL;
   size_t buf_size = 0;
@@ -279,7 +263,7 @@ int util_resolve_game_version(const char *title_id, char *out, size_t out_size) 
                                  "titleVersion", "version", "APP_VER"};
     for (i = 0; i < sizeof(ps5_json_paths) / sizeof(ps5_json_paths[0]); ++i) {
       snprintf(path, sizeof(path), ps5_json_paths[i], title_id);
-      if (util_file_read_alloc(path, &buf, &buf_size, 256 * 1024) < 0) {
+      if (read_regular_capped(path, &buf, &buf_size, 256 * 1024) < 0) {
         continue;
       }
       if (extract_version_from_json(buf, buf_size, keys,
@@ -296,7 +280,7 @@ int util_resolve_game_version(const char *title_id, char *out, size_t out_size) 
       char ver[32] = {0};
       char app_ver[32] = {0};
       snprintf(path, sizeof(path), ps4_sfo_paths[i], title_id);
-      if (util_file_read_alloc(path, &buf, &buf_size, 256 * 1024) < 0) {
+      if (read_regular_capped(path, &buf, &buf_size, 256 * 1024) < 0) {
         continue;
       }
       extract_sfo_string((const unsigned char *)buf, buf_size, "VERSION", ver,
@@ -324,6 +308,23 @@ int util_resolve_game_version(const char *title_id, char *out, size_t out_size) 
   }
   (void)file_exists;
   return -1;
+}
+
+int util_resolve_game_version(const char *title_id, char *out, size_t out_size) {
+  /* One lookup at a time. A param.json open that blocks in the kernel must
+   * not stack more blocked threads behind the ShellUI menu. */
+  static atomic_int busy = 0;
+  int expected = 0;
+  int rc;
+
+  if (!atomic_compare_exchange_strong(&busy, &expected, 1)) {
+    LOG_WARN("[cheats] version lookup still busy; skipping %s",
+             title_id != NULL ? title_id : "");
+    return -1;
+  }
+  rc = resolve_game_version_body(title_id, out, out_size);
+  atomic_store(&busy, 0);
+  return rc;
 }
 
 static int read_process_table(void **buf_out, size_t *buf_size_out) {

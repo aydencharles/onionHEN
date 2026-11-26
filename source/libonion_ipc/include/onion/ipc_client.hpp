@@ -82,11 +82,14 @@ public:
   int OpenConnection(const char *path);
   bool IPCOpenConnection();
   bool IPCOpenIfNotConnected();
-  int IPCReceiveData(IPCMessage &msg, std::string &ipc_msg);
+  int IPCReceiveData(IPCMessage &msg, std::string &ipc_msg,
+                     int recv_timeout_ms = -1);
   int IPCSendData(const IPCMessage &msg);
   int IPCCloseConnection();
+  // recv_timeout_ms < 0 keeps the connection default. A non-negative value
+  // applies only to this exchange.
   bool IPCSendCommand(DaemonCommands cmd, std::string &ipc_msg1,
-                      std::string ipc_msg2 = "");
+                      std::string ipc_msg2 = "", int recv_timeout_ms = -1);
 
   // High-level commands
   int GetDaemonPid();
@@ -149,6 +152,8 @@ private:
 
   /** Unlocked: full-frame send of IPCMessage. */
   int send_frame_unlocked(const IPCMessage &msg);
-  /** Unlocked: full-frame recv into msg; forces NUL on payload. */
-  int recv_frame_unlocked(IPCMessage &msg);
+  /** Unlocked: full-frame recv into msg; forces NUL on payload.
+   *  recv_timeout_ms < 0 uses recv_timeout_ms_. Transport failure closes the
+   *  socket so a late frame cannot be read as the next command's reply. */
+  int recv_frame_unlocked(IPCMessage &msg, int recv_timeout_ms = -1);
 };

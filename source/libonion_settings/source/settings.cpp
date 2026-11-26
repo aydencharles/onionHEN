@@ -134,10 +134,13 @@ int parse_language(const char *s, int def) {
       streq_ci(s, "es-419") || streq_ci(s, "es_419")) {
     return kUiLanguageEs;
   }
+  if (streq_ci(s, "pt-PT") || streq_ci(s, "pt_pt") ||
+      streq_ci(s, "pt-pt")) {
+    return kUiLanguagePtPt;
+  }
   if (streq_ci(s, "pt-BR") || streq_ci(s, "pt_br") ||
       streq_ci(s, "pt-br") || streq_ci(s, "pt") ||
-      streq_ci(s, "portuguese") || streq_ci(s, "pt-PT") ||
-      streq_ci(s, "pt_pt")) {
+      streq_ci(s, "portuguese")) {
     return kUiLanguagePtBr;
   }
   if (streq_ci(s, "it") || streq_ci(s, "italian") ||
@@ -157,6 +160,65 @@ int parse_language(const char *s, int def) {
   if (streq_ci(s, "th") || streq_ci(s, "thai") ||
       streq_ci(s, "th-TH") || streq_ci(s, "th_th")) {
     return kUiLanguageTh;
+  }
+  if (streq_ci(s, "nl") || streq_ci(s, "dutch") ||
+      streq_ci(s, "nl-NL") || streq_ci(s, "nl_nl") ||
+      streq_ci(s, "nederlands")) {
+    return kUiLanguageNl;
+  }
+  if (streq_ci(s, "fi") || streq_ci(s, "finnish") ||
+      streq_ci(s, "fi-FI") || streq_ci(s, "fi_fi") ||
+      streq_ci(s, "suomi")) {
+    return kUiLanguageFi;
+  }
+  if (streq_ci(s, "sv") || streq_ci(s, "swedish") ||
+      streq_ci(s, "sv-SE") || streq_ci(s, "sv_se") ||
+      streq_ci(s, "svenska")) {
+    return kUiLanguageSv;
+  }
+  if (streq_ci(s, "da") || streq_ci(s, "danish") ||
+      streq_ci(s, "da-DK") || streq_ci(s, "da_dk") ||
+      streq_ci(s, "dansk")) {
+    return kUiLanguageDa;
+  }
+  if (streq_ci(s, "no") || streq_ci(s, "nb") || streq_ci(s, "norwegian") ||
+      streq_ci(s, "no-NO") || streq_ci(s, "no_no") ||
+      streq_ci(s, "norsk")) {
+    return kUiLanguageNo;
+  }
+  if (streq_ci(s, "tr") || streq_ci(s, "turkish") ||
+      streq_ci(s, "tr-TR") || streq_ci(s, "tr_tr")) {
+    return kUiLanguageTr;
+  }
+  if (streq_ci(s, "cs") || streq_ci(s, "czech") ||
+      streq_ci(s, "cs-CZ") || streq_ci(s, "cs_cz")) {
+    return kUiLanguageCs;
+  }
+  if (streq_ci(s, "hu") || streq_ci(s, "hungarian") ||
+      streq_ci(s, "hu-HU") || streq_ci(s, "hu_hu") ||
+      streq_ci(s, "magyar")) {
+    return kUiLanguageHu;
+  }
+  if (streq_ci(s, "el") || streq_ci(s, "greek") ||
+      streq_ci(s, "el-GR") || streq_ci(s, "el_gr")) {
+    return kUiLanguageEl;
+  }
+  if (streq_ci(s, "ro") || streq_ci(s, "romanian") ||
+      streq_ci(s, "ro-RO") || streq_ci(s, "ro_ro")) {
+    return kUiLanguageRo;
+  }
+  if (streq_ci(s, "vi") || streq_ci(s, "vietnamese") ||
+      streq_ci(s, "vi-VN") || streq_ci(s, "vi_vn")) {
+    return kUiLanguageVi;
+  }
+  if (streq_ci(s, "id") || streq_ci(s, "in") || streq_ci(s, "indonesian") ||
+      streq_ci(s, "id-ID") || streq_ci(s, "id_id") ||
+      streq_ci(s, "indonesia")) {
+    return kUiLanguageId;
+  }
+  if (streq_ci(s, "uk") || streq_ci(s, "ukrainian") ||
+      streq_ci(s, "uk-UA") || streq_ci(s, "uk_ua")) {
+    return kUiLanguageUk;
   }
   return def;
 }
@@ -193,6 +255,34 @@ const char *language_name(int v) {
     return "pl";
   case kUiLanguageTh:
     return "th";
+  case kUiLanguageNl:
+    return "nl";
+  case kUiLanguageFi:
+    return "fi";
+  case kUiLanguageSv:
+    return "sv";
+  case kUiLanguageDa:
+    return "da";
+  case kUiLanguageNo:
+    return "no";
+  case kUiLanguageTr:
+    return "tr";
+  case kUiLanguageCs:
+    return "cs";
+  case kUiLanguageHu:
+    return "hu";
+  case kUiLanguageEl:
+    return "el";
+  case kUiLanguageRo:
+    return "ro";
+  case kUiLanguageVi:
+    return "vi";
+  case kUiLanguageId:
+    return "id";
+  case kUiLanguageUk:
+    return "uk";
+  case kUiLanguagePtPt:
+    return "pt-PT";
   case kUiLanguageSystem:
   default:
     return "system";
@@ -241,6 +331,40 @@ const char *log_level_name(int v) {
   default:
     return "info";
   }
+}
+
+/*
+ * Accepts a raw byte count or a k/m suffixed one ("512k", "2m", "2097152").
+ * 0, negative, and unparseable all fall back to `def`; anything else is clamped
+ * by clamp_log_max_bytes().
+ */
+int parse_max_bytes(const char *s, int def) {
+  if (!s) {
+    return def;
+  }
+  char *end = nullptr;
+  const long long v = std::strtoll(s, &end, 10);
+  if (end == s) {
+    return def;
+  }
+  while (*end == ' ' || *end == '\t') {
+    ++end;
+  }
+  long long mult = 1;
+  if (*end == 'k' || *end == 'K') {
+    mult = 1024;
+    ++end;
+  } else if (*end == 'm' || *end == 'M') {
+    mult = 1024 * 1024;
+    ++end;
+  } else if (*end != '\0') {
+    return def; /* trailing junk */
+  }
+  /* Bound before multiplying so a huge literal cannot overflow. */
+  if (v > kLogMaxBytesMax || v < -kLogMaxBytesMax) {
+    return kLogMaxBytesMax;
+  }
+  return clamp_log_max_bytes(v * mult);
 }
 
 int parse_cheats_mirror(const char *s, int def) {
@@ -691,8 +815,12 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->startup_open_after_load = parse_startup_open_after_load(
       ini_get(parser, "startup.open_after_load"),
       out->startup_open_after_load);
+  out->show_boot_thanks = parse_bool(ini_get(parser, "startup.show_thanks"),
+                                     out->show_boot_thanks);
   out->log_level =
       parse_log_level(ini_get(parser, "logging.level"), out->log_level);
+  out->log_max_bytes =
+      parse_max_bytes(ini_get(parser, "logging.max_bytes"), out->log_max_bytes);
   out->display_tids = parse_bool(
       ini_get(parser, "home_screen.show_title_ids"), out->display_tids);
   out->onionhen_game_opts =
@@ -843,6 +971,9 @@ std::string settings_serialize(const Settings &in) {
   b += "open_after_load=" +
        std::string(startup_open_after_load_name(in.startup_open_after_load)) +
        "\n";
+  b += "# show_thanks shows the contributor thanks toast when OnionHEN starts.\n";
+  b += "# Available values: true, false\n";
+  b += "show_thanks=" + bool_text(in.show_boot_thanks) + "\n";
   b += "\n";
   b += "[logging]\n";
   b += "# level controls how much OnionHEN records to its log files.\n";
@@ -850,6 +981,14 @@ std::string settings_serialize(const Settings &in) {
   b += "# Raise to debug when reproducing an issue for a bug report.\n";
   b += "# Release builds compile out trace, so trace behaves as debug.\n";
   b += "level=" + std::string(log_level_name(in.log_level)) + "\n";
+  b += "# max_bytes caps a single log file before it rotates, in bytes.\n";
+  b += "# A k or m suffix is accepted, e.g. 512k or 2m.\n";
+  b += "# Three backups are kept next to the live file, so the retained\n";
+  b += "# history is 4x this value (the default 786432 keeps 3 MiB).\n";
+  b += "# Range: 65536 .. 67108864 (256 KiB .. 64 MiB per file).\n";
+  b += "# Raise it before enabling debug or trace: at trace the default\n";
+  b += "# budget can fill in seconds and evict the startup records.\n";
+  b += "max_bytes=" + std::to_string(in.log_max_bytes) + "\n";
   b += "\n";
   b += "[home_screen]\n";
   b += "# show_title_ids displays app Title IDs on the PS5 home screen.\n";

@@ -9,7 +9,7 @@ code here makes `source/` exclusively first-party code.
 | [`cjson/`](cjson/) | Vendored source | JSON parsing and serialization |
 | [`cheat_support/`](cheat_support/) | Vendored source | AES, base64, miniz and SHA-256 used by cheat parsers |
 | [`keystone/`](keystone/) | Headers + prebuilt archive | ShnExt assembly support |
-| [`kstuff-lite/`](kstuff-lite/) | Git submodule | Produces the optional embedded `kstuff.elf` |
+| [`kstuff-lite/`](kstuff-lite/) | Git submodule (v1.11) | Produces the optional embedded `kstuff.elf`; packaging prefers the matching GitHub release blob |
 
 Third-party file names retain their upstream spelling even when it differs
 from the project's snake_case convention. This keeps upstream updates easy to

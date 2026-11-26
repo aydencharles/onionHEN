@@ -92,7 +92,7 @@ void stripDashes(char *s) {
 int parseXmlMutating(char *xml, onion_cheat_file_t &out) {
   const char *cursor = xml;
   char process[128];
-  char game_name[128];
+  char game_name[256];
 
   LOG_DEBUG("[engine] parse_xml begin");
   onion_cheat_file_clear(&out);
@@ -108,8 +108,8 @@ int parseXmlMutating(char *xml, onion_cheat_file_t &out) {
     LOG_ERROR("[engine] parse_xml trainer attrs missing");
     return -1;
   }
-  std::snprintf(out.process, sizeof(out.process), "%s", process);
-  std::snprintf(out.name, sizeof(out.name), "%s", game_name);
+  onion_cheat_copy_utf8(out.process, sizeof(out.process), process);
+  onion_cheat_copy_utf8(out.name, sizeof(out.name), game_name);
   /* GoldHEN SHN/MC4: Moder="AuthorName" on Trainer */
   moder[0] = '\0';
   if (findXmlAttr(xml, "Trainer", "Moder", moder, sizeof(moder)) == 0 &&
@@ -122,7 +122,7 @@ int parseXmlMutating(char *xml, onion_cheat_file_t &out) {
   while ((cursor = std::strstr(cursor, "<Cheat ")) != nullptr) {
     const char *cheat_end = std::strstr(cursor, "</Cheat>");
     const char *line_cursor = cursor;
-    char name[128];
+    char name[256];
     char description[256];
 
     if (onion_cheat_file_ensure_cheat(&out) != 0) {
@@ -143,9 +143,9 @@ int parseXmlMutating(char *xml, onion_cheat_file_t &out) {
     description[0] = '\0';
     (void)findXmlAttr(cursor, "Cheat", "Description", description,
                       sizeof(description));
-    std::snprintf(entry->name, sizeof(entry->name), "%s", name);
-    std::snprintf(entry->description, sizeof(entry->description), "%s",
-                  description);
+    onion_cheat_copy_utf8(entry->name, sizeof(entry->name), name);
+    onion_cheat_copy_utf8(entry->description, sizeof(entry->description),
+                          description);
     std::snprintf(entry->module_name, sizeof(entry->module_name), "%s",
                   process);
 

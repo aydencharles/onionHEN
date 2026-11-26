@@ -29,4 +29,3 @@ extern bool show_notification;
 void startMessageReceiver();
 bool hasPrefixHandler(const uint32_t prefix) noexcept;
 void* messageThread(void*);
-bool GetFileContents(const char *path, char **buffer);

@@ -103,6 +103,8 @@ static const OnPressExactEntry kRootExact[] = {
     {"id_donator_aglx", id_presentation_card},
     {"id_donator_ljf", id_presentation_card},
     {"id_donator_szx", id_presentation_card},
+    {"id_donator_xiaomao", id_presentation_card},
+    {"id_donator_xie", id_presentation_card},
 };
 
 const OnPressExactEntry *onpress_misc_root_exact(size_t *count) {

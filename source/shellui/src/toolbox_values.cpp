@@ -79,6 +79,12 @@ const ExactValueEntry kExactValues[] = {
                : g_settings.log_level;
        return int_str(effective);
      }},
+    {"id_boot_thanks",
+     +[]() -> std::string { return bool_str(g_settings.show_boot_thanks); }},
+    {"id_log_max_bytes",
+     +[]() -> std::string {
+       return int_str(onion::clamp_log_max_bytes(g_settings.log_max_bytes));
+     }},
     {"id_debug_jb",
      +[]() -> std::string { return bool_str(g_settings.debug_app_jb_msg); }},
     {"id_app_jailbreak_enabled",

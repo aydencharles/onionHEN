@@ -5,10 +5,8 @@
 
 #include "sha1.h"
 
-#include <errno.h>
 #include <stdint.h>
 #include <string.h>
-#include <unistd.h>
 
 typedef struct {
   uint32_t state[5];
@@ -241,29 +239,4 @@ void sha1_hash(const uint8_t *data, size_t len, uint8_t digest[SHA1_DIGEST_SIZE]
     }
   }
   SHA1Final(digest, &ctx);
-}
-
-bool sha1_hash_fd(int fd, uint8_t digest[SHA1_DIGEST_SIZE]) {
-  unsigned char buf[64 * 1024];
-  SHA1_CTX ctx;
-
-  if (fd < 0 || !digest)
-    return false;
-  if (lseek(fd, 0, SEEK_SET) < 0)
-    return false;
-
-  SHA1Init(&ctx);
-  for (;;) {
-    const ssize_t n = read(fd, buf, sizeof(buf));
-    if (n < 0) {
-      if (errno == EINTR)
-        continue;
-      return false;
-    }
-    if (n == 0)
-      break;
-    SHA1Update(&ctx, buf, (uint32_t)n);
-  }
-  SHA1Final(digest, &ctx);
-  return true;
 }

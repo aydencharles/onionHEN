@@ -30,6 +30,10 @@ REQUIRED_TOKENS = {
         "plugins.link.sub": ("Kstuff",),
     },
     "notifications": {
+        # The author toast credits the author. The thanks toast names the
+        # contributor.
+        "notify.boot.made_by": ("0xp0co",),
+        "notify.boot.thanks": ("kvnhrt", "Modmycon"),
         "notify.kstuff.loading": ("Kstuff",),
         "notify.kstuff.load_failed": ("Kstuff",),
         "notify.kstuff.load_elfldr_failed": ("Kstuff",),
@@ -56,6 +60,20 @@ FILENAME_IDS = {
     "ru-RU.json": ("ru", False),
     "ar-SA.json": ("ar", False),
     "th-TH.json": ("th", False),
+    "nl-NL.json": ("nl", False),
+    "fi-FI.json": ("fi", False),
+    "sv-SE.json": ("sv", False),
+    "da-DK.json": ("da", False),
+    "no-NO.json": ("no", False),
+    "tr-TR.json": ("tr", False),
+    "cs-CZ.json": ("cs", False),
+    "hu-HU.json": ("hu", False),
+    "el-GR.json": ("el", False),
+    "ro-RO.json": ("ro", False),
+    "vi-VN.json": ("vi", False),
+    "id-ID.json": ("id", False),
+    "uk-UA.json": ("uk", False),
+    "pt-PT.json": ("pt-PT", False),
 }
 
 

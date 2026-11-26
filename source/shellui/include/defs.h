@@ -22,20 +22,17 @@ along with this program; see the file COPYING. If not, see
 #define PRE_RELEASE 0
 
 /*
- * Guards ~50 verbose diagnostic blocks in the ShellUI hooks. It was hardcoded
- * to 1, so those blocks shipped in release payloads — ShellUI is an injected
- * system process, and the chattiest logs in the project ran on every boot.
+ * The ShellUI hook diagnostics are logged unconditionally. They used to sit
+ * behind a SHELL_DEBUG macro that followed NDEBUG, which meant a release build
+ * silently dropped the records that explain why a HomeUI profile did not match
+ * or why a hook declined to fire — the exact questions a bug report asks.
  *
- * Follows the build type via NDEBUG; override with -DSHELL_DEBUG=1 to get the
- * verbose blocks in a release build when chasing a report.
+ * ShellUI is an injected system process, so the volume is real. Gate it at run
+ * time instead of compile time: `[logging] level` in config.ini, or the
+ * "Log output level" selector in the Toolbox. Most of these records are DEBUG,
+ * so they need level=debug; the failure paths are WARN/ERROR and show at the
+ * default level.
  */
-#ifndef SHELL_DEBUG
-#ifdef NDEBUG
-#define SHELL_DEBUG 0
-#else
-#define SHELL_DEBUG 1
-#endif
-#endif
 
 #define libSceKernelHandle 0x2001
 #define KERNEL_DLSYM(handle, sym) \

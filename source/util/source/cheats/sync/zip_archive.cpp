@@ -4,6 +4,7 @@
 
 #include <onion/fs.h>
 #include <onion/log.h>
+#include <onion/tree.h>
 
 #include <miniz.h>
 

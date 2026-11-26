@@ -135,7 +135,7 @@ bool CheatSyncService::cancel(uint32_t task_id) {
     status_.phase = "cancel";
     status_.progress_percent = -1;
   }
-  onion_notify_debug("notify.cheats.sync.cancelling");
+  onion_notify_debug(/*show_watermark=*/0, "notify.cheats.sync.cancelling");
   LOG_INFO("cheat sync cancellation requested task_id=%u", task_id);
   return true;
 }
@@ -278,7 +278,7 @@ void CheatSyncService::worker(onion::Settings settings, std::string catalog_id,
   }
 
   if (result.status == SyncStatus::Cancelled) {
-    onion_notify_debug("notify.cheats.sync.cancelled");
+    onion_notify_debug(/*show_watermark=*/0, "notify.cheats.sync.cancelled");
     LOG_INFO("cheat sync cancelled catalog=%s", catalog->id());
   } else if (result.status == SyncStatus::Ok) {
     onion_notify(true, "notify.cheats.sync.ok", catalog->id());

@@ -29,6 +29,15 @@ if(NOT ONIONHEN_SHELLUI_HOMEUI_TOP_NAV_PATCH)
 	message(STATUS "shellui: HomeUI top-nav patch DISABLED")
 endif()
 
+# A/B: disable the NPXS40003 Control Center extension host.
+#   cmake -DONIONHEN_SHELLUI_CONTROL_CENTER_PATCH=OFF ...
+option(ONIONHEN_SHELLUI_CONTROL_CENTER_PATCH
+	"Patch the 11.6 Control Center with the registration SDK host" ON)
+if(NOT ONIONHEN_SHELLUI_CONTROL_CENTER_PATCH)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE SHELLUI_CONTROL_CENTER_PATCH=0)
+	message(STATUS "shellui: Control Center SDK patch DISABLED")
+endif()
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(I18N_DIR "${D_CWD}/../i18n")
@@ -77,6 +86,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 target_link_directories	(${PROJECT_NAME} PUBLIC "${ONIONHEN_PS5_STUB_DIR}")
 target_link_libraries	(${PROJECT_NAME} PUBLIC onion_payload onion_detour onion_proc onion_platform onion_ipc onion_settings onion_ready onion_plugin_ui onion_plugin_bridge SceRegMgr SceSystemService SceUserService SceNetCtl)
+# External in-process PRX modules resolve only the narrow Control Center C ABI.
+target_link_options(${PROJECT_NAME} PRIVATE
+	"-Wl,--export-dynamic-symbol=onion_cc_register"
+	"-Wl,--export-dynamic-symbol=onion_cc_unregister"
+)
 
 # Add post-build command
 onion_strip_debug(${PROJECT_NAME})

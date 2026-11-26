@@ -108,9 +108,7 @@ int OnPress_Hook(MonoObject *Instance, MonoObject *element, MonoObject *e) {
     return call_original(Instance, element, e);
 
   if (!Instance || !element) {
-#if SHELL_DEBUG == 1
     LOG_DEBUG("[LM HOOK] OnPress_Hook: args are null");
-#endif
     return call_original(Instance, element, e);
   }
 
@@ -137,11 +135,9 @@ int OnPress_Hook(MonoObject *Instance, MonoObject *element, MonoObject *e) {
     return call_original(Instance, element, e);
   }
 
-#if SHELL_DEBUG == 1
   LOG_DEBUG("[LM HOOK] OnPress_Hook: page=%u Id=%s Value=%s",
               static_cast<unsigned>(g_ui.active_page), ctx.id.c_str(),
               ctx.value.c_str());
-#endif
 
   const OnPressResult result = dispatch_toolbox_press(domain, ctx);
 

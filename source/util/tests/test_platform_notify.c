@@ -42,7 +42,7 @@ static int test_notify_format_no_watermark(void) {
 static int test_notify_send_noop(void) {
   /* hits sceKernelSendNotificationRequest stub — must not crash */
   onion_notify(1, "host test notify %d", 7);
-  onion_notify_debug("host test debug notify %d", 7);
+  onion_notify_debug(0, "host test debug notify %d", 7);
   return 0;
 }
 
@@ -65,7 +65,7 @@ static int test_notify_debug_localized(void) {
   onion_notify_set_send(capture_debug_notify);
   onion_notify_set_language(ONION_NOTIFY_LANG_ZH_HANS);
 
-  onion_notify_debug("notify.remote_play.pairing_cancelled");
+  onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.pairing_cancelled");
 
   TEST_ASSERT_TRUE(g_debug_notify_request_size ==
                    sizeof(g_debug_notify_request));
@@ -75,10 +75,16 @@ static int test_notify_debug_localized(void) {
   TEST_ASSERT_TRUE(g_debug_notify_request[0x42D] == '\0');
 
   onion_notify_set_language(ONION_NOTIFY_LANG_EN);
-  onion_notify_debug("notify.remote_play.paired");
+  onion_notify_debug(/*show_watermark=*/0, "notify.remote_play.paired");
   TEST_ASSERT_TRUE(g_debug_notify_request[0x2C] == 0);
   TEST_ASSERT_STREQ("Remote Play device paired.",
                     (const char *)&g_debug_notify_request[0x2D]);
+
+  onion_notify_debug(/*show_watermark=*/1, "notify.boot.thanks");
+  TEST_ASSERT_TRUE(g_debug_notify_request[0x2C] == 0);
+  TEST_ASSERT_STREQ("[OnionHEN] Special Thanks to: kvnhrt, Modmycon",
+                    (const char *)&g_debug_notify_request[0x2D]);
+  TEST_ASSERT_TRUE(g_debug_notify_request[0x42D] == '\0');
 
   onion_notify_set_send(NULL);
   return 0;
@@ -115,6 +121,34 @@ static int test_notify_language_resolution(void) {
                      onion_notify_resolve_language(13, 1));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_TH,
                      onion_notify_resolve_language(14, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_NL,
+                     onion_notify_resolve_language(15, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_FI,
+                     onion_notify_resolve_language(16, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_SV,
+                     onion_notify_resolve_language(17, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_DA,
+                     onion_notify_resolve_language(18, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_NO,
+                     onion_notify_resolve_language(19, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_TR,
+                     onion_notify_resolve_language(20, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_CS,
+                     onion_notify_resolve_language(21, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_HU,
+                     onion_notify_resolve_language(22, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_EL,
+                     onion_notify_resolve_language(23, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_RO,
+                     onion_notify_resolve_language(24, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_VI,
+                     onion_notify_resolve_language(25, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_ID,
+                     onion_notify_resolve_language(26, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_UK,
+                     onion_notify_resolve_language(27, 1));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_PT_PT,
+                     onion_notify_resolve_language(28, 1));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_AR,
                      onion_notify_resolve_language(0, 21));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_JA,
@@ -139,8 +173,34 @@ static int test_notify_language_resolution(void) {
                      onion_notify_resolve_language(0, 20));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_PT_BR,
                      onion_notify_resolve_language(0, 17));
-  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_PT_BR,
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_PT_PT,
                      onion_notify_resolve_language(0, 7));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_NL,
+                     onion_notify_resolve_language(0, 6));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_FI,
+                     onion_notify_resolve_language(0, 12));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_SV,
+                     onion_notify_resolve_language(0, 13));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_DA,
+                     onion_notify_resolve_language(0, 14));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_NO,
+                     onion_notify_resolve_language(0, 15));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_TR,
+                     onion_notify_resolve_language(0, 19));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_CS,
+                     onion_notify_resolve_language(0, 23));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_HU,
+                     onion_notify_resolve_language(0, 24));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_EL,
+                     onion_notify_resolve_language(0, 25));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_RO,
+                     onion_notify_resolve_language(0, 26));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_VI,
+                     onion_notify_resolve_language(0, 28));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_ID,
+                     onion_notify_resolve_language(0, 29));
+  TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_UK,
+                     onion_notify_resolve_language(0, 30));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_IT,
                      onion_notify_resolve_language(0, 5));
   TEST_ASSERT_EQ_INT(ONION_NOTIFY_LANG_RU,
@@ -197,6 +257,21 @@ static int test_notify_format_localized(void) {
   onion_notify_set_language(ONION_NOTIFY_LANG_TH);
   format_msg(out, sizeof(out), 1, "notify.priv.unable");
   TEST_ASSERT_STREQ("[OnionHEN] ไม่สามารถยกระดับสิทธิ์ได้", out);
+  onion_notify_set_language(ONION_NOTIFY_LANG_NL);
+  format_msg(out, sizeof(out), 1, "notify.priv.unable");
+  TEST_ASSERT_STREQ("[OnionHEN] Rechten konden niet worden verhoogd", out);
+  onion_notify_set_language(ONION_NOTIFY_LANG_TR);
+  format_msg(out, sizeof(out), 1, "notify.priv.unable");
+  TEST_ASSERT_STREQ("[OnionHEN] Yetkiler yükseltilemedi", out);
+  onion_notify_set_language(ONION_NOTIFY_LANG_VI);
+  format_msg(out, sizeof(out), 1, "notify.priv.unable");
+  TEST_ASSERT_STREQ("[OnionHEN] Không nâng được quyền", out);
+  onion_notify_set_language(ONION_NOTIFY_LANG_UK);
+  format_msg(out, sizeof(out), 1, "notify.priv.unable");
+  TEST_ASSERT_STREQ("[OnionHEN] Не вдалося підвищити права", out);
+  onion_notify_set_language(ONION_NOTIFY_LANG_PT_PT);
+  format_msg(out, sizeof(out), 1, "notify.priv.unable");
+  TEST_ASSERT_STREQ("[OnionHEN] Não foi possível elevar os privilégios", out);
   return 0;
 }
 

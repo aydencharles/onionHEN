@@ -531,21 +531,6 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       show_while_not_open ? not_open_tid : running_tid;
   IPC_Client& client = IPC_Client::getInstance(true);
 
-  std::string game_ver;
-  const bool have_version = client.GameVerFromTid(target_tid, game_ver);
-  const std::string display_ver =
-      have_version ? game_ver : toolbox_i18n::tr("cheats.ver_unknown");
-
-  ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
-                                      target_tid.c_str(),
-                                      display_ver.c_str()));
-
-  if (!g_ui.is_game_open && show_while_not_open) {
-    page.label("id_cheat_disclaimer",
-               toolbox_i18n::format("cheats.not_running_fmt", target_tid.c_str()),
-               ps5ui::Style::Center);
-  }
-
   std::string cheat_path;
   onion_bigapp_process_t process{};
   int process_result = -1;
@@ -570,26 +555,38 @@ void generate_cheats_xml(std::string& new_xml, std::string& not_open_tid,
       (process_result == 0 || process_result == -2);
   const std::string mode = runtime_request ? "runtime" : "browse";
   const int cheat_pid = runtime_request ? process.pid : 0;
-  if (!client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,
-                            runtime_request ? process.appid : 0,
-                            runtime_request ? process.process_name : "",
-                            runtime_request ? process.session_generation : 0)) {
-    page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
-               ps5ui::Style::Center);
-    new_xml = page.build();
-    return;
+  std::string json_string;
+  if (client.GetGameCheats(target_tid, cheat_path, mode, cheat_pid,
+                           runtime_request ? process.appid : 0,
+                           runtime_request ? process.process_name : "",
+                           runtime_request ? process.session_generation : 0)) {
+    json_string = read_file_to_string(cheat_path.c_str());
+    unlink(cheat_path.c_str());
   }
-
-  const std::string json_string = read_file_to_string(cheat_path.c_str());
-  if (json_string.empty()) {
-    new_xml = page.build();
-    return;
-  }
-  unlink(cheat_path.c_str());
 
   onion_cjson::Root res_json(json_string);
-  if (!res_json) {
+  std::string display_ver = toolbox_i18n::tr("cheats.ver_unknown");
+  if (res_json) {
+    const std::string version =
+        onion_cjson::string_item(res_json.get(), "version", "");
+    if (!version.empty()) {
+      display_ver = version;
+    }
+  } else if (!json_string.empty()) {
     LOG_ERROR("Failed to parse json from cheat response!");
+  }
+
+  ps5ui::Page page(list_id, toolbox_i18n::format("cheats.title_fmt",
+                                                 target_tid.c_str(),
+                                                 display_ver.c_str()));
+  if (!g_ui.is_game_open && show_while_not_open) {
+    page.label("id_cheat_disclaimer",
+               toolbox_i18n::format("cheats.not_running_fmt", target_tid.c_str()),
+               ps5ui::Style::Center);
+  }
+  if (!res_json) {
+    page.label("id_cheat_missing", toolbox_i18n::tr("cheats.missing"),
+               ps5ui::Style::Center);
     new_xml = page.build();
     return;
   }
@@ -658,6 +655,10 @@ constexpr const char* kIconDonatorSzx =
     "/user/data/OnionHEN/assets/icon_xml_donator_szx.png";
 constexpr const char* kIconDonatorAglx =
     "/user/data/OnionHEN/assets/icon_xml_donator_aglx.png";
+constexpr const char* kIconDonatorXiaomao =
+    "/user/data/OnionHEN/assets/icon_xml_donator_xiaomao.png";
+constexpr const char* kIconDonatorXie =
+    "/user/data/OnionHEN/assets/icon_xml_donator_xie.png";
 
 bool toolbox_on(const char* id) {
   return resolve_toolbox_control_value(id) == "1";
@@ -687,8 +688,9 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
             toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
       .link("id_usb_payloads", toolbox_i18n::tr("usb_payloads.title"),
             "usb_payloads.xml", toolbox_i18n::tr("usb_payloads.link.sub"),
-            kIconPlugins);
-  /* SPRX catalog UI is untested; restore id_sprx -> sprx.xml when it is. */
+            kIconPlugins)
+      .link("id_sprx", toolbox_i18n::tr("sprx.link"), "sprx.xml",
+            toolbox_i18n::tr("sprx.link.sub"), kIconPlugins);
 }
 
 void append_toolbox_game_group(ps5ui::Group& g) {
@@ -830,6 +832,8 @@ void append_toolbox_preferences_group(ps5ui::Group& g) {
          toolbox_val("id_start_opt", "0"),
          toolbox_i18n::tr("startup.open_after_load.confirm"),
          toolbox_i18n::tr("startup.open_after_load.confirm_phrase"))
+      .toggle("id_boot_thanks", toolbox_i18n::tr("boot.thanks"),
+              toolbox_on("id_boot_thanks"), toolbox_i18n::tr("boot.thanks.sub"))
       .list("id_ui_lang", toolbox_i18n::tr("lang.list"),
          [](ps5ui::ListBuilder& L) {
            L.item("id_ui_lang_system", toolbox_i18n::tr("lang.system"), "0")
@@ -846,7 +850,21 @@ void append_toolbox_preferences_group(ps5ui::Group& g) {
                .item("id_ui_lang_pl", toolbox_i18n::tr("lang.pl"), "13")
                .item("id_ui_lang_ru", toolbox_i18n::tr("lang.ru"), "12")
                .item("id_ui_lang_ar", toolbox_i18n::tr("lang.ar"), "3")
-               .item("id_ui_lang_th", toolbox_i18n::tr("lang.th"), "14");
+               .item("id_ui_lang_th", toolbox_i18n::tr("lang.th"), "14")
+               .item("id_ui_lang_nl", toolbox_i18n::tr("lang.nl"), "15")
+               .item("id_ui_lang_fi", toolbox_i18n::tr("lang.fi"), "16")
+               .item("id_ui_lang_sv", toolbox_i18n::tr("lang.sv"), "17")
+               .item("id_ui_lang_da", toolbox_i18n::tr("lang.da"), "18")
+               .item("id_ui_lang_no", toolbox_i18n::tr("lang.no"), "19")
+               .item("id_ui_lang_tr", toolbox_i18n::tr("lang.tr"), "20")
+               .item("id_ui_lang_cs", toolbox_i18n::tr("lang.cs"), "21")
+               .item("id_ui_lang_hu", toolbox_i18n::tr("lang.hu"), "22")
+               .item("id_ui_lang_el", toolbox_i18n::tr("lang.el"), "23")
+               .item("id_ui_lang_ro", toolbox_i18n::tr("lang.ro"), "24")
+               .item("id_ui_lang_vi", toolbox_i18n::tr("lang.vi"), "25")
+               .item("id_ui_lang_id", toolbox_i18n::tr("lang.id"), "26")
+               .item("id_ui_lang_uk", toolbox_i18n::tr("lang.uk"), "27")
+               .item("id_ui_lang_pt", toolbox_i18n::tr("lang.pt"), "28");
          },
          toolbox_i18n::tr("lang.list.sub"), toolbox_val("id_ui_lang", "0"))
       .list("id_toolbox_shortcut", toolbox_i18n::tr("sc.toolbox"),
@@ -904,6 +922,17 @@ void append_toolbox_debug_group(ps5ui::Group& g) {
            }
          },
          toolbox_i18n::tr("log.level.sub"), toolbox_val("id_log_level", "3"))
+      .list("id_log_max_bytes", toolbox_i18n::tr("log.max_bytes"),
+            [](ps5ui::ListBuilder& L) {
+              /* Sizes are unit-only on purpose: no locale needs them
+                 translated, so the list stays identical in every language. */
+              L.item("id_log_max_bytes_256k", "256 KiB", "262144")
+                  .item("id_log_max_bytes_768k", "768 KiB", "786432")
+                  .item("id_log_max_bytes_2m", "2 MiB", "2097152")
+                  .item("id_log_max_bytes_8m", "8 MiB", "8388608");
+            },
+            toolbox_i18n::tr("log.max_bytes.sub"),
+            toolbox_val("id_log_max_bytes", "786432"))
       .toggle("id_app_jailbreak_enabled",
               toolbox_i18n::tr("app_jailbreak.enabled"),
               toolbox_on("id_app_jailbreak_enabled"),
@@ -942,7 +971,11 @@ void append_toolbox_about_group(ps5ui::Group& g) {
              .button("id_donator_ljf", "狂爱龙卷風", std::nullopt,
                      std::nullopt, kIconDonatorLjf)
              .button("id_donator_szx", "石之心", std::nullopt,
-                     std::nullopt, kIconDonatorSzx);
+                     std::nullopt, kIconDonatorSzx)
+             .button("id_donator_xiaomao", "小猫小子", std::nullopt,
+                     std::nullopt, kIconDonatorXiaomao)
+             .button("id_donator_xie", "B站谢锡榆", std::nullopt,
+                     std::nullopt, kIconDonatorXie);
        },
        toolbox_i18n::tr("about.donate.sub"), kIconDonations)
       .group(
@@ -977,6 +1010,9 @@ void append_toolbox_about_group(ps5ui::Group& g) {
                        ps5ui::Style::Center)
                 .label("id_about_tester_4",
                        "小小蔡 · B站谢锡榆 · 荆枫",
+                       ps5ui::Style::Center)
+                .label("id_about_tester_5",
+                       "苏打先森 · 噢 · 天天向上",
                        ps5ui::Style::Center)
                 .label("id_about_more", toolbox_i18n::tr("about.more"),
                        ps5ui::Style::Center);

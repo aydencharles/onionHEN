@@ -18,6 +18,7 @@ set_source_files_properties("${ONION_CJSON_SOURCE}" PROPERTIES
 
 add_library(${PROJECT_NAME} STATIC
   source/fs.c
+  source/tree.c
   source/log.c
   source/net.c
   source/notify.c

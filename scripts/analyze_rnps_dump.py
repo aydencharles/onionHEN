@@ -77,6 +77,21 @@ KNOWN_HOMEUI_PROFILES = [
         "file_length": 0x1B70E4,
         "source_hash": "d9aa3ec2fcf7cc0bb0a7fe6362079c494948cf5e",
     },
+    {
+        # Every known 13.x NPXS40002 dump (13.0, 13.2, 13.4, 13.42, 13.6)
+        # is byte-identical.
+        "name": "13.0/13.2/13.4/13.42/13.6 NPXS40002 HomeUI",
+        "hbc_version": 89,
+        "file_length": 0x1B6584,
+        "source_hash": "80837fe66ccb00ba923f279c90b78c7c4813e543",
+    },
+    {
+        # 13.600.007 ShellUI loads the OTA bundle, not the /system_ex file above.
+        "name": "13.600.007 OTA NPXS40002 HomeUI",
+        "hbc_version": 89,
+        "file_length": 0x1B6594,
+        "source_hash": "f73c3e0102be92a4558baa510bd00c17f6fe5f96",
+    },
 ]
 
 
@@ -120,6 +135,14 @@ KNOWN_LEGACY_HOMEUI_PROFILES = [
         "payload_size": 0x185C30,
         "file_size": 0x186750,
         "sha256": "bfa53c6bd1fd4c468ebf7ee44955db0cf8286f116a8ab1870b756de0efbfc5fb",
+    },
+    {
+        # 5.50 ShellUI loads the OTA bundle, not the /system_ex file above.
+        "name": "5.50 OTA NPXS40002 legacy HomeUI",
+        "payload_magic": LEGACY_BUNDLE_MAGIC.hex(),
+        "payload_size": 0x185AD0,
+        "file_size": 0x1865F0,
+        "sha256": "42d215cb7f7dee9700f5e05c838be58668d9756728fbe0bcb5f53d11aa90cae3",
     },
     {
         # 6.00 and 6.02 NPXS40002 are byte-identical.
@@ -366,6 +389,25 @@ KNOWN_SETTINGS_PROFILES = [
         "route": "old",
         "file_length": 0x4E8E54,
         "source_hash": "5d4461858b0a38fc6e7b086dbdfdab619515908e",
+    },
+    {
+        "name": "13.0 NPXS40008 Settings",
+        "route": "old",
+        "file_length": 0x4EB9B4,
+        "source_hash": "5fb007c00f7ba34541032b2997bdabd19d534e78",
+    },
+    {
+        # 13.2, 13.4 and 13.42 NPXS40008 dumps are byte-identical.
+        "name": "13.2/13.4/13.42 NPXS40008 Settings",
+        "route": "old",
+        "file_length": 0x4EBE08,
+        "source_hash": "fb05751464291761de1fdcd9576fc26a02930e10",
+    },
+    {
+        "name": "13.6 NPXS40008 Settings",
+        "route": "old",
+        "file_length": 0x4EBC8C,
+        "source_hash": "a400a5ca932efc80cb6512610903100fa03a8717",
     },
 ]
 

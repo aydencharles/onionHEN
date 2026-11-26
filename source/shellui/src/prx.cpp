@@ -18,16 +18,19 @@ along with this program; see the file COPYING. If not, see
 #include "debug_settings_route_runtime.hpp"
 #include "dynamic_ui_runtime.hpp"
 #include "hooked_funcs.hpp"
+#include "control_center_sdk.hpp"
 #include "defs.h"
 #include "external_symbols.hpp"
 #include "homeui_top_nav_patch.hpp"
 #include "ipc.hpp"
+#include "onion_icon_source_hook.hpp"
+#include "onion_web_server.hpp"
 #include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
 #include "toolbox_i18n.hpp"
-#include "webserver.hpp"
 
+#include <onion/log.h>
 #include <onion/notify.h>
 #include <onion/proc_query.h>
 #include <onion/ready.h>
@@ -585,7 +588,7 @@ bool install_hooks(const ShellImages& img) {
       reinterpret_cast<void*>(&ReactNavigatorManager_UpdateNavigationState_Hook),
       reinterpret_cast<void**>(&ReactNavigatorManager_UpdateNavigationState_Orig));
 
-  install_homeui_top_nav_hooks(img.react_pui);
+  install_onion_icon_source_hook(img.react_pui);
 
   (void)install_optional_diag(
       "[DBG-GETMODEL] GetModel", img.rn_shell, "ReactNative.Modules.ShellUI.Settings",
@@ -738,6 +741,31 @@ int main(int argc, char const* argv[]) {
 
   const pid_t pid = getpid();
 
+  /*
+   * Open the sinks before the first record. The logger's state is per-process
+   * and ShellUI runs in its own process, so without this call every LOG_*
+   * below would only reach klog and stdout — never OnionHEN.log.
+   *
+   * The path is the sandbox view on purpose. ShellUI runs inside the vsh
+   * sandbox, which exposes /user/data; /data is the elevated view of the same
+   * directory and does not resolve here. Opening /data/OnionHEN/... fails and leaves
+   * the file sink closed — silently, which is how ShellUI ended up with no
+   * records in the shared log. Everything else in shellui already uses
+   * /user/data (assets, payloads, cheats), so this is the same file the daemon
+   * opens as /data/OnionHEN/OnionHEN.log.
+   *
+   * OnionHEN.log is shared with the daemon; log.c serialises rotation across
+   * processes and emits each record with a single O_APPEND write. The tag stays
+   * distinct so records are attributable.
+   *
+   * The crash sink is deliberately NOT configured here: nothing in ShellUI
+   * installs a signal handler, and onion_log_emergency() is only reachable from
+   * one, so the sink would never be written. Wiring up a fault handler inside
+   * the vsh process is its own decision — until then an unhandled fault in
+   * ShellUI is simply not captured.
+   */
+  onion_log_configure("ShellUI", "/user/data/OnionHEN/OnionHEN.log");
+
   if (!resolve_native_symbols(pid))
     return -1;
 
@@ -802,6 +830,13 @@ int main(int argc, char const* argv[]) {
   toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
 
   shellui_hooks_publish_ready();
+  /*
+   * Bring the loopback web UI up before registering the built-in control. The
+   * control-center tile's popup is a native WebViewPS pointed at web_ui::url(),
+   * so the server has to be listening before the tile is patched in.
+   */
+  onion::web_ui::start();
+  onion::control_center::initialize_builtin_control();
   /*
    * Home already cached pre-inject state. Display-TID spoof and the top-nav
    * RNPS patch both need NPXS40002 ReloadApp on the UI thread (OnRender), not

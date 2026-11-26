@@ -49,8 +49,6 @@ constexpr size_t kHbcSourceHashOffset = 0x0c;
 constexpr size_t kHbcSourceHashSize = 20;
 constexpr size_t kHbcFileLengthOffset = 0x20;
 constexpr size_t kHbcFooterSha1Size = 20;
-constexpr const char *kOnionHenTopNavIconPath =
-    "/system_ex/vsh_asset/onionhen.png";
 
 static const unsigned char kLegacyOldIconOrder[] = {
     '[', '"', 'F', 'p', 's', '"', ',', '"', 'S', 'e', 'a', 'r', 'c', 'h',
@@ -270,6 +268,25 @@ static const SourceHomeUiProfile kSourceHomeUiProfiles[] = {
         /* strategy */ &kLegacy5x7xSourceStrategy,
     },
     {
+        /*
+         * 5.50 ShellUI loads the OTA /mnt/rnps bundle, which is a distinct
+         * legacy bundle from the /system_ex file above (0x185ad0 vs 0x185c30).
+         * Same minified 5x/7x shape, so it reuses kLegacy5x7xSourceStrategy.
+         */
+        /* name */ "5.50 OTA NPXS40002 legacy HomeUI",
+        /* kind */ SourceBundleKind::LegacyRnps,
+        /* payload_size */ 0x185ad0,
+        /* offsets */ {
+            /* title_id */ 0x6e1c0,
+            /* app_error_event_trigger */ 0xb1242,
+            /* navigate_to_home */ 0x3d9ea,
+            /* icon_order */ 0xb117b,
+            /* app_error_source */ 0x124c47,
+            /* export_alias */ 0x124f3b,
+        },
+        /* strategy */ &kLegacy5x7xSourceStrategy,
+    },
+    {
         /* name */ "6.00/6.02 NPXS40002 legacy HomeUI",
         /* kind */ SourceBundleKind::LegacyRnps,
         /* payload_size */ 0x185d00,
@@ -342,10 +359,6 @@ std::atomic<bool> g_logged_unsupported_source_homeui_skip{false};
 #if SHELL_DEBUG == 1
 std::atomic<bool> g_logged_non_homeui_skip{false};
 #endif
-void (*g_react_button_set_icon_source_orig)(MonoObject *instance,
-                                            MonoObject *source) = nullptr;
-void (*g_react_button_set_inverted_icon_source)(MonoObject *instance,
-                                                MonoObject *source) = nullptr;
 
 struct HbcView {
   unsigned char *data;
@@ -918,52 +931,6 @@ static void update_hbc_footer_sha1(HbcView &hbc, size_t file_length) {
   SHA1Final(hbc.data + footer_offset, &ctx);
 }
 
-/*
- * Focused top-nav buttons use invertedIconSource. Named system icons (Search,
- * Settings) resolve both states from iconId; a custom file URI only fills the
- * normal source unless we mirror it into invertedIcon.
- *
- * Crash history was from Fps body hijack on game-close remount, not from this
- * mirror itself. Still harden: path filter, exception-safe ToString, re-entry
- * guard (SetinvertedIconSource must not re-enter SetIconSource).
- */
-static bool is_homeui_top_nav_icon_source(MonoObject *source) {
-  if (!source || !mono_object_to_string) {
-    return false;
-  }
-
-  MonoObject *exception = nullptr;
-  MonoString *text = mono_object_to_string(source, &exception);
-  if (exception || !text) {
-    return false;
-  }
-
-  return Mono_to_String(text).find(kOnionHenTopNavIconPath) !=
-         std::string::npos;
-}
-
-static void ReactButtonShadowNode_SetIconSource_Hook(MonoObject *instance,
-                                                     MonoObject *source) {
-  thread_local int depth = 0;
-
-  if (g_react_button_set_icon_source_orig) {
-    g_react_button_set_icon_source_orig(instance, source);
-  }
-
-  if (depth > 0 || !shellui_hooks_are_ready() || !instance || !source ||
-      !g_react_button_set_inverted_icon_source ||
-      !is_homeui_top_nav_icon_source(source)) {
-    return;
-  }
-
-  ++depth;
-  g_react_button_set_inverted_icon_source(instance, source);
-  --depth;
-#if SHELL_DEBUG == 1
-  LOG_DEBUG("homeui_top_nav_patch: mirrored OnionHEN icon to invertedIcon");
-#endif
-}
-
 static const SourceHomeUiProfile *
 find_source_homeui_profile(const SourceBundleView &bundle,
                            SourceBundleKind kind) {
@@ -1074,49 +1041,6 @@ static bool patch_source_homeui_top_nav(const SourceBundleView &bundle,
 } // namespace
 
 #endif /* SHELLUI_HOMEUI_TOP_NAV_PATCH == 1 */
-
-void install_homeui_top_nav_hooks(MonoImage *react_pui) {
-#if SHELLUI_HOMEUI_TOP_NAV_PATCH == 1
-  if (!react_pui) {
-    LOG_ERROR("homeui_top_nav_patch: ReactNative.PUI image missing");
-    return;
-  }
-
-  g_react_button_set_inverted_icon_source =
-      reinterpret_cast<void (*)(MonoObject *, MonoObject *)>(
-          Get_Address_of_Method(react_pui, "ReactNative.Views.UI3.View",
-                                "ReactButtonShadowNode",
-                                "SetinvertedIconSource", 1, false));
-  if (!g_react_button_set_inverted_icon_source) {
-    LOG_WARN("homeui_top_nav_patch: SetinvertedIconSource unavailable; "
-             "focused icon may be blank");
-  }
-
-  const uint64_t set_icon_source =
-      Get_Address_of_Method(react_pui, "ReactNative.Views.UI3.View",
-                            "ReactButtonShadowNode", "SetIconSource", 1,
-                            false);
-  if (!set_icon_source) {
-    LOG_WARN("homeui_top_nav_patch: SetIconSource unavailable; "
-             "focused icon may be blank");
-    return;
-  }
-
-  const bool installed = InstallDetour(
-      set_icon_source,
-      reinterpret_cast<void *>(&ReactButtonShadowNode_SetIconSource_Hook),
-      reinterpret_cast<void **>(&g_react_button_set_icon_source_orig), false);
-  if (installed) {
-    LOG_DEBUG("homeui_top_nav_patch: SetIconSource hooked "
-              "(invertedIcon mirror for OnionHEN)");
-  } else {
-    LOG_WARN("homeui_top_nav_patch: SetIconSource detour unavailable; "
-             "focused icon may be blank");
-  }
-#else
-  (void)react_pui;
-#endif
-}
 
 void patch_homeui_top_nav(unsigned char *buffer, int *size_ptr,
                           int buffer_capacity) {

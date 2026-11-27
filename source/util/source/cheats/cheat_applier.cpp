@@ -12,6 +12,7 @@
 #include <vector>
 #include <sys/mman.h>
 
+#include "cheats/cheat_master.hpp"
 #include "cheats/i_memory_backend.hpp"
 #include "util_platform.h"
 
@@ -20,6 +21,10 @@ extern "C" {
 
 namespace onion::cheats {
 namespace {
+
+// Stops the master-code enable, started from a dependent cheat, from
+// looking for a master of its own.
+thread_local int master_auto_depth = 0;
 
 bool containsToken(const char *hay, const char *needle) {
   return hay && needle && std::strstr(hay, needle) != nullptr;
@@ -169,17 +174,6 @@ const char *source_label(const std::string &source_key) {
     return source_key.c_str() + slash + 1;
   }
   return source_key.c_str();
-}
-
-bool isMasterDependent(const onion_cheat_file_t &file, int index) {
-  if (index < 0 || static_cast<size_t>(index) >= file.cheat_count ||
-      index == file.master_code_id) {
-    return false;
-  }
-  const onion_cheat_entry_t &entry = file.cheats[index];
-  return containsToken(entry.name, "MC") && entry.patch_count == 1 &&
-         entry.patches != nullptr &&
-         entry.patches[0].section != 0;
 }
 
 bool addScanRange(std::vector<ModuleRange> &ranges, uint64_t start,
@@ -476,6 +470,23 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   }
 
   const bool enabling = !entry.enabled;
+  if (enabling && master_auto_depth == 0 &&
+      overlaps_preceding_master(file, index)) {
+    const int master = preceding_cave_master(file, index);
+    if (master >= 0 && !file.cheats[master].enabled) {
+      LOG_INFO("[Cheat] enabling master code '%s' before '%s'",
+               file.cheats[master].name, entry.name);
+      ++master_auto_depth;
+      std::string master_status;
+      const int master_rc =
+          toggle(game, file, master, master_status, source_key);
+      --master_auto_depth;
+      if (master_rc != 0) {
+        status = master_status;
+        return -1;
+      }
+    }
+  }
   if (entry.module_name[0] == '\0' && game.process_name[0] != '\0') {
     std::snprintf(entry.module_name, sizeof(entry.module_name), "%s",
                   game.process_name);
@@ -833,14 +844,14 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         }
       }
       for (const ActiveRange &active : active_ranges_) {
-        const bool master_dependency =
+        // The master code owns the flag bytes its cheats toggle. Overlap
+        // with that entry is the dependency, including names without "MC".
+        const bool master_overlap =
             !source_key.empty() && active.source_key == source_key &&
-            ((active.cheat_index == file.master_code_id &&
-              isMasterDependent(file, index)) ||
-             (index == file.master_code_id &&
-              isMasterDependent(file, active.cheat_index)));
-        if (active.pid == pid && active.owner != owner &&
-            !master_dependency &&
+            file.master_code_id >= 0 &&
+            (index == file.master_code_id ||
+             active.cheat_index == file.master_code_id);
+        if (active.pid == pid && active.owner != owner && !master_overlap &&
             rangesOverlap(candidate.address, candidate_len, active.start,
                           active.length)) {
           char address[32];

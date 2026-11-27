@@ -19,10 +19,18 @@ inline constexpr std::string_view kPluginAutoStartPrefix =
     "id_external_plugin_autostart_";
 inline constexpr std::string_view kPluginItemPrefix =
     "id_external_plugin_item_";
+inline constexpr std::string_view kSprxLoadPrefix = "id_external_sprx_load_";
 inline constexpr std::string_view kSprxEnabledPrefix =
     "id_external_sprx_enabled_";
+inline constexpr std::string_view kSprxAutoStartPrefix =
+    "id_external_sprx_autostart_";
+inline constexpr std::string_view kSprxBindCurrentPrefix =
+    "id_external_sprx_bind_current_";
+inline constexpr std::string_view kSprxBindAllPrefix =
+    "id_external_sprx_bind_all_";
 inline constexpr std::string_view kSprxDeletePrefix = "id_external_sprx_delete_";
 inline constexpr std::string_view kSprxItemPrefix = "id_external_sprx_item_";
+inline constexpr std::string_view kSprxReloadId = "id_external_sprx_reload";
 
 inline bool split_control_id(std::string_view control_id,
                              std::string_view prefix, std::string &id,

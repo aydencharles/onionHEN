@@ -9,14 +9,21 @@
 
 namespace onion::daemon::sprx_plugins {
 
+inline constexpr const char *kSprxDir = "/data/OnionHEN/sprx";
 inline constexpr const char *kCatalogPath =
     "/data/OnionHEN/sprx/catalog.ini";
 
 void start();
 void reconcile();
 std::vector<onion::sprx::SprxInventoryEntry> inventory();
+onion::sprx::SprxOperationResult reload_catalog();
+onion::sprx::SprxOperationResult load_now(std::string_view id);
 onion::sprx::SprxOperationResult set_enabled(std::string_view id,
-                                              bool enabled);
+                                             bool enabled);
+onion::sprx::SprxOperationResult set_auto_start(std::string_view id,
+                                                bool auto_start);
+onion::sprx::SprxOperationResult bind_target(std::string_view id,
+                                             onion::sprx::SprxTargetScope scope);
 /** Removes only the manifest entry; it never deletes the module file. */
 onion::sprx::SprxOperationResult remove(std::string_view id);
 void on_big_app_started(pid_t pid, uint32_t app_id,

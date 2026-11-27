@@ -57,7 +57,9 @@ struct Runtime {
   CurrentGameTarget target;
   onion::sprx::SprxPluginManager manager;
 
-  Runtime() : manager(transport, access, target) {}
+  Runtime() : manager(transport, access, target) {
+    manager.set_scan_directory(kSprxDir);
+  }
 };
 
 Runtime &runtime() {
@@ -132,11 +134,43 @@ std::vector<onion::sprx::SprxInventoryEntry> inventory() {
   return current.manager.inventory();
 }
 
+onion::sprx::SprxOperationResult reload_catalog() {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  std::vector<onion::sprx::SprxCatalogIssue> issues;
+  const auto result = current.manager.reload_catalog(&issues);
+  for (const auto &issue : issues)
+    LOG_WARN("[sprx-manager] line=%zu plugin=%s: %s", issue.line,
+             issue.plugin_id.empty() ? "-" : issue.plugin_id.c_str(),
+             issue.message.c_str());
+  return result;
+}
+
+onion::sprx::SprxOperationResult load_now(std::string_view id) {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  return current.manager.load_now(id);
+}
+
 onion::sprx::SprxOperationResult set_enabled(std::string_view id,
                                              bool enabled) {
   Runtime &current = runtime();
   std::lock_guard<std::mutex> lock(current.mutex);
   return current.manager.set_enabled(id, enabled);
+}
+
+onion::sprx::SprxOperationResult set_auto_start(std::string_view id,
+                                                bool auto_start) {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  return current.manager.set_auto_start(id, auto_start);
+}
+
+onion::sprx::SprxOperationResult bind_target(
+    std::string_view id, onion::sprx::SprxTargetScope scope) {
+  Runtime &current = runtime();
+  std::lock_guard<std::mutex> lock(current.mutex);
+  return current.manager.bind_target(id, scope);
 }
 
 onion::sprx::SprxOperationResult remove(std::string_view id) {

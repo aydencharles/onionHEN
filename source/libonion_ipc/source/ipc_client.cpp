@@ -632,11 +632,32 @@ bool IPC_Client::ListSprx(std::vector<SprxInventoryItem> &sprx) {
       const char *id = onion_cjson::string_item(item, "id");
       const char *path = onion_cjson::string_item(item, "path");
       if (!id || !path) return false;
-      sprx.push_back({id, path, onion_cjson::bool_item(item, "enabled"),
-                      onion_cjson::bool_item(item, "auto_start"),
-                      onion_cjson::int_item(item, "priority", 0),
-                      onion_cjson::bool_item(item, "matches_current_target"),
-                      onion_cjson::bool_item(item, "loaded_for_current_target")});
+      SprxInventoryItem entry;
+      entry.id = id;
+      entry.path = path;
+      entry.enabled = onion_cjson::bool_item(item, "enabled");
+      entry.auto_start = onion_cjson::bool_item(item, "auto_start");
+      entry.priority = onion_cjson::int_item(item, "priority", 0);
+      entry.matches_current_target =
+          onion_cjson::bool_item(item, "matches_current_target");
+      entry.loaded_for_current_target =
+          onion_cjson::bool_item(item, "loaded_for_current_target");
+      entry.configured = onion_cjson::bool_item(item, "configured", true);
+      if (const char *summary = onion_cjson::string_item(item, "target_summary"))
+        entry.target_summary = summary;
+      if (const char *current =
+              onion_cjson::string_item(item, "current_target_title_id"))
+        entry.current_target_title_id = current;
+      if (cJSON *deps = onion_cjson::item(item, "dependencies");
+          cJSON_IsArray(deps)) {
+        cJSON *dep = nullptr;
+        cJSON_ArrayForEach(dep, deps) {
+          if (const char *dep_id = onion_cjson::string_value(dep);
+              dep_id && *dep_id)
+            entry.dependencies.emplace_back(dep_id);
+        }
+      }
+      sprx.push_back(std::move(entry));
     }
     const int next = onion_cjson::int_item(root.get(), "next", -1);
     if (next < 0) return true;
@@ -646,20 +667,44 @@ bool IPC_Client::ListSprx(std::vector<SprxInventoryItem> &sprx) {
 }
 
 bool IPC_Client::SprxOperation(DaemonCommands command, const std::string &id,
-                               bool enabled) {
+                               bool enabled, const std::string &scope,
+                               std::string *error_out) {
   if (!require_crit("SprxOperation")) return false;
   cJSON *request = cJSON_CreateObject();
-  cJSON_AddStringToObject(request, "id", id.c_str());
-  if (command == BREW_SPRX_SET_ENABLED)
+  if (!id.empty())
+    cJSON_AddStringToObject(request, "id", id.c_str());
+  if (command == BREW_SPRX_SET_ENABLED || command == BREW_SPRX_SET_AUTO_START)
     cJSON_AddBoolToObject(request, "enabled", enabled);
+  if (command == BREW_SPRX_BIND_TARGET)
+    cJSON_AddStringToObject(request, "scope", scope.c_str());
   std::string response;
-  return IPCSendCommand(command, response, json_object_str(request));
+  const bool ok = IPCSendCommand(command, response, json_object_str(request));
+  if (!ok && error_out)
+    *error_out = response;
+  return ok;
+}
+
+bool IPC_Client::LoadSprx(const std::string &id, std::string *error_out) {
+  return SprxOperation(BREW_SPRX_LOAD, id, false, {}, error_out);
+}
+
+bool IPC_Client::ReloadSprx(std::string *error_out) {
+  return SprxOperation(BREW_SPRX_RELOAD, {}, false, {}, error_out);
 }
 
 bool IPC_Client::SetSprxEnabled(const std::string &id, bool enabled) {
   return SprxOperation(BREW_SPRX_SET_ENABLED, id, enabled);
 }
 
-bool IPC_Client::DeleteSprx(const std::string &id) {
-  return SprxOperation(BREW_SPRX_DELETE, id);
+bool IPC_Client::SetSprxAutoStart(const std::string &id, bool auto_start) {
+  return SprxOperation(BREW_SPRX_SET_AUTO_START, id, auto_start);
+}
+
+bool IPC_Client::BindSprxTarget(const std::string &id, const std::string &scope,
+                                std::string *error_out) {
+  return SprxOperation(BREW_SPRX_BIND_TARGET, id, false, scope, error_out);
+}
+
+bool IPC_Client::DeleteSprx(const std::string &id, std::string *error_out) {
+  return SprxOperation(BREW_SPRX_DELETE, id, false, {}, error_out);
 }

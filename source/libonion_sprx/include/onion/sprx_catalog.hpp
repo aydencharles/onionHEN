@@ -35,6 +35,11 @@ struct SprxOperationResult {
   explicit operator bool() const { return success; }
 };
 
+enum class SprxTargetScope {
+  CurrentGame,
+  AllGames,
+};
+
 struct SprxInventoryEntry {
   std::string id;
   std::string path;
@@ -43,6 +48,10 @@ struct SprxInventoryEntry {
   int32_t priority = 0;
   bool matches_current_target = false;
   bool loaded_for_current_target = false;
+  bool configured = true;
+  std::string target_summary;
+  std::string current_target_title_id;
+  std::vector<std::string> dependencies;
 };
 
 /**
@@ -72,8 +81,13 @@ public:
   const SprxManifestEntry *find(std::string_view id) const noexcept;
 
   bool set_enabled(std::string_view id, bool enabled) noexcept;
+  bool set_auto_start(std::string_view id, bool auto_start) noexcept;
+  bool upsert(const SprxManifestEntry &entry);
   bool remove(std::string_view id) noexcept;
   std::string serialize() const;
+
+  static std::string format_target_summary(const SprxManifestEntry &entry);
+  static std::string make_id_from_filename(std::string_view filename);
 
   bool matches(const SprxManifestEntry &entry,
                std::string_view title_id) const noexcept;
@@ -86,6 +100,14 @@ public:
   std::vector<const SprxManifestEntry *>
   startup_order(std::string_view title_id,
                 std::vector<SprxCatalogIssue> *issues = nullptr) const;
+
+  /**
+   * Returns deterministic load order for one specific entry and its transitive
+   * dependencies against a Title ID (regardless of auto_start).
+   */
+  std::vector<const SprxManifestEntry *>
+  load_order_for(std::string_view id, std::string_view title_id,
+                 std::vector<SprxCatalogIssue> *issues = nullptr) const;
 
 private:
   std::vector<SprxManifestEntry> entries_;
@@ -102,6 +124,8 @@ public:
   /** Returns a consistent copy; callers never observe mutable store state. */
   SprxCatalog snapshot() const;
   SprxOperationResult set_enabled(std::string_view id, bool enabled);
+  SprxOperationResult set_auto_start(std::string_view id, bool auto_start);
+  SprxOperationResult upsert(const SprxManifestEntry &entry);
   SprxOperationResult remove(std::string_view id);
 
   std::string path() const;

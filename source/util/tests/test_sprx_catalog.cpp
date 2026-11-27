@@ -151,6 +151,76 @@ int test_remove_persists_catalog_entry_only() {
   return 0;
 }
 
+int test_helpers_and_load_order_for() {
+  onion::sprx::SprxManifestEntry sample;
+  sample.exact_title_ids = {"CUSA12345"};
+  sample.title_id_prefixes = {"PPSA", "CUSA"};
+  const std::string summary =
+      onion::sprx::SprxCatalog::format_target_summary(sample);
+  TEST_ASSERT_STREQ("CUSA12345, PPSA*, CUSA*", summary.c_str());
+
+  const std::string derived_id =
+      onion::sprx::SprxCatalog::make_id_from_filename(
+          "/data/OnionHEN/sprx/my_mod 1.SPRX");
+  TEST_ASSERT_STREQ("my_mod-1", derived_id.c_str());
+
+  const std::string fallback_id =
+      onion::sprx::SprxCatalog::make_id_from_filename("...prx");
+  TEST_ASSERT_STREQ("module", fallback_id.c_str());
+
+  onion::sprx::SprxCatalog catalog;
+  std::vector<onion::sprx::SprxCatalogIssue> issues;
+  TEST_ASSERT_TRUE(catalog.parse(
+      "[plugin.dep]\npath=/data/dep.sprx\nexact_title_ids=CUSA12345\n"
+      "enabled=true\nauto_start=false\n"
+      "[plugin.manual]\npath=/data/manual.sprx\nexact_title_ids=CUSA12345\n"
+      "enabled=false\nauto_start=false\ndependencies=dep\n",
+      &issues));
+  // Manual on-demand load includes enabled dependency even when target itself
+  // has auto_start=false and enabled=false.
+  const auto order = catalog.load_order_for("manual", "CUSA12345", &issues);
+  TEST_ASSERT_EQ_INT(0, static_cast<int>(issues.size()));
+  TEST_ASSERT_EQ_INT(2, static_cast<int>(order.size()));
+  TEST_ASSERT_STREQ("dep", order[0]->id.c_str());
+  TEST_ASSERT_STREQ("manual", order[1]->id.c_str());
+
+  // Mismatched Title ID is rejected.
+  TEST_ASSERT_TRUE(catalog.load_order_for("manual", "PPSA00001", &issues).empty());
+  TEST_ASSERT_TRUE(!issues.empty());
+  return 0;
+}
+
+int test_upsert_and_set_auto_start_create_catalog() {
+  char path[256] = {};
+  TEST_ASSERT_EQ_INT(0, onion_test_write_temp_text_file(".ini", "", path,
+                                                        sizeof(path)));
+  unlink(path); // Verify upsert creates a non-existent catalog.ini cleanly.
+
+  onion::sprx::SprxCatalogStore store;
+  TEST_ASSERT_TRUE(!store.load(path)); // Missing file still records path.
+
+  onion::sprx::SprxManifestEntry entry;
+  entry.id = "fps";
+  entry.path = "/data/OnionHEN/sprx/fps.sprx";
+  entry.exact_title_ids = {"PPSA01234"};
+  entry.enabled = true;
+  entry.auto_start = true;
+  TEST_ASSERT_TRUE(store.upsert(entry));
+  TEST_ASSERT_TRUE(store.set_auto_start("fps", false));
+
+  onion::sprx::SprxCatalogStore reloaded;
+  TEST_ASSERT_TRUE(reloaded.load(path));
+  const auto inv = reloaded.inventory();
+  TEST_ASSERT_EQ_INT(1, static_cast<int>(inv.size()));
+  TEST_ASSERT_STREQ("fps", inv[0].id.c_str());
+  TEST_ASSERT_TRUE(inv[0].configured);
+  TEST_ASSERT_TRUE(inv[0].enabled);
+  TEST_ASSERT_TRUE(!inv[0].auto_start);
+  TEST_ASSERT_STREQ("PPSA01234", inv[0].target_summary.c_str());
+  unlink(path);
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_sprx_catalog_suite(void) {
@@ -161,5 +231,7 @@ extern "C" int test_sprx_catalog_suite(void) {
   failures += onion_test_run("sprx_catalog_dependency_cycle", test_dependency_cycle_rejected);
   failures += onion_test_run("sprx_catalog_enabled_persists", test_enabled_persists_and_excludes_startup);
   failures += onion_test_run("sprx_catalog_remove_persists", test_remove_persists_catalog_entry_only);
+  failures += onion_test_run("sprx_catalog_helpers_load_order_for", test_helpers_and_load_order_for);
+  failures += onion_test_run("sprx_catalog_upsert_and_autostart", test_upsert_and_set_auto_start_create_catalog);
   return failures;
 }

@@ -60,7 +60,7 @@ std::string plugin_inventory_page(size_t offset) {
 }
 
 std::string sprx_inventory_page(size_t offset) {
-  constexpr size_t kPageSize = 8;
+  constexpr size_t kPageSize = 4;
   const std::vector<onion::sprx::SprxInventoryEntry> inventory =
       onion::daemon::sprx_plugins::inventory();
   const size_t begin = std::min(offset, inventory.size());
@@ -80,6 +80,15 @@ std::string sprx_inventory_page(size_t offset) {
                           entry.matches_current_target);
     cJSON_AddBoolToObject(item, "loaded_for_current_target",
                           entry.loaded_for_current_target);
+    cJSON_AddBoolToObject(item, "configured", entry.configured);
+    cJSON_AddStringToObject(item, "target_summary",
+                            entry.target_summary.c_str());
+    cJSON_AddStringToObject(item, "current_target_title_id",
+                            entry.current_target_title_id.c_str());
+    cJSON *deps = cJSON_CreateArray();
+    for (const std::string &dep : entry.dependencies)
+      cJSON_AddItemToArray(deps, cJSON_CreateString(dep.c_str()));
+    cJSON_AddItemToObject(item, "dependencies", deps);
     cJSON_AddItemToArray(items, item);
   }
   cJSON_AddNumberToObject(root, "next",
@@ -193,18 +202,46 @@ void handleIPC(clientArgs *client, std::string &inputStr,
           result.success ? std::string("ok") : result.error);
     break;
   }
+  case BREW_SPRX_RELOAD: {
+    const onion::sprx::SprxOperationResult result =
+        onion::daemon::sprx_plugins::reload_catalog();
+    reply(sender_app, !result.success,
+          result.success ? std::string("ok") : result.error);
+    break;
+  }
   case BREW_SPRX_SET_ENABLED:
+  case BREW_SPRX_SET_AUTO_START:
+  case BREW_SPRX_LOAD:
+  case BREW_SPRX_BIND_TARGET:
   case BREW_SPRX_DELETE: {
     const char *id = onion_cjson::string_item(my_json.get(), "id");
     if (!id || !*id) {
       reply(sender_app, true, "missing SPRX id");
       break;
     }
-    const onion::sprx::SprxOperationResult result =
-        command == BREW_SPRX_SET_ENABLED
-            ? onion::daemon::sprx_plugins::set_enabled(
-                  id, onion_cjson::bool_item(my_json.get(), "enabled"))
-            : onion::daemon::sprx_plugins::remove(id);
+    onion::sprx::SprxOperationResult result;
+    if (command == BREW_SPRX_SET_ENABLED) {
+      result = onion::daemon::sprx_plugins::set_enabled(
+          id, onion_cjson::bool_item(my_json.get(), "enabled"));
+    } else if (command == BREW_SPRX_SET_AUTO_START) {
+      result = onion::daemon::sprx_plugins::set_auto_start(
+          id, onion_cjson::bool_item(my_json.get(), "enabled"));
+    } else if (command == BREW_SPRX_LOAD) {
+      result = onion::daemon::sprx_plugins::load_now(id);
+    } else if (command == BREW_SPRX_BIND_TARGET) {
+      const char *scope = onion_cjson::string_item(my_json.get(), "scope");
+      if (scope && std::string_view(scope) == "current") {
+        result = onion::daemon::sprx_plugins::bind_target(
+            id, onion::sprx::SprxTargetScope::CurrentGame);
+      } else if (scope && std::string_view(scope) == "all") {
+        result = onion::daemon::sprx_plugins::bind_target(
+            id, onion::sprx::SprxTargetScope::AllGames);
+      } else {
+        result = {false, "invalid SPRX target scope"};
+      }
+    } else {
+      result = onion::daemon::sprx_plugins::remove(id);
+    }
     reply(sender_app, !result.success,
           result.success ? std::string("ok") : result.error);
     break;

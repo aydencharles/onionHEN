@@ -219,17 +219,22 @@ bool try_external_plugin_value(const std::string &id, std::string &out) {
 }
 
 bool try_external_sprx_value(const std::string &id, std::string &out) {
+  using onion::shellui::plugin_pages::kSprxAutoStartPrefix;
   using onion::shellui::plugin_pages::kSprxEnabledPrefix;
   using onion::shellui::plugin_pages::split_control_id;
 
   std::string sprx_id;
-  if (!split_control_id(id, kSprxEnabledPrefix, sprx_id, 1, 31))
+  bool is_enabled = false;
+  if (split_control_id(id, kSprxEnabledPrefix, sprx_id, 1, 31)) {
+    is_enabled = true;
+  } else if (!split_control_id(id, kSprxAutoStartPrefix, sprx_id, 1, 31)) {
     return false;
+  }
   const auto it =
       std::ranges::find(g_ui.external_sprx, sprx_id, &SprxInventoryItem::id);
   if (it == g_ui.external_sprx.end())
     return false;
-  out = bool_str(it->enabled);
+  out = bool_str(is_enabled ? it->enabled : it->auto_start);
   return true;
 }
 

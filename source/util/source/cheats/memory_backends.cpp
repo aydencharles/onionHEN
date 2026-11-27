@@ -1,5 +1,7 @@
 #include <onion/log.h>
 #include <onion/proc_dmap.h>
+#include "cheats/cheat_code_cave.hpp"
+#include "cheats/i_cheat_runtime.hpp"
 #include "cheats/i_memory_backend.hpp"
 
 #include <cerrno>
@@ -16,46 +18,65 @@
 namespace onion::cheats {
 namespace {
 
-constexpr uint64_t kPageSize = 0x4000ULL;
+int ps5Attach(pid_t pid, void *) { return pt_attach_proc(pid); }
 
-inline uint64_t pageAlignDown(uint64_t v) {
-  return v & ~(kPageSize - 1ULL);
+intptr_t ps5Mmap(pid_t pid, intptr_t addr, size_t len, void *) {
+  return pt_mmap(pid, addr, len, PROT_READ | PROT_WRITE,
+                 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 }
-inline uint64_t pageAlignUp(uint64_t v) {
-  return (v + kPageSize - 1ULL) & ~(kPageSize - 1ULL);
+
+int ps5Copyin(pid_t pid, const void *buf, intptr_t addr, size_t len, void *) {
+  return pt_copyin(pid, buf, addr, len);
 }
+
+int ps5MprotectRwx(pid_t pid, uint64_t addr, size_t len, void *) {
+  return kernel_mprotect(pid, addr, len, PROT_READ | PROT_WRITE | PROT_EXEC);
+}
+
+int ps5Munmap(pid_t pid, intptr_t addr, size_t len, void *) {
+  return pt_munmap(pid, addr, len);
+}
+
+int ps5Detach(pid_t pid, void *) { return pt_detach_proc(pid, 0); }
 
 int mapCodeCaveCommon(pid_t pid, uint64_t addr, size_t len) {
-  const uint64_t page_start = pageAlignDown(addr);
-  const uint64_t page_end = pageAlignUp(addr + len);
-  const size_t page_len = static_cast<size_t>(page_end - page_start);
+  CodeCaveMapOps ops{};
+  ops.attach = ps5Attach;
+  ops.mmap = ps5Mmap;
+  ops.copyin = ps5Copyin;
+  ops.mprotect_rwx = ps5MprotectRwx;
+  ops.munmap = ps5Munmap;
+  ops.detach = ps5Detach;
 
-  if (pt_attach_proc(pid) < 0) {
-    LOG_ERROR("[Cheat] code cave attach failed pid=%d errno=%d", pid,
-                 errno);
+  uint64_t mapped_page = 0;
+  intptr_t mmap_ret = 0;
+  const CodeCaveMapStatus rc =
+      mapCodeCaveWithOps(pid, addr, len, ops, &mapped_page, &mmap_ret);
+  switch (rc) {
+  case CodeCaveMapStatus::Ok:
+    return 0;
+  case CodeCaveMapStatus::InvalidRange:
+    LOG_ERROR("[Cheat] code cave invalid range addr=0x%llx len=%zu",
+              static_cast<unsigned long long>(addr), len);
     return -1;
-  }
-
-  const intptr_t mapped =
-      pt_mmap(pid, static_cast<intptr_t>(page_start), page_len,
-              PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-  if (mapped != static_cast<intptr_t>(page_start)) {
+  case CodeCaveMapStatus::AttachFailed:
+    LOG_ERROR("[Cheat] code cave attach failed pid=%d errno=%d", pid, errno);
+    return -1;
+  case CodeCaveMapStatus::MmapFailed:
     LOG_ERROR("[Cheat] code cave mmap failed page=0x%llx ret=0x%llx",
-                 (unsigned long long)page_start, (unsigned long long)mapped);
-    pt_detach_proc(pid, 0);
+              static_cast<unsigned long long>(mapped_page),
+              static_cast<unsigned long long>(mmap_ret));
     return -1;
-  }
-
-  if (kernel_mprotect(pid, page_start, page_len,
-                      PROT_READ | PROT_WRITE | PROT_EXEC) < 0) {
+  case CodeCaveMapStatus::FaultInFailed:
+    LOG_ERROR("[Cheat] code cave fault-in failed page=0x%llx errno=%d",
+              static_cast<unsigned long long>(mapped_page), errno);
+    return -1;
+  case CodeCaveMapStatus::MprotectFailed:
     LOG_ERROR("[Cheat] code cave mprotect failed page=0x%llx",
-                 (unsigned long long)page_start);
-    pt_detach_proc(pid, 0);
+              static_cast<unsigned long long>(mapped_page));
     return -1;
   }
-
-  pt_detach_proc(pid, 0);
-  return 0;
+  return -1;
 }
 
 class MdbgBackend final : public IMemoryBackend {
@@ -84,6 +105,23 @@ public:
   }
 };
 
+class Ps5CheatRuntime final : public ICheatRuntime {
+public:
+  uint32_t firmwareMajor() const override { return util_system_fw_major(); }
+  std::unique_ptr<IMemoryBackend> createBackend(
+      uint32_t fw_major) const override {
+    return MemoryBackendFactory::create(fw_major);
+  }
+  int findModule(pid_t pid, const char *name,
+                 util_module_info_t *out) const override {
+    return util_find_module(pid, name, out);
+  }
+  int findModuleInApp(int32_t appid, const char *name, pid_t *pid_out,
+                      util_module_info_t *out) const override {
+    return util_find_module_in_app(appid, name, pid_out, out);
+  }
+};
+
 } // namespace
 
 std::unique_ptr<IMemoryBackend> MemoryBackendFactory::create(uint32_t fw_major) {
@@ -91,6 +129,11 @@ std::unique_ptr<IMemoryBackend> MemoryBackendFactory::create(uint32_t fw_major) 
     return std::make_unique<KdirectBackend>();
   }
   return std::make_unique<MdbgBackend>();
+}
+
+const ICheatRuntime &defaultCheatRuntime() {
+  static const Ps5CheatRuntime kRuntime;
+  return kRuntime;
 }
 
 } // namespace onion::cheats

@@ -12,6 +12,8 @@
 #include <vector>
 #include <sys/mman.h>
 
+#include "cheats/cheat_code_cave.hpp"
+#include "cheats/cheat_master.hpp"
 #include "cheats/i_memory_backend.hpp"
 #include "util_platform.h"
 
@@ -20,6 +22,10 @@ extern "C" {
 
 namespace onion::cheats {
 namespace {
+
+// Stops the master-code enable, started from a dependent cheat, from
+// looking for a master of its own.
+thread_local int master_auto_depth = 0;
 
 bool containsToken(const char *hay, const char *needle) {
   return hay && needle && std::strstr(hay, needle) != nullptr;
@@ -169,17 +175,6 @@ const char *source_label(const std::string &source_key) {
     return source_key.c_str() + slash + 1;
   }
   return source_key.c_str();
-}
-
-bool isMasterDependent(const onion_cheat_file_t &file, int index) {
-  if (index < 0 || static_cast<size_t>(index) >= file.cheat_count ||
-      index == file.master_code_id) {
-    return false;
-  }
-  const onion_cheat_entry_t &entry = file.cheats[index];
-  return containsToken(entry.name, "MC") && entry.patch_count == 1 &&
-         entry.patches != nullptr &&
-         entry.patches[0].section != 0;
 }
 
 bool addScanRange(std::vector<ModuleRange> &ranges, uint64_t start,
@@ -432,7 +427,112 @@ std::vector<uint8_t> makeJumpBytes(uint64_t instruction_address,
   return bytes;
 }
 
+struct TransactionItem {
+  ResolvedSegment *segment = nullptr;
+  onion_patch_t *patch = nullptr;
+};
+
+/**
+ * Capture preflight snapshots for all transaction segments.
+ *
+ * Pass 1 reads all segments and immediately aborts if any non-cave segment is
+ * unreadable (without mapping anything in the target process).
+ * Pass 2 lazily maps eligible unmapped code caves (zero-filled OFF bytes) and
+ * retries the snapshot read, reusing pages already mapped by earlier segments.
+ */
+bool captureSnapshots(pid_t pid, const onion_cheat_entry_t &entry,
+                      bool enabling,
+                      const std::vector<TransactionItem> &transaction,
+                      IMemoryBackend &backend, std::vector<Snapshot> &snapshots,
+                      std::string &status) {
+  snapshots.clear();
+  snapshots.resize(transaction.size());
+  std::vector<bool> needs_cave_map(transaction.size(), false);
+
+  for (size_t i = 0; i < transaction.size(); ++i) {
+    const TransactionItem &item = transaction[i];
+    const ResolvedSegment &segment = *item.segment;
+    const size_t reserve_len = std::max(segment.on.size(), segment.off.size());
+    if (reserve_len == 0 || reserve_len > ONION_MAX_PATCH_BYTES ||
+        segment.address >
+            std::numeric_limits<uint64_t>::max() - reserve_len) {
+      status = status_tr("notify.cheats.invalid_patch", entry.name);
+      return false;
+    }
+
+    Snapshot &snapshot = snapshots[i];
+    snapshot.address = segment.address;
+    snapshot.bytes.resize(reserve_len);
+    const int read_result = backend.read(
+        pid, snapshot.address, snapshot.bytes.data(), snapshot.bytes.size());
+    if (read_result < 0) {
+      if (canMapCodeCaveOnSnapshotFailure(
+              enabling, segment.allow_code_cave_reloc,
+              item.patch->code_cave_reloc, segment.restore_original,
+              segment.off.data(), segment.off.size())) {
+        needs_cave_map[i] = true;
+        continue;
+      }
+      LOG_ERROR(
+          "[Cheat] Snapshot read failed pid=%d patch=%zu/%zu segment=%zu "
+          "addr=0x%llx len=%zu rc=%d",
+          (int)pid, segment.patch_index + 1, entry.patch_count,
+          segment.segment_index + 1,
+          static_cast<unsigned long long>(snapshot.address),
+          snapshot.bytes.size(), read_result);
+      status = status_tr("notify.cheats.snapshot_failed", entry.name);
+      return false;
+    }
+  }
+
+  for (size_t i = 0; i < transaction.size(); ++i) {
+    if (!needs_cave_map[i]) {
+      continue;
+    }
+    const TransactionItem &item = transaction[i];
+    const ResolvedSegment &segment = *item.segment;
+    Snapshot &snapshot = snapshots[i];
+
+    // An earlier segment in this transaction may have already mapped the page.
+    int read_result = backend.read(
+        pid, snapshot.address, snapshot.bytes.data(), snapshot.bytes.size());
+    if (read_result < 0) {
+      const int map_rc =
+          backend.mapCodeCave(pid, snapshot.address, snapshot.bytes.size());
+      if (map_rc != 0) {
+        LOG_ERROR(
+            "[Cheat] Snapshot code cave map failed pid=%d patch=%zu/%zu "
+            "segment=%zu addr=0x%llx len=%zu rc=%d",
+            (int)pid, segment.patch_index + 1, entry.patch_count,
+            segment.segment_index + 1,
+            static_cast<unsigned long long>(snapshot.address),
+            snapshot.bytes.size(), map_rc);
+        status = status_tr("notify.cheats.snapshot_failed", entry.name);
+        return false;
+      }
+      read_result = backend.read(pid, snapshot.address, snapshot.bytes.data(),
+                                 snapshot.bytes.size());
+      if (read_result < 0) {
+        LOG_ERROR(
+            "[Cheat] Snapshot read failed after code cave map pid=%d "
+            "patch=%zu/%zu segment=%zu addr=0x%llx len=%zu rc=%d",
+            (int)pid, segment.patch_index + 1, entry.patch_count,
+            segment.segment_index + 1,
+            static_cast<unsigned long long>(snapshot.address),
+            snapshot.bytes.size(), read_result);
+        status = status_tr("notify.cheats.snapshot_failed", entry.name);
+        return false;
+      }
+    }
+    item.patch->code_cave_reloc = true;
+  }
+
+  return true;
+}
+
 } // namespace
+
+CheatApplier::CheatApplier(const ICheatRuntime *runtime) : runtime_(runtime) {}
 
 int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
                          int index, std::string &status,
@@ -444,14 +544,16 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   }
 
   auto &entry = file.cheats[index];
+  const ICheatRuntime &runtime =
+      runtime_ != nullptr ? *runtime_ : defaultCheatRuntime();
   const std::string owner = ownerFor(file, index, source_key);
-  const uint32_t fw = util_system_fw_major();
+  const uint32_t fw = runtime.firmwareMajor();
   if (fw == 0) {
     status = status_tr("notify.cheats.fw_unavailable", entry.name);
     return -1;
   }
 
-  auto backend = MemoryBackendFactory::create(fw);
+  auto backend = runtime.createBackend(fw);
   if (!backend) {
     status = status_tr("notify.cheats.backend_unavailable", entry.name);
     return -1;
@@ -465,6 +567,9 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
               (int)pid);
     for (size_t i = 0; i < file.cheat_count; ++i) {
       file.cheats[i].enabled = false;
+      for (size_t p = 0; p < file.cheats[i].patch_count; ++p) {
+        file.cheats[i].patches[p].code_cave_reloc = false;
+      }
     }
     file.master_code_id = -1;
     active_ranges_.erase(
@@ -476,6 +581,23 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   }
 
   const bool enabling = !entry.enabled;
+  if (enabling && master_auto_depth == 0 &&
+      overlaps_preceding_master(file, index)) {
+    const int master = preceding_cave_master(file, index);
+    if (master >= 0 && !file.cheats[master].enabled) {
+      LOG_INFO("[Cheat] enabling master code '%s' before '%s'",
+               file.cheats[master].name, entry.name);
+      ++master_auto_depth;
+      std::string master_status;
+      const int master_rc =
+          toggle(game, file, master, master_status, source_key);
+      --master_auto_depth;
+      if (master_rc != 0) {
+        status = master_status;
+        return -1;
+      }
+    }
+  }
   if (entry.module_name[0] == '\0' && game.process_name[0] != '\0') {
     std::snprintf(entry.module_name, sizeof(entry.module_name), "%s",
                   game.process_name);
@@ -483,9 +605,9 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
 
   util_module_info_t mod{};
   util_module_info_t ps2{};
-  if (util_find_module(pid, entry.module_name, &mod) < 0) {
+  if (runtime.findModule(pid, entry.module_name, &mod) < 0) {
     pid_t fallback_pid = -1;
-    if (util_find_module_in_app(game.appid, entry.module_name, &fallback_pid,
+    if (runtime.findModuleInApp(game.appid, entry.module_name, &fallback_pid,
                                 &mod) < 0) {
       status = status_tr("notify.cheats.module_missing", entry.module_name);
       return -1;
@@ -495,7 +617,7 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
   }
 
   const bool is_ps2 =
-      util_find_module(pid, "libScePs2EmuMenuDialog.sprx", &ps2) == 0;
+      runtime.findModule(pid, "libScePs2EmuMenuDialog.sprx", &ps2) == 0;
   const uint64_t base = mod.sections[0].vaddr;
   if (file.master_code_id < 0 &&
       (containsToken(entry.name, "Master Code") ||
@@ -785,10 +907,6 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
     resolved.push_back(std::move(candidate));
   }
 
-  struct TransactionItem {
-    ResolvedSegment *segment = nullptr;
-    onion_patch_t *patch = nullptr;
-  };
   std::vector<TransactionItem> transaction;
   size_t segment_count = 0;
   for (const ResolvedPatch &patch : resolved) {
@@ -833,14 +951,14 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
         }
       }
       for (const ActiveRange &active : active_ranges_) {
-        const bool master_dependency =
+        // The master code owns the flag bytes its cheats toggle. Overlap
+        // with that entry is the dependency, including names without "MC".
+        const bool master_overlap =
             !source_key.empty() && active.source_key == source_key &&
-            ((active.cheat_index == file.master_code_id &&
-              isMasterDependent(file, index)) ||
-             (index == file.master_code_id &&
-              isMasterDependent(file, active.cheat_index)));
-        if (active.pid == pid && active.owner != owner &&
-            !master_dependency &&
+            file.master_code_id >= 0 &&
+            (index == file.master_code_id ||
+             active.cheat_index == file.master_code_id);
+        if (active.pid == pid && active.owner != owner && !master_overlap &&
             rangesOverlap(candidate.address, candidate_len, active.start,
                           active.length)) {
           char address[32];
@@ -860,35 +978,9 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
             entry.enabled ? "ON->OFF" : "OFF->ON");
 
   std::vector<Snapshot> snapshots;
-  snapshots.reserve(transaction.size());
-  for (size_t i = 0; i < transaction.size(); ++i) {
-    const TransactionItem &item = transaction[i];
-    const ResolvedSegment &segment = *item.segment;
-    const size_t reserve_len = std::max(segment.on.size(), segment.off.size());
-    if (reserve_len == 0 || reserve_len > ONION_MAX_PATCH_BYTES ||
-        segment.address >
-            std::numeric_limits<uint64_t>::max() - reserve_len) {
-      status = status_tr("notify.cheats.invalid_patch", entry.name);
-      return -1;
-    }
-    Snapshot snapshot;
-    snapshot.address = segment.address;
-    snapshot.bytes.resize(reserve_len);
-    const int read_result = backend->read(
-        pid, snapshot.address, snapshot.bytes.data(), snapshot.bytes.size());
-    if (read_result < 0) {
-      LOG_ERROR(
-          "[Cheat] Snapshot read failed pid=%d patch=%zu/%zu segment=%zu "
-          "addr=0x%llx "
-          "len=%zu rc=%d",
-          (int)pid, segment.patch_index + 1, entry.patch_count,
-          segment.segment_index + 1,
-          (unsigned long long)snapshot.address, snapshot.bytes.size(),
-          read_result);
-      status = status_tr("notify.cheats.snapshot_failed", entry.name);
-      return -1;
-    }
-    snapshots.push_back(std::move(snapshot));
+  if (!captureSnapshots(pid, entry, enabling, transaction, *backend, snapshots,
+                        status)) {
+    return -1;
   }
 
   if (!enabling) {
@@ -961,26 +1053,25 @@ int CheatApplier::toggle(const game_context_t &game, onion_cheat_file_t &file,
     }
 
     ++touched_count;
-    if (backend->write(pid, segment.address, data.data(), len) < 0) {
-      status = status_tr("notify.cheats.write_failed", entry.name);
-      break;
-    }
-
+    bool wrote = backend->write(pid, segment.address, data.data(), len) >= 0;
     uint8_t verify[ONION_MAX_PATCH_BYTES];
-    bool ok = backend->read(pid, segment.address, verify, len) >= 0 &&
+    bool ok = wrote &&
+              backend->read(pid, segment.address, verify, len) >= 0 &&
               std::memcmp(verify, data.data(), len) == 0;
     if (!ok && enabling && segment.allow_code_cave_reloc &&
         !patch.code_cave_reloc) {
-      patch.code_cave_reloc = true;
-      if (backend->mapCodeCave(pid, segment.address, len) == 0 &&
-          backend->write(pid, segment.address, data.data(), len) >= 0 &&
-          backend->read(pid, segment.address, verify, len) >= 0 &&
-          std::memcmp(verify, data.data(), len) == 0) {
-        ok = true;
+      if (backend->mapCodeCave(pid, segment.address, len) == 0) {
+        patch.code_cave_reloc = true;
+        wrote = backend->write(pid, segment.address, data.data(), len) >= 0;
+        ok = wrote &&
+             backend->read(pid, segment.address, verify, len) >= 0 &&
+             std::memcmp(verify, data.data(), len) == 0;
       }
     }
     if (!ok) {
-      status = status_tr("notify.cheats.verify_failed", entry.name);
+      status = status_tr(wrote ? "notify.cheats.verify_failed"
+                               : "notify.cheats.write_failed",
+                         entry.name);
       break;
     }
   }

@@ -64,6 +64,16 @@ bool parseModObject(const cJSON *object, const char *process_name,
                         description);
   std::snprintf(entry->module_name, sizeof(entry->module_name), "%s",
                 process_name);
+  // GoldHEN-style files put the target module on the mod. Offsets are
+  // relative to that module, not the file-level process (often eboot.bin).
+  // An absent or empty key keeps the process fallback.
+  char module_override[sizeof(entry->module_name)];
+  if (copyStringItem(object, "module_name", module_override,
+                     sizeof(module_override)) &&
+      module_override[0] != '\0') {
+    onion_cheat_copy_utf8(entry->module_name, sizeof(entry->module_name),
+                          module_override);
+  }
 
   const cJSON *memory = onion_cjson::item(object, "memory");
   if (!memory) {

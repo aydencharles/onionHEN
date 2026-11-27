@@ -3,6 +3,7 @@
 extern "C" int test_cheat_utils_suite(void);
 extern "C" int test_cheat_parsers_suite(void);
 extern "C" int test_cheat_repository_suite(void);
+extern "C" int test_cheat_applier_suite(void);
 extern "C" int test_cheat_flatten_suite(void);
 extern "C" int test_payload_suite(void);
 extern "C" int test_payload_config_suite(void);
@@ -60,6 +61,7 @@ int main() {
   failures += test_cheat_utils_suite();
   failures += test_cheat_parsers_suite();
   failures += test_cheat_repository_suite();
+  failures += test_cheat_applier_suite();
   failures += test_cheat_flatten_suite();
   failures += test_payload_suite();
   failures += test_payload_config_suite();

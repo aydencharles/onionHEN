@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 
+#include "cheats/cheat_master.hpp"
 #include "cheats/i_cheat_parser.hpp"
 #include "cheats/cheat_engine.h"
 #include "test_harness.h"
@@ -139,6 +140,90 @@ int test_parse_json_buffer_rejects_invalid_hex() {
   static onion_cheat_file_t file;
 
   TEST_ASSERT_EQ_INT(-1, load_buf("json", json, file));
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
+int add_direct_patch(onion_cheat_entry_t &entry, uint64_t offset, size_t len) {
+  if (onion_cheat_entry_ensure_patch(&entry) != 0) {
+    return -1;
+  }
+  onion_patch_t &patch = entry.patches[entry.patch_count];
+  patch.offset = offset;
+  patch.on_len = len;
+  patch.off_len = len;
+  ++entry.patch_count;
+  return 0;
+}
+
+int test_master_code_overlap_helpers() {
+  static onion_cheat_file_t file;
+  onion_cheat_file_clear(&file);
+
+  TEST_ASSERT_EQ_INT(0, onion_cheat_file_ensure_cheat(&file));
+  onion_cheat_entry_t &master = file.cheats[file.cheat_count];
+  std::snprintf(master.name, sizeof(master.name), "Master Code");
+  std::snprintf(master.module_name, sizeof(master.module_name), "eboot.bin");
+  TEST_ASSERT_EQ_INT(0, add_direct_patch(master, 0x5A5BF00, 1));
+  TEST_ASSERT_EQ_INT(0, add_direct_patch(master, 0x401F000, 16));
+  ++file.cheat_count;
+
+  TEST_ASSERT_EQ_INT(0, onion_cheat_file_ensure_cheat(&file));
+  onion_cheat_entry_t &hp = file.cheats[file.cheat_count];
+  std::snprintf(hp.name, sizeof(hp.name), "--Inf Hp");
+  std::snprintf(hp.module_name, sizeof(hp.module_name), "eboot.bin");
+  TEST_ASSERT_EQ_INT(0, add_direct_patch(hp, 0x5A5BF00, 1));
+  ++file.cheat_count;
+
+  TEST_ASSERT_EQ_INT(0, onion_cheat_file_ensure_cheat(&file));
+  onion_cheat_entry_t &energy = file.cheats[file.cheat_count];
+  std::snprintf(energy.name, sizeof(energy.name), "Inf Energy");
+  std::snprintf(energy.module_name, sizeof(energy.module_name), "eboot.bin");
+  TEST_ASSERT_EQ_INT(0, add_direct_patch(energy, 0x28C9ECF, 6));
+  ++file.cheat_count;
+
+  TEST_ASSERT_EQ_INT(0, onion_cheat_file_ensure_cheat(&file));
+  onion_cheat_entry_t &other = file.cheats[file.cheat_count];
+  std::snprintf(other.name, sizeof(other.name), "Other module");
+  std::snprintf(other.module_name, sizeof(other.module_name), "other.prx");
+  TEST_ASSERT_EQ_INT(0, add_direct_patch(other, 0x5A5BF00, 1));
+  ++file.cheat_count;
+
+  TEST_ASSERT_EQ_INT(-1, onion::cheats::preceding_cave_master(file, 0));
+  TEST_ASSERT_EQ_INT(0, onion::cheats::preceding_cave_master(file, 1));
+  TEST_ASSERT_TRUE(onion::cheats::overlaps_preceding_master(file, 1));
+  TEST_ASSERT_TRUE(!onion::cheats::overlaps_preceding_master(file, 2));
+  TEST_ASSERT_TRUE(!onion::cheats::overlaps_preceding_master(file, 3));
+
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
+int test_parse_json_honors_mod_module_name() {
+  const char *json =
+      "{"
+      "\"process\":\"eboot.bin\","
+      "\"name\":\"Demo\","
+      "\"mods\":[{"
+      "\"name\":\"Uses process\","
+      "\"memory\":[{\"offset\":\"10\",\"on\":\"AA\",\"off\":\"BB\"}]"
+      "},{"
+      "\"name\":\"Uses module\","
+      "\"module_name\":\"Il2CppUserAssemblies.prx\","
+      "\"memory\":[{\"offset\":\"20\",\"on\":\"CC\",\"off\":\"DD\"}]"
+      "},{"
+      "\"name\":\"Empty module keeps process\","
+      "\"module_name\":\"\","
+      "\"memory\":[{\"offset\":\"30\",\"on\":\"EE\",\"off\":\"FF\"}]"
+      "}]"
+      "}";
+  static onion_cheat_file_t file;
+
+  TEST_ASSERT_EQ_INT(0, load_buf("json", json, file));
+  TEST_ASSERT_EQ_INT(3, static_cast<int>(file.cheat_count));
+  TEST_ASSERT_STREQ("eboot.bin", file.cheats[0].module_name);
+  TEST_ASSERT_STREQ("Il2CppUserAssemblies.prx", file.cheats[1].module_name);
+  TEST_ASSERT_STREQ("eboot.bin", file.cheats[2].module_name);
   onion_cheat_file_clear(&file);
   return 0;
 }
@@ -455,6 +540,10 @@ extern "C" int test_cheat_parsers_suite(void) {
                              test_parse_json_rejects_trailing_garbage);
   failures += onion_test_run("cheat json rejects invalid hex",
                              test_parse_json_buffer_rejects_invalid_hex);
+  failures += onion_test_run("cheat json honors mod module_name",
+                             test_parse_json_honors_mod_module_name);
+  failures += onion_test_run("master code overlap helpers",
+                             test_master_code_overlap_helpers);
   failures += onion_test_run("cheat json ignores out-of-range section",
                              test_parse_json_ignores_out_of_range_section);
   failures +=

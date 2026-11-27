@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 60
     env:
       PS5_PAYLOAD_SDK: ${{ github.workspace }}/.ps5-payload-sdk
+      PACBREW_VERSION: v0.41.1
       LLVM_CONFIG: /usr/lib/llvm-18/bin/llvm-config
     steps:
       - name: Checkout
@@ -71,7 +72,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PS5_PAYLOAD_SDK }}
-          key: ps5-payload-sdk-${{ runner.os }}-${{ steps.sdk.outputs.tag }}
+          key: ps5-payload-sdk-${{ runner.os }}-${{ steps.sdk.outputs.tag }}-pacbrew-${{ env.PACBREW_VERSION }}
 
       - name: Install PS5 Payload SDK
         if: steps.sdk-cache.outputs.cache-hit != 'true'
@@ -93,8 +94,15 @@ jobs:
           rm -rf "${PS5_PAYLOAD_SDK}"
           mkdir -p "$(dirname "${PS5_PAYLOAD_SDK}")"
           cp -a "${root}" "${PS5_PAYLOAD_SDK}"
+          # util requires libcurl (+ openssl, zlib, ...) and ca-bundle.crt from pacbrew.
+          hb=opt/ps5-payload-sdk/target/user/homebrew
+          curl -fsSL --retry 3 \
+            "https://github.com/ps5-payload-dev/pacbrew-repo/releases/download/${PACBREW_VERSION}/ps5-payload-dev.tar.gz" |
+            tar -xz -C "${PS5_PAYLOAD_SDK}" --strip-components=2 "${hb}/include" "${hb}/lib" "${hb}/etc"
           rm -rf "${tmp}"
           test -x "${PS5_PAYLOAD_SDK}/bin/prospero-cmake"
+          test -f "${PS5_PAYLOAD_SDK}/target/user/homebrew/lib/libcurl.a"
+          test -f "${PS5_PAYLOAD_SDK}/target/user/homebrew/etc/ca-bundle.crt"
 
       - name: Cache kstuff.elf
         uses: actions/cache@v4

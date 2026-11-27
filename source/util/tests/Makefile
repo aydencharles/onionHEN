@@ -87,6 +87,7 @@ PROD_CXX_SRCS := \
 	$(UTIL_ROOT)/source/cheats/shn_ext_cheat_parser.cpp \
 	$(UTIL_ROOT)/source/cheats/cheat_parser_factory.cpp \
 	$(UTIL_ROOT)/source/cheats/cheat_repository.cpp \
+	$(UTIL_ROOT)/source/cheats/cheat_applier.cpp \
 	$(UTIL_ROOT)/source/cheats/sync/catalog_hen_collection.cpp \
 	$(UTIL_ROOT)/source/cheats/sync/catalog_registry.cpp \
 	$(UTIL_ROOT)/source/cheats/sync/mirror_github.cpp \
@@ -138,6 +139,7 @@ TEST_C_SRCS := \
 TEST_CXX_SRCS := \
 	test_cheat_parsers.cpp \
 	test_cheat_repository.cpp \
+	test_cheat_applier.cpp \
 	test_git_mirror_factory.cpp \
 	test_cheat_catalog.cpp \
 	test_cheat_sync.cpp \

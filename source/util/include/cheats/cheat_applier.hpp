@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "cheats/cheat_engine.h"
+#include "cheats/i_cheat_runtime.hpp"
 #include "util_platform.h"
 
 namespace onion::cheats {
@@ -15,6 +16,8 @@ namespace onion::cheats {
  */
 class CheatApplier {
 public:
+  explicit CheatApplier(const ICheatRuntime *runtime = nullptr);
+
   /**
    * Toggle cheat at index. Returns 0 on success; status holds human message.
    */
@@ -39,6 +42,7 @@ private:
     std::vector<uint8_t> applied;
   };
 
+  const ICheatRuntime *runtime_ = nullptr;
   std::vector<ActiveRange> active_ranges_;
 };
 

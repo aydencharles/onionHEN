@@ -101,6 +101,10 @@ jobs:
         run: |
           cd "$RUNNER_TEMP"
           curl -fsSL --retry 3 "https://github.com/keystone-engine/keystone/archive/refs/tags/$KEYSTONE_VERSION.tar.gz" | tar -xz
+          # CMake 4.x removed OLD behavior for CMP0051; keystone 0.9.2 still sets it.
+          sed -i 's/CMP0051 OLD/CMP0051 NEW/g' \
+            "keystone-$KEYSTONE_VERSION/CMakeLists.txt" \
+            "keystone-$KEYSTONE_VERSION/llvm/CMakeLists.txt"
           cmake -S "keystone-$KEYSTONE_VERSION" -B keystone-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DBUILD_SHARED_LIBS=OFF -DLLVM_TARGETS_TO_BUILD=X86 \

@@ -84,6 +84,7 @@ inline constexpr int kUiLanguageMax = kUiLanguagePtPt;
 inline constexpr int kStartupOpenNone = 0;
 inline constexpr int kStartupOpenHomeMenu = 1;
 inline constexpr std::size_t kMaxCustomPkgSearchPaths = 8;
+inline constexpr std::size_t kMaxCustomPkgQuickPaths = 8;
 
 // Mirrors onion_log_level from <onion/log.h>. Duplicated rather than included
 // so libonion_settings stays independent of libonion_platform; the processes
@@ -344,6 +345,14 @@ struct Settings {
   std::array<std::string, kMaxCustomPkgSearchPaths> custom_pkg_search_paths = {
       "/data/OnionHEN/pkgs"};
   std::size_t custom_pkg_search_path_count = 1;
+  // Preset directories offered as one-click shortcuts in Search folders.
+  std::array<std::string, kMaxCustomPkgQuickPaths> custom_pkg_quick_paths = {
+      "/data/OnionHEN/pkgs",
+      "/data/pkg",
+      "/data",
+      "/data/downloads",
+  };
+  std::size_t custom_pkg_quick_path_count = 4;
 
   // [logging]
   // Runtime log threshold, matching onion_log_level (1=error .. 5=trace).

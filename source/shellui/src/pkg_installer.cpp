@@ -59,10 +59,12 @@ std::vector<std::string> g_scanned_system_paths;
 std::vector<PkgInstallerEntry> g_scanned_entries;
 std::string g_path_draft;
 
+#ifndef ONION_HOST_TEST
 extern "C" int sceKernelLoadStartModule(const char *name, std::size_t argc,
                                         const void *argv, std::uint32_t flags,
                                         std::uint32_t opt, int *result);
 extern "C" int sceKernelDlsym(int handle, const char *symbol, void **addrp);
+#endif
 
 bool has_prefix(std::string_view value, std::string_view prefix) {
   return value.size() >= prefix.size() &&
@@ -70,7 +72,7 @@ bool has_prefix(std::string_view value, std::string_view prefix) {
 }
 
 bool has_pkg_suffix(std::string_view name) {
-  if (name.size() < 4)
+  if (name.size() < 5 || name.front() == '.')
     return false;
   const std::size_t start = name.size() - 4;
   return std::tolower(static_cast<unsigned char>(name[start])) == '.' &&
@@ -79,7 +81,23 @@ bool has_pkg_suffix(std::string_view name) {
          std::tolower(static_cast<unsigned char>(name[start + 3])) == 'g';
 }
 
+bool icase_less(std::string_view a, std::string_view b) {
+  const std::size_t n = std::min(a.size(), b.size());
+  for (std::size_t i = 0; i < n; ++i) {
+    const unsigned char ca = static_cast<unsigned char>(
+        std::tolower(static_cast<unsigned char>(a[i])));
+    const unsigned char cb = static_cast<unsigned char>(
+        std::tolower(static_cast<unsigned char>(b[i])));
+    if (ca != cb)
+      return ca < cb;
+  }
+  return a.size() < b.size();
+}
+
 int resolve_appinst_api() {
+#ifdef ONION_HOST_TEST
+  return -ENOSYS;
+#else
   if (g_appinst.initialized)
     return 0;
   if (g_appinst.module_id < 0) {
@@ -111,14 +129,30 @@ int resolve_appinst_api() {
   }
   g_appinst.initialized = true;
   return 0;
+#endif
 }
 
 } // namespace
 
+std::string normalize_pkg_search_path(const std::string &path) {
+  const auto first = std::find_if_not(path.begin(), path.end(), [](char c) {
+    return std::isspace(static_cast<unsigned char>(c));
+  });
+  const auto last = std::find_if_not(path.rbegin(), path.rend(), [](char c) {
+    return std::isspace(static_cast<unsigned char>(c));
+  }).base();
+  std::string out = first < last ? std::string(first, last) : std::string();
+  while (out.size() > 1 && out.back() == '/')
+    out.pop_back();
+  return out;
+}
+
 bool pkg_search_path_is_valid(const std::string &path) {
-  if (path.size() < 7 || path.size() > kMaxPathLength || path.front() != '/' ||
-      path.find_first_of("\\\r\n") != std::string::npos)
+  if (path.size() < 5 || path.size() > kMaxPathLength || path.front() != '/' ||
+      path.find_first_of(",\\\r\n") != std::string::npos)
     return false;
+  if (path == "/data")
+    return true;
   std::size_t start = std::string::npos;
   if (path.rfind("/data/", 0) == 0)
     start = 6;
@@ -152,6 +186,46 @@ std::string pkg_search_path_shellui_view(const std::string &system_path) {
   return {};
 }
 
+bool pkg_search_path_exists(const std::string &system_path) {
+  if (!pkg_search_path_is_valid(system_path))
+    return false;
+  const std::string shellui_path = pkg_search_path_shellui_view(system_path);
+  if (shellui_path.empty())
+    return false;
+  DIR *dir = ::opendir(shellui_path.c_str());
+  if (!dir)
+    return false;
+  ::closedir(dir);
+  return true;
+}
+
+std::vector<std::size_t>
+available_quick_pkg_folder_indices(const std::string *quick_paths,
+                                   std::size_t quick_count,
+                                   const std::string *configured,
+                                   std::size_t configured_count) {
+  std::vector<std::size_t> result;
+  if (!quick_paths)
+    return result;
+  const std::size_t limit =
+      std::min(quick_count, onion::kMaxCustomPkgQuickPaths);
+  for (std::size_t i = 0; i < limit; ++i) {
+    const std::string candidate = normalize_pkg_search_path(quick_paths[i]);
+    if (!pkg_search_path_is_valid(candidate))
+      continue;
+    bool already = false;
+    for (std::size_t j = 0; configured && j < configured_count; ++j) {
+      if (normalize_pkg_search_path(configured[j]) == candidate) {
+        already = true;
+        break;
+      }
+    }
+    if (!already && pkg_search_path_exists(candidate))
+      result.push_back(i);
+  }
+  return result;
+}
+
 PkgInstallerScan scan_pkg_search_paths(const std::string *system_paths,
                                       std::size_t path_count) {
   PkgInstallerScan result{};
@@ -160,9 +234,13 @@ PkgInstallerScan scan_pkg_search_paths(const std::string *system_paths,
     return result;
 
   g_scanned_system_paths.assign(system_paths, system_paths + path_count);
+  result.folders.reserve(path_count);
+  bool pkg_entry_limit_reached = false;
   for (const std::string &system_path : g_scanned_system_paths) {
+    PkgFolderStatus folder_status{system_path, false, 0};
     if (!pkg_search_path_is_valid(system_path)) {
       ++result.inaccessible_paths;
+      result.folders.push_back(std::move(folder_status));
       continue;
     }
     const std::string shellui_path = pkg_search_path_shellui_view(system_path);
@@ -170,11 +248,12 @@ PkgInstallerScan scan_pkg_search_paths(const std::string *system_paths,
                                            : ::opendir(shellui_path.c_str());
     if (!directory) {
       ++result.inaccessible_paths;
+      result.folders.push_back(std::move(folder_status));
       continue;
     }
     result.accessible = true;
+    folder_status.accessible = true;
     std::size_t examined_entries = 0;
-    bool pkg_entry_limit_reached = false;
     while (const struct dirent *entry = ::readdir(directory)) {
       if (examined_entries >= kMaxExaminedPkgDirEntries) {
         result.truncated = true;
@@ -190,28 +269,33 @@ PkgInstallerScan scan_pkg_search_paths(const std::string *system_paths,
       struct stat st {};
       if (::stat(shellui_file.c_str(), &st) != 0 || !S_ISREG(st.st_mode))
         continue;
-      if (result.entries.size() == kMaxPkgEntries) {
+      ++folder_status.pkg_count;
+      if (pkg_entry_limit_reached || result.entries.size() == kMaxPkgEntries) {
         result.truncated = true;
         pkg_entry_limit_reached = true;
-        break;
+        continue;
       }
       std::string system_file = system_path;
       if (system_file.back() != '/')
         system_file.push_back('/');
       system_file += entry->d_name;
+      const std::uint64_t file_size =
+          st.st_size > 0 ? static_cast<std::uint64_t>(st.st_size) : 0;
       result.entries.push_back({entry->d_name, std::move(shellui_file),
-                                std::move(system_file), system_path});
+                                std::move(system_file), system_path,
+                                file_size});
     }
     ::closedir(directory);
-    if (pkg_entry_limit_reached)
-      break;
+    result.folders.push_back(std::move(folder_status));
   }
 
   std::sort(result.entries.begin(), result.entries.end(),
             [](const PkgInstallerEntry &left, const PkgInstallerEntry &right) {
-              if (left.search_path != right.search_path)
-                return left.search_path < right.search_path;
-              return left.name < right.name;
+              if (icase_less(left.name, right.name))
+                return true;
+              if (icase_less(right.name, left.name))
+                return false;
+              return left.search_path < right.search_path;
             });
   g_scanned_entries = result.entries;
   return result;
@@ -233,22 +317,22 @@ PkgInstallerResult install_scanned_pkg(std::size_t index,
       !std::equal(system_paths, system_paths + path_count,
                   g_scanned_system_paths.begin()) ||
       index >= g_scanned_entries.size())
-    return {false, -ENOENT};
+    return {false, -ENOENT, {}};
   const PkgInstallerEntry &entry = g_scanned_entries[index];
   if (!has_pkg_suffix(entry.name) || !pkg_search_path_is_valid(entry.search_path))
-    return {false, -EINVAL};
+    return {false, -EINVAL, entry.name};
   struct stat st {};
   if (::stat(entry.shellui_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode))
-    return {false, errno ? -errno : -ENOENT};
+    return {false, errno ? -errno : -ENOENT, entry.name};
 
   const int init_rc = resolve_appinst_api();
   if (init_rc != 0)
-    return {false, init_rc};
+    return {false, init_rc, entry.name};
 
   AppInstallPkgInfo pkg_info{};
   PlayGoInfo playgo{};
   MetaInfo meta{entry.system_path.c_str(), "", "", "", entry.name.c_str(),
                 ""};
   const int rc = g_appinst.install_by_package(&meta, &pkg_info, &playgo);
-  return {rc == 0, rc};
+  return {rc == 0, rc, entry.name};
 }

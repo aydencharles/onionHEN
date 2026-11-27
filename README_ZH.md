@@ -261,13 +261,14 @@ OnionHEN 在下面两处读写同一份配置：
 如果还没有配置文件，OnionHEN 会按 [`config.ini.example`](config.ini.example)
 写出一份带注释的默认文件。
 
-自定义 PKG 安装器把目录记成 `pkg.search_path_0` 到 `pkg.search_path_7`。安装进度由 PS5 系统安装器显示。不同固件对包的支持仍需要在主机上验证。
+自定义 PKG 安装器在 `[pkg]` 段用逗号分隔的 `pkg.search_paths`（扫描目录）和 `pkg.quick_paths`（常用快捷目录）保存配置。安装进度由 PS5 系统安装器显示。不同固件对包的支持仍需要在主机上验证。
 
 | 配置项 | 默认值 | 可用值 |
 | --- | --- | --- |
 | `meta.schema_version` | `1` | `1` |
 | `toolbox.language` | `system` | `system`, `zh-Hans`, `zh-Hant`, `en`, `ja`, `ko`, `fr`, `de`, `it`, `es`, `pt-BR`, `pt-PT`, `pl`, `ru`, `ar`, `th`, `nl`, `fi`, `sv`, `da`, `no`, `tr`, `cs`, `hu`, `el`, `ro`, `vi`, `id`, `uk` |
-| `pkg.search_path_count` / `pkg.search_path_N` | `1` / `/data/OnionHEN/pkgs` | 最多 8 个 `/data` 或 `/mnt` 下的绝对路径 |
+| `pkg.search_paths` | `/data/OnionHEN/pkgs` | 逗号分隔的 `/data` 或 `/mnt` 绝对路径（最多 8 个） |
+| `pkg.quick_paths` | `/data/OnionHEN/pkgs,/data/pkg,/data,/data/downloads` | 逗号分隔的常用快捷目录（最多 8 个；留空禁用） |
 | `startup.open_after_load` | `none` | `none`, `home_menu` |
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
 | `game_menu.show_onionhen_options` | `true` | `true`, `false` |

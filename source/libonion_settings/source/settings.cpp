@@ -22,14 +22,11 @@ along with this program; see the file COPYING. If not, see
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
-#include <memory>
-#include <new>
+#include <map>
 #include <string>
+#include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
-
-// Header-only inih-style parser already used across the tree.
-#include <ini.h>
 
 namespace onion {
 namespace {
@@ -66,8 +63,87 @@ bool streq_ci(const char *a, const char *b) {
   return *a == '\0' && *b == '\0';
 }
 
-const char *ini_get(IniParser *parser, const char *key) {
-  return ini_parser_get(parser, key, nullptr);
+struct IniDoc {
+  std::map<std::string, std::string> pairs;
+};
+
+std::string trim_view_copy(std::string_view sv) {
+  std::size_t first = 0;
+  while (first < sv.size() &&
+         std::isspace(static_cast<unsigned char>(sv[first]))) {
+    ++first;
+  }
+  std::size_t last = sv.size();
+  while (last > first &&
+         std::isspace(static_cast<unsigned char>(sv[last - 1]))) {
+    --last;
+  }
+  return std::string(sv.substr(first, last - first));
+}
+
+bool ini_doc_load(IniDoc *doc, const char *filename) {
+  if (!doc || !filename) {
+    return false;
+  }
+  const int fd = open(filename, O_RDONLY, 0);
+  if (fd < 0) {
+    return false;
+  }
+  constexpr std::size_t kMaxConfigBytes = 256 * 1024;
+  std::string content;
+  char buf[4096];
+  ssize_t n = 0;
+  while ((n = read(fd, buf, sizeof(buf))) > 0) {
+    if (content.size() + static_cast<std::size_t>(n) > kMaxConfigBytes) {
+      close(fd);
+      return false;
+    }
+    content.append(buf, static_cast<std::size_t>(n));
+  }
+  close(fd);
+  if (n < 0) {
+    return false;
+  }
+
+  doc->pairs.clear();
+  std::string section;
+  std::size_t pos = 0;
+  while (pos <= content.size()) {
+    const std::size_t nl = content.find('\n', pos);
+    const std::size_t end = (nl == std::string::npos) ? content.size() : nl;
+    const std::string line =
+        trim_view_copy(std::string_view(content).substr(pos, end - pos));
+    if (!line.empty() && line.front() != ';' && line.front() != '#') {
+      if (line.front() == '[' && line.back() == ']' && line.size() >= 2) {
+        section = trim_view_copy(
+            std::string_view(line).substr(1, line.size() - 2));
+      } else {
+        const std::size_t eq = line.find('=');
+        if (eq != std::string::npos) {
+          const std::string key = trim_view_copy(
+              std::string_view(line).substr(0, eq));
+          const std::string val = trim_view_copy(
+              std::string_view(line).substr(eq + 1));
+          if (!key.empty()) {
+            doc->pairs.emplace(section + "." + key, val);
+          }
+        }
+      }
+    }
+    if (nl == std::string::npos) {
+      break;
+    }
+    pos = nl + 1;
+  }
+  return true;
+}
+
+const char *ini_get(const IniDoc *doc, const char *key) {
+  if (!doc || !key) {
+    return nullptr;
+  }
+  const auto it = doc->pairs.find(key);
+  return it == doc->pairs.end() ? nullptr : it->second.c_str();
 }
 
 bool parse_bool(const char *s, bool def) {
@@ -407,9 +483,12 @@ std::string trim_copy(const std::string &value) {
 }
 
 bool valid_custom_pkg_search_path(const std::string &path) {
-  if (path.size() < 7 || path.size() > 512 || path.front() != '/' ||
-      path.find_first_of("\\\r\n") != std::string::npos) {
+  if (path.size() < 5 || path.size() > 512 || path.front() != '/' ||
+      path.find_first_of(",\\\r\n") != std::string::npos) {
     return false;
+  }
+  if (path == "/data") {
+    return true;
   }
   std::size_t start = std::string::npos;
   if (path.rfind("/data/", 0) == 0) {
@@ -435,6 +514,75 @@ bool valid_custom_pkg_search_path(const std::string &path) {
     start = slash + 1;
   }
   return true;
+}
+
+std::string normalize_custom_pkg_path(std::string_view raw) {
+  std::string out = trim_view_copy(raw);
+  while (out.size() > 1 && out.back() == '/') {
+    out.pop_back();
+  }
+  return out;
+}
+
+template <std::size_t N>
+void parse_comma_pkg_paths(const char *raw,
+                           std::array<std::string, N> &paths,
+                           std::size_t &path_count) {
+  if (!raw) {
+    return;
+  }
+  const std::string trimmed = trim_view_copy(raw);
+  if (trimmed.empty()) {
+    path_count = 0;
+    return;
+  }
+  std::array<std::string, N> parsed{};
+  std::size_t parsed_count = 0;
+  std::size_t pos = 0;
+  while (pos <= trimmed.size() && parsed_count < N) {
+    const std::size_t comma = trimmed.find(',', pos);
+    const std::size_t end =
+        (comma == std::string::npos) ? trimmed.size() : comma;
+    const std::string candidate = normalize_custom_pkg_path(
+        std::string_view(trimmed).substr(pos, end - pos));
+    if (valid_custom_pkg_search_path(candidate)) {
+      bool duplicate = false;
+      for (std::size_t i = 0; i < parsed_count; ++i) {
+        if (parsed[i] == candidate) {
+          duplicate = true;
+          break;
+        }
+      }
+      if (!duplicate) {
+        parsed[parsed_count++] = candidate;
+      }
+    }
+    if (comma == std::string::npos) {
+      break;
+    }
+    pos = comma + 1;
+  }
+  if (parsed_count > 0) {
+    paths = std::move(parsed);
+    path_count = parsed_count;
+  }
+}
+
+template <std::size_t N>
+std::string join_pkg_paths(const std::array<std::string, N> &paths,
+                           std::size_t count) {
+  const std::size_t limit = std::min(count, N);
+  std::string out;
+  for (std::size_t i = 0; i < limit; ++i) {
+    if (paths[i].empty()) {
+      continue;
+    }
+    if (!out.empty()) {
+      out.push_back(',');
+    }
+    out += paths[i];
+  }
+  return out;
 }
 
 bool is_upper_alnum(char c) {
@@ -755,7 +903,7 @@ const char *toolbox_shortcut_name(int v) {
 
 std::string bool_text(bool value) { return value ? "true" : "false"; }
 
-bool apply_parser(IniParser *parser, Settings *out) {
+bool apply_parser(const IniDoc *parser, Settings *out) {
   const int version = atoi_def(ini_get(parser, "meta.schema_version"), -1);
   if (version != kSettingsSchemaVersion) {
     return false;
@@ -764,54 +912,12 @@ bool apply_parser(IniParser *parser, Settings *out) {
   out->schema_version = version;
   out->ui_lang =
       parse_language(ini_get(parser, "toolbox.language"), out->ui_lang);
-  const char *pkg_path_count = ini_get(parser, "pkg.search_path_count");
-  const bool has_pkg_path_count = pkg_path_count != nullptr;
-  bool found_indexed_pkg_path = false;
-  std::array<std::string, kMaxCustomPkgSearchPaths> parsed_pkg_search_paths{};
-  std::size_t parsed_pkg_search_path_count = 0;
-  const bool explicitly_empty_pkg_search_paths =
-      has_pkg_path_count && trim_copy(pkg_path_count) == "0";
-  const int declared_path_count =
-      has_pkg_path_count ? std::max(0, std::min(
-                                  atoi_def(pkg_path_count, 0),
-                                  static_cast<int>(kMaxCustomPkgSearchPaths)))
-                         : static_cast<int>(kMaxCustomPkgSearchPaths);
-  for (int i = 0; i < declared_path_count; ++i) {
-    char key[32] = {};
-    std::snprintf(key, sizeof(key), "pkg.search_path_%d", i);
-    const char *raw_path = ini_get(parser, key);
-    if (!raw_path)
-      continue;
-    found_indexed_pkg_path = true;
-    const std::string candidate = trim_copy(raw_path);
-    if (!valid_custom_pkg_search_path(candidate))
-      continue;
-    bool duplicate = false;
-    for (std::size_t n = 0; n < parsed_pkg_search_path_count; ++n) {
-      if (parsed_pkg_search_paths[n] == candidate) {
-        duplicate = true;
-        break;
-      }
-    }
-    if (!duplicate) {
-      parsed_pkg_search_paths[parsed_pkg_search_path_count++] = candidate;
-    }
-  }
-  if (parsed_pkg_search_path_count > 0) {
-    out->custom_pkg_search_paths = std::move(parsed_pkg_search_paths);
-    out->custom_pkg_search_path_count = parsed_pkg_search_path_count;
-  } else if (explicitly_empty_pkg_search_paths) {
-    out->custom_pkg_search_path_count = 0;
-  }
-  if (!has_pkg_path_count && !found_indexed_pkg_path) {
-    if (const char *legacy_path = ini_get(parser, "pkg.search_path")) {
-      const std::string candidate = trim_copy(legacy_path);
-      if (valid_custom_pkg_search_path(candidate)) {
-        out->custom_pkg_search_paths[0] = candidate;
-        out->custom_pkg_search_path_count = 1;
-      }
-    }
-  }
+  parse_comma_pkg_paths(ini_get(parser, "pkg.search_paths"),
+                        out->custom_pkg_search_paths,
+                        out->custom_pkg_search_path_count);
+  parse_comma_pkg_paths(ini_get(parser, "pkg.quick_paths"),
+                        out->custom_pkg_quick_paths,
+                        out->custom_pkg_quick_path_count);
   out->startup_open_after_load = parse_startup_open_after_load(
       ini_get(parser, "startup.open_after_load"),
       out->startup_open_after_load);
@@ -914,15 +1020,12 @@ bool try_load_path(const char *path, Settings *out) {
   if (!path_exists(path)) {
     return false;
   }
-  /* IniParser is about 51 KiB.  This function also runs on daemon IPC client
-     threads, where keeping it on the stack can exhaust the thread stack in
-     unoptimised/debug builds. */
-  std::unique_ptr<IniParser> parser(new (std::nothrow) IniParser{});
-  if (!parser || !ini_parser_load(parser.get(), path)) {
+  IniDoc parser;
+  if (!ini_doc_load(&parser, path)) {
     return false;
   }
   Settings parsed = *out;
-  if (!apply_parser(parser.get(), &parsed)) {
+  if (!apply_parser(&parser, &parsed)) {
     return false;
   }
   *out = parsed;
@@ -953,17 +1056,16 @@ std::string settings_serialize(const Settings &in) {
   b += "language=" + std::string(language_name(in.ui_lang)) + "\n";
   b += "\n";
   b += "[pkg]\n";
-  b += "# search_path_N is an absolute /data or /mnt directory scanned for PKG files.\n";
-  b += "search_path_count=" +
-       std::to_string(std::min(in.custom_pkg_search_path_count,
-                               kMaxCustomPkgSearchPaths)) +
+  b += "# Comma-separated absolute /data or /mnt directories scanned for PKG files.\n";
+  b += "search_paths=" +
+       join_pkg_paths(in.custom_pkg_search_paths,
+                      in.custom_pkg_search_path_count) +
        "\n";
-  for (std::size_t i = 0;
-       i < in.custom_pkg_search_path_count && i < kMaxCustomPkgSearchPaths;
-       ++i) {
-    b += "search_path_" + std::to_string(i) + "=" +
-         in.custom_pkg_search_paths[i] + "\n";
-  }
+  b += "# Comma-separated preset directories offered as one-click shortcuts in Search folders.\n";
+  b += "quick_paths=" +
+       join_pkg_paths(in.custom_pkg_quick_paths,
+                      in.custom_pkg_quick_path_count) +
+       "\n";
   b += "\n";
   b += "[startup]\n";
   b += "# open_after_load chooses which page opens after OnionHEN finishes loading.\n";

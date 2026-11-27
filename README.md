@@ -315,15 +315,17 @@ Most options can be changed in the Toolbox. The format is
 `schema_version=1`. If no file exists, OnionHEN writes a commented
 default from [`config.ini.example`](config.ini.example).
 
-The Custom PKG Installer stores folders as `pkg.search_path_0` through
-`pkg.search_path_7`. Installation progress is shown by the PS5 system
-installer. Firmware-specific package support still needs console validation.
+The Custom PKG Installer stores comma-separated folders under `[pkg]` as
+`pkg.search_paths` (scanned folders) and `pkg.quick_paths` (one-click preset
+folders). Installation progress is shown by the PS5 system installer.
+Firmware-specific package support still needs console validation.
 
 | Key | Default | Values |
 | --- | --- | --- |
 | `meta.schema_version` | `1` | `1` |
 | `toolbox.language` | `system` | `system`, `zh-Hans`, `zh-Hant`, `en`, `ja`, `ko`, `fr`, `de`, `it`, `es`, `pt-BR`, `pt-PT`, `pl`, `ru`, `ar`, `th`, `nl`, `fi`, `sv`, `da`, `no`, `tr`, `cs`, `hu`, `el`, `ro`, `vi`, `id`, `uk` |
-| `pkg.search_path_count` / `pkg.search_path_N` | `1` / `/data/OnionHEN/pkgs` | Up to 8 absolute `/data` or `/mnt` folder paths |
+| `pkg.search_paths` | `/data/OnionHEN/pkgs` | Comma-separated absolute `/data` or `/mnt` paths (up to 8) |
+| `pkg.quick_paths` | `/data/OnionHEN/pkgs,/data/pkg,/data,/data/downloads` | Comma-separated preset shortcut paths (up to 8; empty disables shortcuts) |
 | `startup.open_after_load` | `none` | `none`, `home_menu` |
 | `home_screen.show_title_ids` | `false` | `true`, `false` |
 | `game_menu.show_onionhen_options` | `true` | `true`, `false` |

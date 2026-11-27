@@ -165,6 +165,7 @@ TEST_CXX_SRCS := \
 	test_sprx_plugin_manager.cpp \
 	test_plugin_ui.cpp \
 	test_plugin_sprx_pages.cpp \
+	test_pkg_installer_pages.cpp \
 	test_plugin_progress.cpp \
 	test_progress_auto_return.cpp \
 	test_settings_page_update.cpp \
@@ -209,6 +210,8 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/usb_payload_importer.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_i18n.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/pkg_installer.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/pkg_installer_pages.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_fps/fps_formula.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_lifecycle/app_lifecycle.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_sprx/sprx_loader.o
@@ -373,6 +376,14 @@ $(BUILD_DIR)/prod/shellui/toolbox_i18n.o: $(REPO_ROOT)/source/shellui/src/toolbo
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/shellui/plugin_sprx_pages.o: $(REPO_ROOT)/source/shellui/src/plugin_sprx_pages.cpp $(I18N_CATALOG) | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/pkg_installer.o: $(REPO_ROOT)/source/shellui/src/pkg_installer.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/pkg_installer_pages.o: $(REPO_ROOT)/source/shellui/src/pkg_installer_pages.cpp $(I18N_CATALOG) | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

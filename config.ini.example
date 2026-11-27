@@ -17,9 +17,10 @@ schema_version=1
 language=system
 
 [pkg]
-# Configure up to eight absolute /data or /mnt folders for local PS4 PKG files.
-search_path_count=1
-search_path_0=/data/OnionHEN/pkgs
+# Comma-separated absolute /data or /mnt directories scanned for local PS4 PKG files (up to 8).
+search_paths=/data/OnionHEN/pkgs
+# Comma-separated preset directories offered as one-click shortcuts in Search folders (up to 8).
+quick_paths=/data/OnionHEN/pkgs,/data/pkg,/data,/data/downloads
 
 [startup]
 # open_after_load chooses which page opens after OnionHEN finishes loading.

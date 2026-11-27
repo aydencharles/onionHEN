@@ -31,6 +31,8 @@ enum class Page : unsigned char {
   DynamicPlugin,     /**< SDK-provided UI contribution page */
   PluginProgress,    /**< external plugin start/stop progress transition page */
   CustomPkgInstaller,
+  CustomPkgFolders,   /**< search folder management for custom PKG installer */
+  CustomPkgAddFolder, /**< manual folder input for custom PKG installer */
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
 };
@@ -81,6 +83,8 @@ RouteResult resolve_resource(const RouteInput &in);
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
          page == Page::CustomPkgInstaller ||
+         page == Page::CustomPkgFolders ||
+         page == Page::CustomPkgAddFolder ||
          page == Page::PayloadConfig || page == Page::OverlayMetricConfig ||
          page == Page::PluginConfig ||
          page == Page::SprxConfig ||
@@ -113,6 +117,10 @@ inline constexpr std::string_view kOverlayMetricsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.overlay_metrics.xml";
 inline constexpr std::string_view kCustomPkgInstallerXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkginstaller.xml";
+inline constexpr std::string_view kCustomPkgFoldersXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkg_folders.xml";
+inline constexpr std::string_view kCustomPkgAddFolderXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkg_add_folder.xml";
 
 /** Sony Settings.Plugins module prefix shared by toolbox child resources. */
 inline constexpr std::string_view kSettingsPluginsPrefix =

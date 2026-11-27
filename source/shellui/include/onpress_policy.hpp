@@ -64,6 +64,8 @@ constexpr OnPressDomain onpress_domain_for_page(Page page) {
   case Page::RemotePlay:
     return OnPressDomain::RemotePlay;
   case Page::CustomPkgInstaller:
+  case Page::CustomPkgFolders:
+  case Page::CustomPkgAddFolder:
     return OnPressDomain::CustomPkgInstaller;
   case Page::DynamicPlugin:
     return OnPressDomain::DynamicPlugin;

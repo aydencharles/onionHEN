@@ -37,6 +37,7 @@
 #include "toolbox_helpers.hpp"
 #include "overlay_metrics.hpp"
 #include "pkg_installer.hpp"
+#include "pkg_installer_pages.hpp"
 #include "toolbox_route.hpp"
 
 #include <onion/payload_identity.h>
@@ -1125,56 +1126,58 @@ void generate_toolbox_xml(std::string& new_xml) {
   new_xml = page.build();
 }
 
-void generate_custom_pkg_installer_xml(std::string &xml_buffer) {
+static bool custom_pkg_installer_model(ps5ui::Node &model) {
   const std::size_t path_count = std::min(
       g_settings.custom_pkg_search_path_count,
       onion::kMaxCustomPkgSearchPaths);
   const PkgInstallerScan scan = scan_pkg_search_paths(
       g_settings.custom_pkg_search_paths.data(), path_count);
   ps5ui::Page page("custom_pkg_installer", toolbox_i18n::tr("pkg.custom.title"));
-  page.label("id_pkg_help", toolbox_i18n::tr("pkg.custom.help"));
-  page.text_field("id_pkg_path_input", toolbox_i18n::tr("pkg.custom.path_input"),
-                  toolbox_i18n::tr("pkg.custom.path_input_hint"), "url", "1",
-                  "512", std::nullopt, std::nullopt, std::nullopt,
-                  pkg_search_path_draft());
-  page.button("id_pkg_path_add", toolbox_i18n::tr("pkg.custom.add_path"));
+  onion::shellui::pkg_pages::fill_custom_pkg_installer_page(page, scan,
+                                                            path_count);
+  model = page.root();
+  return true;
+}
 
-  page.group("id_pkg_paths", toolbox_i18n::tr("pkg.custom.saved_paths"),
-             [&](ps5ui::Group &group) {
-               for (std::size_t i = 0; i < path_count; ++i) {
-                 group.button("id_pkg_remove_" + std::to_string(i),
-                              g_settings.custom_pkg_search_paths[i],
-                              toolbox_i18n::tr("pkg.custom.remove"));
-               }
-               if (path_count == 0)
-                 group.label("id_pkg_no_paths",
-                             toolbox_i18n::tr("pkg.custom.no_paths"));
-             });
+static bool custom_pkg_folders_model(ps5ui::Node &model) {
+  const std::size_t path_count = std::min(
+      g_settings.custom_pkg_search_path_count,
+      onion::kMaxCustomPkgSearchPaths);
+  const std::size_t quick_count = std::min(
+      g_settings.custom_pkg_quick_path_count,
+      onion::kMaxCustomPkgQuickPaths);
+  const PkgInstallerScan scan = scan_pkg_search_paths(
+      g_settings.custom_pkg_search_paths.data(), path_count);
+  const auto quick_add = available_quick_pkg_folder_indices(
+      g_settings.custom_pkg_quick_paths.data(), quick_count,
+      g_settings.custom_pkg_search_paths.data(), path_count);
+  ps5ui::Page page("custom_pkg_folders",
+                   toolbox_i18n::tr("pkg.custom.manage_folders"));
+  onion::shellui::pkg_pages::fill_custom_pkg_folders_page(
+      page, scan, g_settings.custom_pkg_quick_paths.data(), quick_count,
+      quick_add);
+  model = page.root();
+  return true;
+}
 
-  page.group("id_pkg_scan_results", toolbox_i18n::tr("pkg.custom.packages"),
-             [&](ps5ui::Group &group) {
-               if (path_count == 0)
-                 return;
-               if (!scan.accessible) {
-                 group.label("id_pkg_inaccessible",
-                             toolbox_i18n::tr("pkg.custom.inaccessible"));
-                 return;
-               }
-               if (scan.inaccessible_paths != 0)
-                 group.label("id_pkg_partial_inaccessible",
-                             toolbox_i18n::tr("pkg.custom.partial_inaccessible"));
-               if (scan.entries.empty() && !scan.truncated)
-                 group.label("id_pkg_empty",
-                             toolbox_i18n::tr("pkg.custom.empty"));
-               for (std::size_t i = 0; i < scan.entries.size(); ++i) {
-                 const PkgInstallerEntry &entry = scan.entries[i];
-                 group.button("id_pkg_install_" + std::to_string(i), entry.name,
-                              entry.search_path,
-                              toolbox_i18n::tr("pkg.custom.package_help"));
-               }
-               if (scan.truncated)
-                 group.label("id_pkg_truncated",
-                             toolbox_i18n::tr("pkg.custom.truncated"));
-             });
+void generate_custom_pkg_installer_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  custom_pkg_installer_model(model);
+  xml_buffer = onion::shellui::settings::publish(model,
+                                                 custom_pkg_installer_model);
+}
+
+void generate_custom_pkg_folders_xml(std::string &xml_buffer) {
+  ps5ui::Node model;
+  custom_pkg_folders_model(model);
+  xml_buffer = onion::shellui::settings::publish(model,
+                                                 custom_pkg_folders_model);
+}
+
+void generate_custom_pkg_add_folder_xml(std::string &xml_buffer) {
+  ps5ui::Page page("custom_pkg_add_folder",
+                   toolbox_i18n::tr("pkg.custom.add_custom"));
+  onion::shellui::pkg_pages::fill_custom_pkg_add_folder_page(
+      page, pkg_search_path_draft());
   xml_buffer = page.build();
 }

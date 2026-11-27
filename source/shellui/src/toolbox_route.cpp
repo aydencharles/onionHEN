@@ -19,6 +19,8 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_auto_payload = (in.resource == kAutoPayloadsXml);
   out.flags.is_plugins = (in.resource == kPluginsXml);
   const bool is_custom_pkg_installer = in.resource == kCustomPkgInstallerXml;
+  const bool is_custom_pkg_folders = in.resource == kCustomPkgFoldersXml;
+  const bool is_custom_pkg_add_folder = in.resource == kCustomPkgAddFolderXml;
   out.flags.is_sprx = (in.resource == kSprxXml);
   out.flags.is_sprx_config = parse_sprx_config_resource(in.resource, nullptr);
   out.flags.is_payload_config =
@@ -57,6 +59,10 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::Plugins;
   } else if (is_custom_pkg_installer) {
     out.page = Page::CustomPkgInstaller;
+  } else if (is_custom_pkg_folders) {
+    out.page = Page::CustomPkgFolders;
+  } else if (is_custom_pkg_add_folder) {
+    out.page = Page::CustomPkgAddFolder;
   } else if (out.flags.is_sprx) {
     out.page = Page::Sprx;
   } else if (out.flags.is_sprx_config) {

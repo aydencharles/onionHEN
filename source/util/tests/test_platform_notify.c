@@ -82,8 +82,9 @@ static int test_notify_debug_localized(void) {
 
   onion_notify_debug(/*show_watermark=*/1, "notify.boot.thanks");
   TEST_ASSERT_TRUE(g_debug_notify_request[0x2C] == 0);
-  TEST_ASSERT_STREQ("[OnionHEN] Special Thanks to: kvnhrt, Modmycon",
-                    (const char *)&g_debug_notify_request[0x2D]);
+  TEST_ASSERT_STREQ(
+      "[OnionHEN] Special Thanks to: kvnhrt, Modmycon, bobrass, Eskiell, Firat17aze",
+      (const char *)&g_debug_notify_request[0x2D]);
   TEST_ASSERT_TRUE(g_debug_notify_request[0x42D] == '\0');
 
   onion_notify_set_send(NULL);

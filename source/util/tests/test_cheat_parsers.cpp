@@ -143,6 +143,35 @@ int test_parse_json_buffer_rejects_invalid_hex() {
   return 0;
 }
 
+int test_parse_json_honors_mod_module_name() {
+  const char *json =
+      "{"
+      "\"process\":\"eboot.bin\","
+      "\"name\":\"Demo\","
+      "\"mods\":[{"
+      "\"name\":\"Uses process\","
+      "\"memory\":[{\"offset\":\"10\",\"on\":\"AA\",\"off\":\"BB\"}]"
+      "},{"
+      "\"name\":\"Uses module\","
+      "\"module_name\":\"Il2CppUserAssemblies.prx\","
+      "\"memory\":[{\"offset\":\"20\",\"on\":\"CC\",\"off\":\"DD\"}]"
+      "},{"
+      "\"name\":\"Empty module keeps process\","
+      "\"module_name\":\"\","
+      "\"memory\":[{\"offset\":\"30\",\"on\":\"EE\",\"off\":\"FF\"}]"
+      "}]"
+      "}";
+  static onion_cheat_file_t file;
+
+  TEST_ASSERT_EQ_INT(0, load_buf("json", json, file));
+  TEST_ASSERT_EQ_INT(3, static_cast<int>(file.cheat_count));
+  TEST_ASSERT_STREQ("eboot.bin", file.cheats[0].module_name);
+  TEST_ASSERT_STREQ("Il2CppUserAssemblies.prx", file.cheats[1].module_name);
+  TEST_ASSERT_STREQ("eboot.bin", file.cheats[2].module_name);
+  onion_cheat_file_clear(&file);
+  return 0;
+}
+
 int test_parse_json_ignores_out_of_range_section() {
   const char *json =
       "{"
@@ -455,6 +484,8 @@ extern "C" int test_cheat_parsers_suite(void) {
                              test_parse_json_rejects_trailing_garbage);
   failures += onion_test_run("cheat json rejects invalid hex",
                              test_parse_json_buffer_rejects_invalid_hex);
+  failures += onion_test_run("cheat json honors mod module_name",
+                             test_parse_json_honors_mod_module_name);
   failures += onion_test_run("cheat json ignores out-of-range section",
                              test_parse_json_ignores_out_of_range_section);
   failures +=

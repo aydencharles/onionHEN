@@ -1,5 +1,4 @@
 #include "test_harness.h"
-#include "usb_payload_action.hpp"
 #include "usb_payload_importer.hpp"
 
 #include <cerrno>
@@ -60,56 +59,6 @@ int test_import_without_hard_links() {
                    ImportResult::Completed);
   TEST_ASSERT_TRUE(contents(f.destination + "/kraken-mount.elf") == payload);
   TEST_ASSERT_EQ_INT(0, link_calls);
-  return 0;
-}
-
-int test_action_identity_after_reorder() {
-  const Entry displayed{"first_name.elf", "/usb1/first_name.elf", 10, 1,
-                        true};
-  const Entry other{"other_name.elf", "/usb0/other_name.elf", 12, 0,
-                    true};
-  const std::string displayed_id = action_id(displayed, true);
-  const std::vector<Entry> refreshed{other, displayed};
-
-  const Entry *found = find_action_entry(refreshed, displayed_id, true);
-  TEST_ASSERT_TRUE(found != nullptr && found->name == displayed.name &&
-                   found->usb_index == displayed.usb_index);
-  TEST_ASSERT_TRUE(find_action_entry({other}, displayed_id, true) == nullptr);
-  TEST_ASSERT_TRUE(find_action_entry(refreshed, displayed_id, false) == nullptr);
-  TEST_ASSERT_TRUE(find_action_entry(refreshed, "id_usb_payload_replace_1_",
-                                     true) == nullptr);
-  TEST_ASSERT_TRUE(find_action_entry(refreshed,
-                                     "id_usb_payload_replace_9_first_name.elf",
-                                     true) == nullptr);
-
-  const Entry same_name_other_usb{"first_name.elf", "/usb0/first_name.elf",
-                                  10, 0, true};
-  const std::vector<Entry> duplicates{same_name_other_usb, displayed};
-  found = find_action_entry(duplicates, displayed_id, true);
-  TEST_ASSERT_TRUE(found != nullptr && found->usb_index == 1);
-
-  Entry newline = displayed;
-  newline.name = "line\nbreak.elf";
-  Entry literal_percent = displayed;
-  literal_percent.name = "line%0Abreak.elf";
-  Entry tab_and_return = displayed;
-  tab_and_return.name = "tab\treturn\r.elf";
-  const std::vector<Entry> unusual{newline, literal_percent, tab_and_return};
-  const std::string newline_id = action_id(newline, true);
-  TEST_ASSERT_TRUE(newline_id.find('\n') == std::string::npos);
-  TEST_ASSERT_TRUE(newline_id != action_id(literal_percent, true));
-  found = find_action_entry(unusual, newline_id, true);
-  TEST_ASSERT_TRUE(found != nullptr && found->name == newline.name);
-  found = find_action_entry(unusual, action_id(literal_percent, true), true);
-  TEST_ASSERT_TRUE(found != nullptr && found->name == literal_percent.name);
-  const std::string whitespace_id = action_id(tab_and_return, true);
-  TEST_ASSERT_TRUE(whitespace_id.find_first_of("\t\r\n") ==
-                   std::string::npos);
-  found = find_action_entry(unusual, whitespace_id, true);
-  TEST_ASSERT_TRUE(found != nullptr && found->name == tab_and_return.name);
-  TEST_ASSERT_TRUE(find_action_entry(
-                       unusual, "id_usb_payload_replace_1_line%0Xbreak.elf",
-                       true) == nullptr);
   return 0;
 }
 
@@ -245,8 +194,6 @@ extern "C" int test_usb_payload_importer_suite(void) {
   int failures = 0;
   failures += onion_test_run("usb_payloads.import_without_hard_links",
                              test_import_without_hard_links);
-  failures += onion_test_run("usb_payloads.action_identity_after_reorder",
-                             test_action_identity_after_reorder);
   failures += onion_test_run("usb_payloads.scan_import_replace",
                              test_scan_and_import);
   failures += onion_test_run("usb_payloads.native_access_directory",

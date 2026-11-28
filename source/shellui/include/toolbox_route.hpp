@@ -15,7 +15,6 @@ enum class Page : unsigned char {
   None = 0,           /**< unknown → original stream */
   DebugSettings,      /**< embedded toolbox XML */
   Payloads,
-  UsbPayloads,
   PayloadConfig,      /**< per-Payload configuration page */
   OverlayMetrics,     /**< overlay metric list (overlay_metrics.xml) */
   OverlayMetricConfig, /**< per-overlay metric page (overlay_<id>.xml) */
@@ -30,9 +29,7 @@ enum class Page : unsigned char {
   RemotePlay,
   DynamicPlugin,     /**< SDK-provided UI contribution page */
   PluginProgress,    /**< external plugin start/stop progress transition page */
-  CustomPkgInstaller,
-  CustomPkgFolders,   /**< search folder management for custom PKG installer */
-  CustomPkgAddFolder, /**< manual folder input for custom PKG installer */
+  FileBrowser,        /**< reusable lightweight file browser (All/PKG/Payload/Patch) */
   SuperuserPass,      /**< recognized; still use original stream */
   RedirectOgDebug,    /**< og_debug.xml → debug_settings resource */
 };
@@ -82,9 +79,7 @@ RouteResult resolve_resource(const RouteInput &in);
 /** Child routes whose page-stack pop should restore the owning parent route. */
 constexpr bool restores_parent_on_pop(Page page) {
   return page == Page::CheatProgress || page == Page::RemotePlay ||
-         page == Page::CustomPkgInstaller ||
-         page == Page::CustomPkgFolders ||
-         page == Page::CustomPkgAddFolder ||
+         page == Page::FileBrowser ||
          page == Page::PayloadConfig || page == Page::OverlayMetricConfig ||
          page == Page::PluginConfig ||
          page == Page::SprxConfig ||
@@ -97,8 +92,6 @@ inline constexpr std::string_view kAutoPayloadsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.auto_payloads.xml";
 inline constexpr std::string_view kPluginsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.plugins.xml";
-inline constexpr std::string_view kUsbPayloadsXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.usb_payloads.xml";
 inline constexpr std::string_view kSprxXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.sprx.xml";
 inline constexpr std::string_view kAccountXml =
@@ -115,12 +108,14 @@ inline constexpr std::string_view kOgDebugXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.og_debug.xml";
 inline constexpr std::string_view kOverlayMetricsXml =
     "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.overlay_metrics.xml";
-inline constexpr std::string_view kCustomPkgInstallerXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkginstaller.xml";
-inline constexpr std::string_view kCustomPkgFoldersXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkg_folders.xml";
-inline constexpr std::string_view kCustomPkgAddFolderXml =
-    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.custom_pkg_add_folder.xml";
+inline constexpr std::string_view kFileBrowserXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.file_browser.xml";
+inline constexpr std::string_view kFileBrowserPkgXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.file_browser_pkg.xml";
+inline constexpr std::string_view kFileBrowserPayloadXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.file_browser_payload.xml";
+inline constexpr std::string_view kFileBrowserPatchXml =
+    "Sce.Vsh.ShellUI.Legacy.src.Sce.Vsh.ShellUI.Settings.Plugins.file_browser_patch.xml";
 
 /** Sony Settings.Plugins module prefix shared by toolbox child resources. */
 inline constexpr std::string_view kSettingsPluginsPrefix =
@@ -270,6 +265,24 @@ inline bool parse_overlay_metric_resource(std::string_view resource,
 
 inline std::string overlay_metric_xml(std::string_view id) {
   return std::string(kOverlayMetricXmlPrefix) + std::string(id) + ".xml";
+}
+
+inline bool parse_file_browser_resource(std::string_view resource,
+                                        std::string *out_mode) {
+  std::string_view mode;
+  if (resource == kFileBrowserXml)
+    mode = "all";
+  else if (resource == kFileBrowserPkgXml)
+    mode = "pkg";
+  else if (resource == kFileBrowserPayloadXml)
+    mode = "payload";
+  else if (resource == kFileBrowserPatchXml)
+    mode = "patch";
+  else
+    return false;
+  if (out_mode)
+    *out_mode = std::string(mode);
+  return true;
 }
 
 } // namespace toolbox

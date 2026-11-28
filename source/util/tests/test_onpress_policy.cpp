@@ -64,6 +64,8 @@ static int test_page_domain_matrix(void) {
                    OnPressDomain::Sprx);
   TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::SprxConfig) ==
                    OnPressDomain::Sprx);
+  TEST_ASSERT_TRUE(toolbox::onpress_domain_for_page(Page::FileBrowser) ==
+                   OnPressDomain::FileBrowser);
   return 0;
 }
 

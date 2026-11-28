@@ -781,70 +781,6 @@ static int test_overlay_font_and_order(void) {
   return 0;
 }
 
-static int test_custom_pkg_paths_and_quick_paths(void) {
-  onion::Settings defaults{};
-  TEST_ASSERT_EQ_U64(4, defaults.custom_pkg_quick_path_count);
-  TEST_ASSERT_STREQ("/data/OnionHEN/pkgs",
-                    defaults.custom_pkg_quick_paths[0].c_str());
-  TEST_ASSERT_STREQ("/data/pkg", defaults.custom_pkg_quick_paths[1].c_str());
-  TEST_ASSERT_STREQ("/data", defaults.custom_pkg_quick_paths[2].c_str());
-  TEST_ASSERT_STREQ("/data/downloads",
-                    defaults.custom_pkg_quick_paths[3].c_str());
-
-  const std::string path = temp_ini_path();
-  TEST_ASSERT_TRUE(!path.empty());
-
-  onion::Settings custom{};
-  custom.custom_pkg_search_paths[0] = "/data";
-  custom.custom_pkg_search_path_count = 1;
-  custom.custom_pkg_quick_paths[0] = "/data/fpkg";
-  custom.custom_pkg_quick_paths[1] = "/mnt/ext0/pkgs";
-  custom.custom_pkg_quick_path_count = 2;
-  TEST_ASSERT_TRUE(onion::settings_save_file(path.c_str(), custom));
-
-  onion::Settings loaded{};
-  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &loaded));
-  TEST_ASSERT_EQ_U64(1, loaded.custom_pkg_search_path_count);
-  TEST_ASSERT_STREQ("/data", loaded.custom_pkg_search_paths[0].c_str());
-  TEST_ASSERT_EQ_U64(2, loaded.custom_pkg_quick_path_count);
-  TEST_ASSERT_STREQ("/data/fpkg", loaded.custom_pkg_quick_paths[0].c_str());
-  TEST_ASSERT_STREQ("/mnt/ext0/pkgs", loaded.custom_pkg_quick_paths[1].c_str());
-
-  const std::string serialized = onion::settings_serialize(custom);
-  TEST_ASSERT_TRUE(serialized.find("search_paths=/data\n") !=
-                   std::string::npos);
-  TEST_ASSERT_TRUE(
-      serialized.find("quick_paths=/data/fpkg,/mnt/ext0/pkgs\n") !=
-      std::string::npos);
-
-  // Verify long (>256 byte) comma-separated lines load without truncation.
-  std::string long_line = "[meta]\nschema_version=1\n\n[pkg]\nsearch_paths=";
-  std::string expected_last;
-  for (int i = 0; i < 8; ++i) {
-    const std::string p =
-        "/data/OnionHEN/very_long_pkg_directory_name_number_" +
-        std::to_string(i);
-    if (i > 0)
-      long_line += ", ";
-    long_line += p;
-    expected_last = p;
-  }
-  long_line += "\nquick_paths=\n";
-  FILE *f = fopen(path.c_str(), "w");
-  TEST_ASSERT_TRUE(f != nullptr);
-  fputs(long_line.c_str(), f);
-  fclose(f);
-  onion::Settings long_loaded{};
-  TEST_ASSERT_TRUE(onion::settings_load_file(path.c_str(), &long_loaded));
-  TEST_ASSERT_EQ_U64(8, long_loaded.custom_pkg_search_path_count);
-  TEST_ASSERT_STREQ(expected_last.c_str(),
-                    long_loaded.custom_pkg_search_paths[7].c_str());
-  TEST_ASSERT_EQ_U64(0, long_loaded.custom_pkg_quick_path_count);
-
-  unlink(path.c_str());
-  return 0;
-}
-
 extern "C" int test_settings_suite(void) {
   int failures = 0;
   failures += onion_test_run("settings_defaults_serialize", test_defaults_and_serialize_keys);
@@ -880,7 +816,5 @@ extern "C" int test_settings_suite(void) {
                              test_v0_0_10_config_keeps_kstuff_autoload);
   failures += onion_test_run("settings_clamp_fan_threshold",
                              test_clamp_fan_threshold);
-  failures += onion_test_run("settings_custom_pkg_quick_paths",
-                             test_custom_pkg_paths_and_quick_paths);
   return failures;
 }

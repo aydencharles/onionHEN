@@ -36,8 +36,6 @@
 #include "shellui_payload_state.hpp"
 #include "toolbox_helpers.hpp"
 #include "overlay_metrics.hpp"
-#include "pkg_installer.hpp"
-#include "pkg_installer_pages.hpp"
 #include "toolbox_route.hpp"
 
 #include <onion/payload_identity.h>
@@ -671,12 +669,20 @@ std::string toolbox_val(const char* id, const char* fallback = "0") {
 }
 
 void append_toolbox_pkg_group(ps5ui::Group& g) {
-  g.link("id_game_package_installer", toolbox_i18n::tr("pkg.installer"),
-         "PkgInstaller/data/pkginstaller.xml",
-         toolbox_i18n::tr("pkg.installer.sub"))
-      .link("id_custom_pkg_installer", toolbox_i18n::tr("pkg.custom.title"),
-            "custom_pkginstaller.xml",
-            toolbox_i18n::tr("pkg.custom.subtitle"))
+  g.group(
+       "id_pkg_installer_menu", toolbox_i18n::tr("pkg.installer"),
+       [](ps5ui::Group& p) {
+         p.link("id_game_package_installer",
+                toolbox_i18n::tr("pkg.installer.native"),
+                "PkgInstaller/data/pkginstaller.xml",
+                toolbox_i18n::tr("pkg.installer.native.sub"))
+             .link("id_custom_pkg_installer",
+                   toolbox_i18n::tr("pkg.installer.custom"),
+                   "file_browser_pkg.xml",
+                   toolbox_i18n::tr("pkg.installer.custom.sub"));
+       },
+       toolbox_i18n::tr("pkg.installer.sub"), std::nullopt,
+       "id_game_package_installer")
       .link("id_game_add_content_manager", toolbox_i18n::tr("pkg.add_content"),
             "Addcontent/data/addcontent.xml",
             toolbox_i18n::tr("pkg.add_content.sub"));
@@ -687,9 +693,10 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
          toolbox_i18n::tr("payloads.link.sub"), kIconPlugins)
       .link("id_plugins", toolbox_i18n::tr("plugins.link"), "plugins.xml",
             toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
-      .link("id_usb_payloads", toolbox_i18n::tr("usb_payloads.title"),
-            "usb_payloads.xml", toolbox_i18n::tr("usb_payloads.link.sub"),
-            kIconPlugins)
+      .link("id_file_browser_payload",
+            toolbox_i18n::tr("file_browser.title.payload"),
+            "file_browser_payload.xml",
+            toolbox_i18n::tr("file_browser.payload.sub"), kIconPlugins)
       .link("id_sprx", toolbox_i18n::tr("sprx.link"), "sprx.xml",
             toolbox_i18n::tr("sprx.link.sub"), kIconPlugins);
 }
@@ -697,6 +704,10 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
 void append_toolbox_game_group(ps5ui::Group& g) {
   g.link("id_cheats", toolbox_i18n::tr("cheats.link"), "cheats.xml",
          toolbox_i18n::tr("cheats.link.sub"), kIconCheats)
+      .link("id_file_browser_patch",
+            toolbox_i18n::tr("file_browser.title.patch"),
+            "file_browser_patch.xml",
+            toolbox_i18n::tr("file_browser.patch.sub"), kIconCheats)
       .button("id_download_cheats", toolbox_i18n::tr("cheats.repo.download"),
               toolbox_i18n::tr("cheats.repo.download.desc"), std::nullopt,
               kIconDownload, ps5ui::Style::None,
@@ -1080,7 +1091,10 @@ void generate_toolbox_xml(std::string& new_xml) {
           "id_group_pkg", toolbox_i18n::tr("group.pkg"),
           [](ps5ui::Group& g) { append_toolbox_pkg_group(g); },
           toolbox_i18n::tr("group.pkg.sub"), kIconPkg,
-          "id_game_package_installer")
+          "id_pkg_installer_menu")
+      .link("id_file_browser", toolbox_i18n::tr("file_browser.title"),
+            "file_browser.xml", toolbox_i18n::tr("file_browser.root.sub"),
+            kIconHardDrive)
       .group(
           "id_group_payloads", toolbox_i18n::tr("group.payloads"),
           [](ps5ui::Group& g) { append_toolbox_payloads_group(g); },
@@ -1124,60 +1138,4 @@ void generate_toolbox_xml(std::string& new_xml) {
           ps5ui::Style::Center);
 
   new_xml = page.build();
-}
-
-static bool custom_pkg_installer_model(ps5ui::Node &model) {
-  const std::size_t path_count = std::min(
-      g_settings.custom_pkg_search_path_count,
-      onion::kMaxCustomPkgSearchPaths);
-  const PkgInstallerScan scan = scan_pkg_search_paths(
-      g_settings.custom_pkg_search_paths.data(), path_count);
-  ps5ui::Page page("custom_pkg_installer", toolbox_i18n::tr("pkg.custom.title"));
-  onion::shellui::pkg_pages::fill_custom_pkg_installer_page(page, scan,
-                                                            path_count);
-  model = page.root();
-  return true;
-}
-
-static bool custom_pkg_folders_model(ps5ui::Node &model) {
-  const std::size_t path_count = std::min(
-      g_settings.custom_pkg_search_path_count,
-      onion::kMaxCustomPkgSearchPaths);
-  const std::size_t quick_count = std::min(
-      g_settings.custom_pkg_quick_path_count,
-      onion::kMaxCustomPkgQuickPaths);
-  const PkgInstallerScan scan = scan_pkg_search_paths(
-      g_settings.custom_pkg_search_paths.data(), path_count);
-  const auto quick_add = available_quick_pkg_folder_indices(
-      g_settings.custom_pkg_quick_paths.data(), quick_count,
-      g_settings.custom_pkg_search_paths.data(), path_count);
-  ps5ui::Page page("custom_pkg_folders",
-                   toolbox_i18n::tr("pkg.custom.manage_folders"));
-  onion::shellui::pkg_pages::fill_custom_pkg_folders_page(
-      page, scan, g_settings.custom_pkg_quick_paths.data(), quick_count,
-      quick_add);
-  model = page.root();
-  return true;
-}
-
-void generate_custom_pkg_installer_xml(std::string &xml_buffer) {
-  ps5ui::Node model;
-  custom_pkg_installer_model(model);
-  xml_buffer = onion::shellui::settings::publish(model,
-                                                 custom_pkg_installer_model);
-}
-
-void generate_custom_pkg_folders_xml(std::string &xml_buffer) {
-  ps5ui::Node model;
-  custom_pkg_folders_model(model);
-  xml_buffer = onion::shellui::settings::publish(model,
-                                                 custom_pkg_folders_model);
-}
-
-void generate_custom_pkg_add_folder_xml(std::string &xml_buffer) {
-  ps5ui::Page page("custom_pkg_add_folder",
-                   toolbox_i18n::tr("pkg.custom.add_custom"));
-  onion::shellui::pkg_pages::fill_custom_pkg_add_folder_page(
-      page, pkg_search_path_draft());
-  xml_buffer = page.build();
 }

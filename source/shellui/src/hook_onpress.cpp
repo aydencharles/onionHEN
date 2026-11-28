@@ -6,7 +6,7 @@
 #include "hooked_funcs.hpp"
 #include "shellui_state.hpp"
 #include "dynamic_ui_runtime.hpp"
-#include "usb_payload_ui.hpp"
+#include "file_browser_ui.hpp"
 
 namespace {
 
@@ -67,9 +67,6 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
   case toolbox::OnPressDomain::AutoPayloads:
     run_prefix(onpress_payloads_prefix);
     break;
-  case toolbox::OnPressDomain::UsbPayloads:
-    result = onpress_usb_payload(ctx);
-    break;
   case toolbox::OnPressDomain::Sprx:
     run_prefix(onpress_sprx_prefix);
     break;
@@ -89,9 +86,8 @@ OnPressResult dispatch_toolbox_press(toolbox::OnPressDomain domain,
   case toolbox::OnPressDomain::RemotePlay:
     run_exact(onpress_network_exact);
     break;
-  case toolbox::OnPressDomain::CustomPkgInstaller:
-    run_exact(onpress_pkg_installer_exact);
-    run_prefix(onpress_pkg_installer_prefix);
+  case toolbox::OnPressDomain::FileBrowser:
+    result = onion::shellui::file_browser::onpress(ctx);
     break;
   case toolbox::OnPressDomain::PassThrough:
   case toolbox::OnPressDomain::DynamicPlugin:

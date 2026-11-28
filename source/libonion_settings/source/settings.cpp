@@ -482,109 +482,6 @@ std::string trim_copy(const std::string &value) {
   return value.substr(first, last - first);
 }
 
-bool valid_custom_pkg_search_path(const std::string &path) {
-  if (path.size() < 5 || path.size() > 512 || path.front() != '/' ||
-      path.find_first_of(",\\\r\n") != std::string::npos) {
-    return false;
-  }
-  if (path == "/data") {
-    return true;
-  }
-  std::size_t start = std::string::npos;
-  if (path.rfind("/data/", 0) == 0) {
-    start = 6;
-  } else if (path.rfind("/mnt/", 0) == 0) {
-    start = 5;
-  } else {
-    return false;
-  }
-  while (start <= path.size()) {
-    const std::size_t slash = path.find('/', start);
-    const std::string_view part(path.data() + start,
-                                (slash == std::string::npos ? path.size()
-                                                            : slash) - start);
-    if (part.empty() && slash == std::string::npos && start == path.size())
-      return true;
-    if (part.empty() || part == "." || part == "..") {
-      return false;
-    }
-    if (slash == std::string::npos) {
-      break;
-    }
-    start = slash + 1;
-  }
-  return true;
-}
-
-std::string normalize_custom_pkg_path(std::string_view raw) {
-  std::string out = trim_view_copy(raw);
-  while (out.size() > 1 && out.back() == '/') {
-    out.pop_back();
-  }
-  return out;
-}
-
-template <std::size_t N>
-void parse_comma_pkg_paths(const char *raw,
-                           std::array<std::string, N> &paths,
-                           std::size_t &path_count) {
-  if (!raw) {
-    return;
-  }
-  const std::string trimmed = trim_view_copy(raw);
-  if (trimmed.empty()) {
-    path_count = 0;
-    return;
-  }
-  std::array<std::string, N> parsed{};
-  std::size_t parsed_count = 0;
-  std::size_t pos = 0;
-  while (pos <= trimmed.size() && parsed_count < N) {
-    const std::size_t comma = trimmed.find(',', pos);
-    const std::size_t end =
-        (comma == std::string::npos) ? trimmed.size() : comma;
-    const std::string candidate = normalize_custom_pkg_path(
-        std::string_view(trimmed).substr(pos, end - pos));
-    if (valid_custom_pkg_search_path(candidate)) {
-      bool duplicate = false;
-      for (std::size_t i = 0; i < parsed_count; ++i) {
-        if (parsed[i] == candidate) {
-          duplicate = true;
-          break;
-        }
-      }
-      if (!duplicate) {
-        parsed[parsed_count++] = candidate;
-      }
-    }
-    if (comma == std::string::npos) {
-      break;
-    }
-    pos = comma + 1;
-  }
-  if (parsed_count > 0) {
-    paths = std::move(parsed);
-    path_count = parsed_count;
-  }
-}
-
-template <std::size_t N>
-std::string join_pkg_paths(const std::array<std::string, N> &paths,
-                           std::size_t count) {
-  const std::size_t limit = std::min(count, N);
-  std::string out;
-  for (std::size_t i = 0; i < limit; ++i) {
-    if (paths[i].empty()) {
-      continue;
-    }
-    if (!out.empty()) {
-      out.push_back(',');
-    }
-    out += paths[i];
-  }
-  return out;
-}
-
 bool is_upper_alnum(char c) {
   const unsigned char uc = static_cast<unsigned char>(c);
   return std::isdigit(uc) || std::isupper(uc);
@@ -912,12 +809,6 @@ bool apply_parser(const IniDoc *parser, Settings *out) {
   out->schema_version = version;
   out->ui_lang =
       parse_language(ini_get(parser, "toolbox.language"), out->ui_lang);
-  parse_comma_pkg_paths(ini_get(parser, "pkg.search_paths"),
-                        out->custom_pkg_search_paths,
-                        out->custom_pkg_search_path_count);
-  parse_comma_pkg_paths(ini_get(parser, "pkg.quick_paths"),
-                        out->custom_pkg_quick_paths,
-                        out->custom_pkg_quick_path_count);
   out->startup_open_after_load = parse_startup_open_after_load(
       ini_get(parser, "startup.open_after_load"),
       out->startup_open_after_load);
@@ -1054,18 +945,6 @@ std::string settings_serialize(const Settings &in) {
   b += "# Available values: system, zh-Hans, zh-Hant, en, ja, ko, fr, de, it, es, pt-BR, pl, ru, ar, th\n";
   b += "# system follows the PS5 system language when it can be detected.\n";
   b += "language=" + std::string(language_name(in.ui_lang)) + "\n";
-  b += "\n";
-  b += "[pkg]\n";
-  b += "# Comma-separated absolute /data or /mnt directories scanned for PKG files.\n";
-  b += "search_paths=" +
-       join_pkg_paths(in.custom_pkg_search_paths,
-                      in.custom_pkg_search_path_count) +
-       "\n";
-  b += "# Comma-separated preset directories offered as one-click shortcuts in Search folders.\n";
-  b += "quick_paths=" +
-       join_pkg_paths(in.custom_pkg_quick_paths,
-                      in.custom_pkg_quick_path_count) +
-       "\n";
   b += "\n";
   b += "[startup]\n";
   b += "# open_after_load chooses which page opens after OnionHEN finishes loading.\n";

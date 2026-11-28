@@ -10,10 +10,10 @@
 #include "plugin_progress.hpp"
 #include "remote_play.hpp"
 #include "toolbox_route.hpp"
-#include "usb_payload_ui.hpp"
 #include "dynamic_ui_runtime.hpp"
 #include "external_plugin_ui.hpp"
 #include "external_sprx_ui.hpp"
+#include "file_browser_ui.hpp"
 #include <onion/platform.h>
 #include <string>
 
@@ -31,9 +31,6 @@ void generate_plugins_xml(std::string &xml_buffer);
 void generate_sprx_xml(std::string &xml_buffer);
 void generate_plugin_config_xml(std::string &xml_buffer);
 void generate_account_xml(std::string &xml_buffer);
-void generate_custom_pkg_installer_xml(std::string &xml_buffer);
-void generate_custom_pkg_folders_xml(std::string &xml_buffer);
-void generate_custom_pkg_add_folder_xml(std::string &xml_buffer);
 void generate_toolbox_xml(std::string &new_xml);
 void generate_cheats_xml(std::string &new_xml, std::string &not_open_tid,
                          bool running_as_debug_settings,
@@ -129,9 +126,6 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   case toolbox::Page::Payloads:
     generate_payload_xml(new_xml_string);
     break;
-  case toolbox::Page::UsbPayloads:
-    generate_usb_payload_xml(new_xml_string);
-    break;
   case toolbox::Page::PayloadConfig: {
     std::string payload_id;
     toolbox::parse_payload_config_resource(resourceName, &payload_id);
@@ -150,15 +144,12 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
   case toolbox::Page::Plugins:
     generate_plugins_xml(new_xml_string);
     break;
-  case toolbox::Page::CustomPkgInstaller:
-    generate_custom_pkg_installer_xml(new_xml_string);
+  case toolbox::Page::FileBrowser: {
+    std::string mode;
+    toolbox::parse_file_browser_resource(resourceName, &mode);
+    onion::shellui::file_browser::generate_xml(new_xml_string, mode);
     break;
-  case toolbox::Page::CustomPkgFolders:
-    generate_custom_pkg_folders_xml(new_xml_string);
-    break;
-  case toolbox::Page::CustomPkgAddFolder:
-    generate_custom_pkg_add_folder_xml(new_xml_string);
-    break;
+  }
   case toolbox::Page::Sprx:
     generate_sprx_xml(new_xml_string);
     break;

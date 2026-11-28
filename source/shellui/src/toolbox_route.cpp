@@ -18,9 +18,8 @@ RouteResult resolve_resource(const RouteInput &in) {
   out.flags.is_cheats = (in.resource == in.names.cheats_xml);
   out.flags.is_auto_payload = (in.resource == kAutoPayloadsXml);
   out.flags.is_plugins = (in.resource == kPluginsXml);
-  const bool is_custom_pkg_installer = in.resource == kCustomPkgInstallerXml;
-  const bool is_custom_pkg_folders = in.resource == kCustomPkgFoldersXml;
-  const bool is_custom_pkg_add_folder = in.resource == kCustomPkgAddFolderXml;
+  const bool is_file_browser =
+      parse_file_browser_resource(in.resource, nullptr);
   out.flags.is_sprx = (in.resource == kSprxXml);
   out.flags.is_sprx_config = parse_sprx_config_resource(in.resource, nullptr);
   out.flags.is_payload_config =
@@ -47,8 +46,6 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::DebugSettings;
   } else if (out.flags.is_payloads) {
     out.page = Page::Payloads;
-  } else if (in.resource == kUsbPayloadsXml) {
-    out.page = Page::UsbPayloads;
   } else if (out.flags.is_payload_config) {
     out.page = Page::PayloadConfig;
   } else if (out.flags.is_overlay_metrics) {
@@ -57,12 +54,8 @@ RouteResult resolve_resource(const RouteInput &in) {
     out.page = Page::OverlayMetricConfig;
   } else if (out.flags.is_plugins) {
     out.page = Page::Plugins;
-  } else if (is_custom_pkg_installer) {
-    out.page = Page::CustomPkgInstaller;
-  } else if (is_custom_pkg_folders) {
-    out.page = Page::CustomPkgFolders;
-  } else if (is_custom_pkg_add_folder) {
-    out.page = Page::CustomPkgAddFolder;
+  } else if (is_file_browser) {
+    out.page = Page::FileBrowser;
   } else if (out.flags.is_sprx) {
     out.page = Page::Sprx;
   } else if (out.flags.is_sprx_config) {

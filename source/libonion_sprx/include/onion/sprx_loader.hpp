@@ -34,6 +34,8 @@ enum class LoadStatus : uint8_t {
 };
 
 const char *load_status_name(LoadStatus status) noexcept;
+struct LoadResult;
+std::string format_load_error(const LoadResult &result);
 
 struct LoadOptions {
   uint32_t timeout_ms = 5000;
@@ -76,6 +78,8 @@ enum class AccessStatus : uint8_t {
 
 struct AccessResult {
   AccessStatus status = AccessStatus::Denied;
+  /** Optional path visible inside the target's own sandbox (e.g. /download0/...). */
+  std::string target_path;
 
   bool allowed() const noexcept { return status == AccessStatus::Allowed; }
 };
@@ -87,6 +91,11 @@ public:
 
   virtual AccessResult prepare(pid_t pid,
                                std::string_view title_id) noexcept = 0;
+  virtual AccessResult prepare_for_module(pid_t pid,
+                                          std::string_view title_id,
+                                          std::string_view /*host_path*/) noexcept {
+    return prepare(pid, title_id);
+  }
   virtual AccessResult restore(pid_t pid,
                                std::string_view title_id) noexcept = 0;
 };

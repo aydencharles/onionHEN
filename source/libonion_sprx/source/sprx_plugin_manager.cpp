@@ -305,7 +305,7 @@ SprxOperationResult SprxPluginManager::load_now(std::string_view id) {
       request.path = entry->path;
       const LoadResult result = loader.load(request);
       if (!result.succeeded()) {
-        return {false, entry->id + ": " + load_status_name(result.status)};
+        return {false, entry->id + ": " + format_load_error(result)};
       }
     }
     return {true, {}};
@@ -331,7 +331,7 @@ SprxOperationResult SprxPluginManager::load_now(std::string_view id) {
   request.path = it->path;
   const LoadResult result = loader.load(request);
   if (!result.succeeded())
-    return {false, load_status_name(result.status)};
+    return {false, format_load_error(result)};
   return {true, {}};
 }
 

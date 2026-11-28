@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <limits.h>
 #include <mutex>
@@ -73,7 +74,6 @@ bool retryable(LoadStatus status) noexcept {
   case LoadStatus::ThreadCreateFailed:
   case LoadStatus::Timeout:
   case LoadStatus::TargetExited:
-  case LoadStatus::RemoteError:
     return true;
   default:
     return false;
@@ -119,6 +119,30 @@ const char *load_status_name(LoadStatus status) noexcept {
   case LoadStatus::RemoteError: return "remote-error";
   }
   return "unknown";
+}
+
+std::string format_load_error(const LoadResult &result) {
+  std::string message = load_status_name(result.status);
+  if (result.status == LoadStatus::RetryExhausted &&
+      result.underlying_status != result.status) {
+    message += " (";
+    message += load_status_name(result.underlying_status);
+    message += ")";
+  }
+  const bool has_remote_code =
+      (result.status == LoadStatus::RemoteError ||
+       result.status == LoadStatus::ThreadCreateFailed ||
+       result.underlying_status == LoadStatus::RemoteError ||
+       result.underlying_status == LoadStatus::ThreadCreateFailed) &&
+      result.remote_result != -1 && result.remote_result != 0;
+  if (has_remote_code) {
+    char hex[24] = {};
+    std::snprintf(hex, sizeof(hex), " (0x%08x)",
+                  static_cast<unsigned int>(
+                      static_cast<uint32_t>(result.remote_result)));
+    message += hex;
+  }
+  return message;
 }
 
 SprxLoader::SprxLoader(IRemoteSprxRuntime &runtime,
@@ -210,8 +234,8 @@ LoadResult SprxLoader::load(const LoadRequest &request) noexcept {
              attempt, request.options.max_attempts, static_cast<int>(request.pid),
              request.title_id.c_str(), canonical_path.c_str());
 
-    const AccessResult prepared =
-        access_policy_.prepare(request.pid, request.title_id);
+    const AccessResult prepared = access_policy_.prepare_for_module(
+        request.pid, request.title_id, canonical_path);
     if (!prepared.allowed()) {
       last = invalid(prepared.status == AccessStatus::Denied
                          ? LoadStatus::PolicyDenied
@@ -224,7 +248,10 @@ LoadResult SprxLoader::load(const LoadRequest &request) noexcept {
       break;
     }
 
-    last = runtime_.load(request.pid, canonical_path, module_name,
+    const std::string_view target_path =
+        prepared.target_path.empty() ? std::string_view(canonical_path)
+                                     : std::string_view(prepared.target_path);
+    last = runtime_.load(request.pid, target_path, module_name,
                          request.options);
     last.attempts = attempt;
     const AccessResult restored =
@@ -236,9 +263,10 @@ LoadResult SprxLoader::load(const LoadRequest &request) noexcept {
       break;
     }
 
-    LOG_INFO("sprx: load attempt=%u status=%s pid=%d module=%u remote=%lld cleanup=%d",
+    LOG_INFO("sprx: load attempt=%u status=%s pid=%d module=%u remote=%lld (0x%08x) cleanup=%d",
              attempt, load_status_name(last.status), static_cast<int>(request.pid),
              last.module_handle, static_cast<long long>(last.remote_result),
+             static_cast<unsigned int>(static_cast<uint32_t>(last.remote_result)),
              last.cleanup_ok ? 1 : 0);
     if (last.succeeded() || !retryable(last.status) || !last.cleanup_ok) {
       if (!last.cleanup_ok)

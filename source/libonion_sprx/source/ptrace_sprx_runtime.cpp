@@ -3,6 +3,7 @@
 #include <onion/sprx_loader.hpp>
 
 #include <onion/log.h>
+#include <onion/proc_dmap.h>
 #include <onion/proc_query.h>
 #include <onion/pt.h>
 #include <onion/ucred.h>
@@ -25,9 +26,33 @@ namespace {
 
 constexpr char kLoadStartModuleNid[] = "wzvqT4UqKX8";
 constexpr char kPthreadCreateNid[] = "OxhIB8LB-PQ";
-constexpr size_t kPageSize = 0x1000;
+constexpr size_t kPageSize = 0x4000;
+constexpr size_t kThreadStackSize = 0x10000;
 constexpr size_t kContextOffsetPath = 0x100;
+constexpr size_t kLoaderStubOffset = 0x80;
 constexpr int64_t kPendingResult = INT64_MIN;
+constexpr useconds_t kPostFinishGraceUs = 5000;
+
+/*
+ * Transient bootstrap stager executed at full speed via pt_call2 (ends in int3).
+ * Immediately switches RSP to our dedicated 64 KiB private stack so zero bytes
+ * of the interrupted target thread's stack are touched, calls pthread_create,
+ * stores the return code into RemoteContext::create_rc, then traps cleanly.
+ */
+constexpr std::array<uint8_t, 42> kBootstrapStager = {
+    0x48, 0x8B, 0x67, 0x30,       // mov rsp, [rdi+0x30]
+    0x48, 0x83, 0xEC, 0x20,       // sub rsp, 0x20
+    0x48, 0x89, 0x7C, 0x24, 0x10, // mov [rsp+0x10], rdi
+    0x48, 0x8B, 0x47, 0x18,       // mov rax, [rdi+0x18]
+    0x48, 0x89, 0xF9,             // mov rcx, rdi
+    0x48, 0x8B, 0x57, 0x28,       // mov rdx, [rdi+0x28]
+    0x31, 0xF6,                   // xor esi, esi
+    0x48, 0x8B, 0x7F, 0x20,       // mov rdi, [rdi+0x20]
+    0xFF, 0xD0,                   // call rax
+    0x48, 0x8B, 0x54, 0x24, 0x10, // mov rdx, [rsp+0x10]
+    0x48, 0x89, 0x42, 0x38,       // mov [rdx+0x38], rax
+    0xCC                          // int3
+};
 
 /*
  * pthread start routine.  Its single argument is a RemoteContext pointer;
@@ -61,9 +86,16 @@ struct RemoteContext {
   uint64_t load_start_module;
   uint64_t path;
   int64_t result;
+  uint64_t pthread_create_fn;
+  uint64_t thread_out_ptr;
+  uint64_t loader_entry;
+  uint64_t stager_stack_top;
+  int64_t create_rc;
 };
 
-static_assert(sizeof(RemoteContext) == 24, "unexpected remote context size");
+static_assert(sizeof(RemoteContext) == 64, "unexpected remote context size");
+static_assert(kBootstrapStager.size() <= kLoaderStubOffset,
+              "stager overlaps loader stub");
 
 class ScopedPtrace {
 public:
@@ -121,6 +153,21 @@ std::string make_string(std::string_view value) {
   return std::string(value.data(), value.size());
 }
 
+bool read_remote_context(pid_t pid, intptr_t context_page,
+                         RemoteContext *out) noexcept {
+  if (!out)
+    return false;
+  if (onion_proc_copyout(pid, static_cast<uint64_t>(context_page), out,
+                         sizeof(*out)) == 0) {
+    return true;
+  }
+  return kernel_proc_copyout(pid, context_page, out, sizeof(*out)) == 0;
+}
+
+int32_t decode_sce_result(int64_t raw) noexcept {
+  return static_cast<int32_t>(static_cast<uint32_t>(raw));
+}
+
 } // namespace
 
 bool PtraceSprxRuntime::find_loaded(pid_t pid, std::string_view module_name,
@@ -173,7 +220,7 @@ LoadResult PtraceSprxRuntime::load(pid_t pid, std::string_view path,
       pid, 0, kPageSize, PROT_READ | PROT_WRITE,
       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   const intptr_t thread_page = pt_mmap(
-      pid, 0, kPageSize, PROT_READ | PROT_WRITE,
+      pid, 0, kThreadStackSize, PROT_READ | PROT_WRITE,
       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (context_page <= 0 || code_page <= 0 || thread_page <= 0) {
     bool cleanup_ok = true;
@@ -182,7 +229,8 @@ LoadResult PtraceSprxRuntime::load(pid_t pid, std::string_view path,
     if (code_page > 0)
       cleanup_ok = pt_munmap(pid, code_page, kPageSize) == 0 && cleanup_ok;
     if (thread_page > 0)
-      cleanup_ok = pt_munmap(pid, thread_page, kPageSize) == 0 && cleanup_ok;
+      cleanup_ok =
+          pt_munmap(pid, thread_page, kThreadStackSize) == 0 && cleanup_ok;
     LoadResult result = result_with(LoadStatus::AllocationFailed, pid);
     result.cleanup_ok = cleanup_ok;
     if (!cleanup_ok)
@@ -194,7 +242,7 @@ LoadResult PtraceSprxRuntime::load(pid_t pid, std::string_view path,
     bool ok = true;
     ok = pt_munmap(pid, context_page, kPageSize) == 0 && ok;
     ok = pt_munmap(pid, code_page, kPageSize) == 0 && ok;
-    ok = pt_munmap(pid, thread_page, kPageSize) == 0 && ok;
+    ok = pt_munmap(pid, thread_page, kThreadStackSize) == 0 && ok;
     return ok;
   };
 
@@ -211,26 +259,46 @@ LoadResult PtraceSprxRuntime::load(pid_t pid, std::string_view path,
   context.load_start_module = static_cast<uint64_t>(load_fn);
   context.path = static_cast<uint64_t>(context_page + kContextOffsetPath);
   context.result = kPendingResult;
+  context.pthread_create_fn = static_cast<uint64_t>(pthread_create_fn);
+  context.thread_out_ptr = static_cast<uint64_t>(thread_page);
+  context.loader_entry = static_cast<uint64_t>(code_page + kLoaderStubOffset);
+  context.stager_stack_top =
+      static_cast<uint64_t>(thread_page + kThreadStackSize - 0x10);
+  context.create_rc = kPendingResult;
   const std::string path_copy = make_string(path);
   if (path_copy.size() + 1 > kPageSize - kContextOffsetPath ||
       pt_copyin(pid, &context, context_page, sizeof(context)) != 0 ||
       pt_copyin(pid, path_copy.c_str(), context.path, path_copy.size() + 1) != 0 ||
-      pt_copyin(pid, kLoadThreadStub.data(), code_page,
+      pt_copyin(pid, kBootstrapStager.data(), code_page,
+                kBootstrapStager.size()) != 0 ||
+      pt_copyin(pid, kLoadThreadStub.data(), code_page + kLoaderStubOffset,
                 kLoadThreadStub.size()) != 0) {
     return fail_with_cleanup(LoadStatus::WriteFailed);
   }
 
-  if (pt_mprotect(pid, code_page, kPageSize, PROT_READ | PROT_EXEC) != 0) {
+  /* PS5 SYS_mprotect rejects adding PROT_EXEC to anonymous MAP_PRIVATE pages;
+   * update the VM map entry protection through kernel_mprotect (like elfldr). */
+  if (kernel_mprotect(pid, code_page, kPageSize, PROT_READ | PROT_EXEC) != 0) {
+    LOG_ERROR("sprx: kernel_mprotect failed pid=%d addr=0x%lx",
+              static_cast<int>(pid), static_cast<unsigned long>(code_page));
     return fail_with_cleanup(LoadStatus::ProtectFailed);
   }
 
-  const long thread_rc = pt_call(
-      pid, pthread_create_fn, static_cast<uint64_t>(thread_page), 0,
-      static_cast<uint64_t>(code_page), static_cast<uint64_t>(context_page),
-      0, 0);
-  if (thread_rc != 0) {
+  if (pt_call2(pid, code_page, static_cast<uint64_t>(context_page), 0ULL, 0ULL,
+               0ULL, 0ULL, 0ULL) == -1) {
+    LOG_ERROR("sprx: bootstrap stager failed pid=%d errno=%d",
+              static_cast<int>(pid), errno);
+    return fail_with_cleanup(LoadStatus::ThreadCreateFailed);
+  }
+
+  RemoteContext after_create{};
+  after_create.create_rc = kPendingResult;
+  if (pt_copyout(pid, context_page, &after_create, sizeof(after_create)) != 0 ||
+      after_create.create_rc != 0) {
     LoadResult result = result_with(LoadStatus::ThreadCreateFailed, pid);
-    result.remote_result = thread_rc;
+    if (after_create.create_rc != kPendingResult)
+      result.remote_result = static_cast<int64_t>(
+          decode_sce_result(after_create.create_rc));
     result.cleanup_ok = cleanup();
     if (!result.cleanup_ok)
       LOG_ERROR("sprx: cleanup failed pid=%d status=%s", static_cast<int>(pid),
@@ -250,13 +318,17 @@ LoadResult PtraceSprxRuntime::load(pid_t pid, std::string_view path,
 
   const auto deadline = std::chrono::steady_clock::now() +
                         std::chrono::milliseconds(options.timeout_ms);
-  ModuleInfo info;
-  bool loaded = false;
+  bool thread_finished = false;
+  int64_t raw_remote_result = kPendingResult;
   while (std::chrono::steady_clock::now() < deadline) {
     if (!onion_proc_is_alive(pid))
       break;
-    if (find_loaded(pid, module_name, &info)) {
-      loaded = true;
+    RemoteContext current{};
+    current.result = kPendingResult;
+    if (read_remote_context(pid, context_page, &current) &&
+        current.result != kPendingResult) {
+      thread_finished = true;
+      raw_remote_result = current.result;
       break;
     }
     const uint64_t poll_us =
@@ -265,36 +337,67 @@ LoadResult PtraceSprxRuntime::load(pid_t pid, std::string_view path,
     usleep(static_cast<useconds_t>(poll_us));
   }
 
-  LoadResult result = result_with(
-      loaded ? LoadStatus::Loaded
-             : (onion_proc_is_alive(pid) ? LoadStatus::Timeout
-                                         : LoadStatus::TargetExited),
-      pid);
-  if (loaded)
-    result.module_handle = info.handle;
+  /* Let the 3-instruction thunk epilogue return into libkernel before unmap. */
+  if (thread_finished && onion_proc_is_alive(pid))
+    usleep(kPostFinishGraceUs);
 
-  /* Reattach only after the loader thread has published its return value. */
-  if (session.attach()) {
-    RemoteContext finished{};
-    finished.result = kPendingResult;
-    const bool read_ok =
-        pt_copyout(pid, context_page, &finished, sizeof(finished)) == 0;
-    if (read_ok && finished.result != kPendingResult)
-      result.remote_result = finished.result;
-    if (read_ok && finished.result != kPendingResult)
-      result.cleanup_ok = cleanup();
-    else
-      result.cleanup_ok = false; // never unmap code while the thread runs
-    if (!session.detach())
-      result.cleanup_ok = false;
-    if (!result.cleanup_ok)
-      LOG_ERROR("sprx: post-load cleanup failed pid=%d status=%s",
-                static_cast<int>(pid), load_status_name(result.status));
-  } else {
-    LOG_ERROR("sprx: reattach failed; retaining temporary mappings pid=%d",
-              static_cast<int>(pid));
-    result.cleanup_ok = false;
+  bool cleanup_ok = true;
+  if (onion_proc_is_alive(pid)) {
+    if (session.attach()) {
+      RemoteContext finished{};
+      finished.result = kPendingResult;
+      const bool read_ok =
+          pt_copyout(pid, context_page, &finished, sizeof(finished)) == 0;
+      if (read_ok && finished.result != kPendingResult) {
+        thread_finished = true;
+        raw_remote_result = finished.result;
+        cleanup_ok = cleanup();
+      } else {
+        cleanup_ok = false; // never unmap code while the thread runs
+      }
+      if (!session.detach())
+        cleanup_ok = false;
+    } else if (onion_proc_is_alive(pid)) {
+      LOG_ERROR("sprx: reattach failed; retaining temporary mappings pid=%d",
+                static_cast<int>(pid));
+      cleanup_ok = false;
+    }
   }
+
+  LoadResult result = result_with(LoadStatus::Timeout, pid);
+  result.cleanup_ok = cleanup_ok;
+  if (thread_finished) {
+    const int32_t sce_rc = decode_sce_result(raw_remote_result);
+    result.remote_result = static_cast<int64_t>(sce_rc);
+    if (sce_rc >= 0) {
+      ModuleInfo info{};
+      result.status = LoadStatus::Loaded;
+      result.underlying_status = LoadStatus::Loaded;
+      result.module_handle =
+          find_loaded(pid, module_name, &info)
+              ? info.handle
+              : static_cast<uint32_t>(sce_rc);
+      LOG_INFO("sprx: remote load succeeded pid=%d module=%.*s handle=%u rc=0x%08x",
+               static_cast<int>(pid), static_cast<int>(module_name.size()),
+               module_name.data(), result.module_handle,
+               static_cast<unsigned int>(static_cast<uint32_t>(sce_rc)));
+    } else {
+      result.status = LoadStatus::RemoteError;
+      result.underlying_status = LoadStatus::RemoteError;
+      LOG_ERROR("sprx: sceKernelLoadStartModule failed pid=%d module=%.*s rc=0x%08x",
+                static_cast<int>(pid), static_cast<int>(module_name.size()),
+                module_name.data(),
+                static_cast<unsigned int>(static_cast<uint32_t>(sce_rc)));
+    }
+  } else {
+    result.status = onion_proc_is_alive(pid) ? LoadStatus::Timeout
+                                             : LoadStatus::TargetExited;
+    result.underlying_status = result.status;
+  }
+
+  if (!result.cleanup_ok)
+    LOG_ERROR("sprx: post-load cleanup failed pid=%d status=%s",
+              static_cast<int>(pid), load_status_name(result.status));
 
   return result;
 }

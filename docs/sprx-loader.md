@@ -14,10 +14,13 @@ production adapter and contains the PS5-specific details:
 1. Elevate the loader process to `PTRACE_AUTHID` for one scoped operation.
 2. Attach to the target and resolve `sceKernelLoadStartModule` and
    `pthread_create` by NID.
-3. Allocate three temporary target pages for context, path, and thread data.
+3. Allocate three temporary target pages for context, path, and thread data,
+   marking the thunk page `PROT_READ | PROT_EXEC` via `kernel_mprotect`.
 4. Start a short remote thread thunk. The thunk calls
    `sceKernelLoadStartModule(path, 0, 0, 0, 0, 0)` and records its return code.
-5. Detach while the module initializes and poll the target's dynlib table.
+5. Detach while the module initializes and poll `RemoteContext::result` via
+   `onion_proc_copyout` (with `kernel_proc_copyout` fallback) until the call
+   returns either a handle or a negative SCE error code.
 6. Reattach only after the thunk completed, then unmap temporary pages.
 
 The loader does not inject a persistent ELF payload and does not leave a
@@ -46,10 +49,12 @@ if (!result.succeeded()) {
 ```
 
 The target must be able to resolve the two NIDs and access the requested path.
-For a sandboxed game, the caller must apply the project's existing target
-jailbreak/privilege policy before loading, or provide a runtime adapter that
-does so. The framework deliberately does not silently jailbreak arbitrary
-processes.
+For a sandboxed game, the daemon's `PreparedTargetAccess` stages the module into
+the game's own sandbox (`/download0/.onion_sprx/...`) so `fd_rdir`/`fd_jdir` and
+`/app0` are never disrupted for concurrent game threads, temporarily elevates
+the target `ucred`, and restores the exact saved `ucred` snapshot once loading
+finishes. The core `SprxLoader` library itself remains policy-driven and does
+not elevate arbitrary processes without an access policy.
 
 ## Why this is not wired into FPS
 

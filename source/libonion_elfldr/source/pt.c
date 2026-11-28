@@ -159,6 +159,18 @@ pt_setregs(pid_t pid, const struct reg *r) {
 
 
 int
+pt_getfpregs(pid_t pid, struct fpreg *r) {
+  return sys_ptrace(PT_GETFPREGS, pid, (caddr_t)r, 0);
+}
+
+
+int
+pt_setfpregs(pid_t pid, const struct fpreg *r) {
+  return sys_ptrace(PT_SETFPREGS, pid, (caddr_t)r, 0);
+}
+
+
+int
 pt_copyin(pid_t pid, const void* buf, intptr_t addr, size_t len) {
   struct ptrace_io_desc iod = {
     .piod_op = PIOD_WRITE_D,
@@ -232,12 +244,15 @@ long
 pt_call(pid_t pid, intptr_t addr, ...) {
   struct reg jmp_reg;
   struct reg bak_reg;
+  struct fpreg bak_fpreg;
+  int have_fpreg;
   uintptr_t entry_rsp;
   va_list ap;
 
   if(pt_getregs(pid, &bak_reg)) {
     return -1;
   }
+  have_fpreg = (pt_getfpregs(pid, &bak_fpreg) == 0);
 
   memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
   jmp_reg.r_rip = addr;
@@ -275,7 +290,10 @@ pt_call(pid_t pid, intptr_t addr, ...) {
     }
   }
 
-  // restore registers
+  // restore registers (including FPU/SSE/XMM state)
+  if(have_fpreg) {
+    (void)pt_setfpregs(pid, &bak_fpreg);
+  }
   if(pt_setregs(pid, &bak_reg)) {
     return -1;
   }
@@ -288,12 +306,15 @@ pt_call2(pid_t pid, intptr_t addr, ...)
 {
   struct reg jmp_reg;
   struct reg bak_reg;
+  struct fpreg bak_fpreg;
+  int have_fpreg;
   uintptr_t entry_rsp;
   va_list ap;
 
   if(pt_getregs(pid, &bak_reg)) {
     return -1;
   }
+  have_fpreg = (pt_getfpregs(pid, &bak_fpreg) == 0);
 
   memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
   jmp_reg.r_rip = addr;
@@ -352,6 +373,9 @@ pt_call2(pid_t pid, intptr_t addr, ...)
     return -1;
   }
 
+  if (have_fpreg) {
+    (void)pt_setfpregs(pid, &bak_fpreg);
+  }
   if (pt_setregs(pid, &bak_reg) != 0) {
     return -1;
   }
@@ -365,6 +389,8 @@ pt_syscall(pid_t pid, int sysno, ...) {
   intptr_t addr = pt_resolve(pid, "HoLVWNanBBc");
   struct reg jmp_reg;
   struct reg bak_reg;
+  struct fpreg bak_fpreg;
+  int have_fpreg;
   uintptr_t entry_rsp;
   va_list ap;
 
@@ -377,6 +403,7 @@ pt_syscall(pid_t pid, int sysno, ...) {
   if(pt_getregs(pid, &bak_reg)) {
     return -1;
   }
+  have_fpreg = (pt_getfpregs(pid, &bak_fpreg) == 0);
 
   memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
   jmp_reg.r_rip = addr;
@@ -414,7 +441,10 @@ pt_syscall(pid_t pid, int sysno, ...) {
     }
   }
 
-  // restore registers
+  // restore registers (including FPU/SSE/XMM state)
+  if(have_fpreg) {
+    (void)pt_setfpregs(pid, &bak_fpreg);
+  }
   if(pt_setregs(pid, &bak_reg)) {
     return -1;
   }

@@ -20,6 +20,7 @@ struct FakeRuntime final : onion::sprx::IRemoteSprxRuntime {
   size_t response_index = 0;
   bool loaded = false;
   bool cleanup_ok = true;
+  int64_t error_remote_result = -1;
 
   bool find_loaded(pid_t, std::string_view,
                    onion::sprx::ModuleInfo *out) const noexcept override {
@@ -44,7 +45,8 @@ struct FakeRuntime final : onion::sprx::IRemoteSprxRuntime {
     result.status = status;
     result.pid = pid;
     result.module_handle = status == onion::sprx::LoadStatus::Loaded ? 42 : 0;
-    result.remote_result = status == onion::sprx::LoadStatus::Loaded ? 0 : -1;
+    result.remote_result =
+        status == onion::sprx::LoadStatus::Loaded ? 0 : error_remote_result;
     result.cleanup_ok = cleanup_ok;
     if (status == onion::sprx::LoadStatus::Loaded)
       loaded = true;
@@ -55,17 +57,18 @@ struct FakeRuntime final : onion::sprx::IRemoteSprxRuntime {
 struct FakeAccess final : onion::sprx::ITargetAccessPolicy {
   onion::sprx::AccessStatus prepare_status = onion::sprx::AccessStatus::Allowed;
   onion::sprx::AccessStatus restore_status = onion::sprx::AccessStatus::Allowed;
+  std::string rewritten_path;
   int prepares = 0;
   int restores = 0;
 
   onion::sprx::AccessResult prepare(pid_t, std::string_view) noexcept override {
     ++prepares;
-    return {prepare_status};
+    return {prepare_status, rewritten_path};
   }
 
   onion::sprx::AccessResult restore(pid_t, std::string_view) noexcept override {
     ++restores;
-    return {restore_status};
+    return {restore_status, {}};
   }
 };
 
@@ -216,6 +219,55 @@ int test_access_prepare_failure() {
   return 0;
 }
 
+int test_remote_error_fails_fast_and_formats_code() {
+  std::string path;
+  TEST_ASSERT_TRUE(make_request_file(&path));
+  onion::sprx::TitleIdAllowlist allowlist;
+  TEST_ASSERT_TRUE(allowlist.add_exact("CUSA12345"));
+  FakeRuntime runtime;
+  runtime.responses = {onion::sprx::LoadStatus::RemoteError,
+                       onion::sprx::LoadStatus::Loaded};
+  runtime.error_remote_result = static_cast<int32_t>(0x80020063u);
+  FakeAccess access;
+  onion::sprx::SprxLoader loader(runtime, access, allowlist);
+  auto request = request_for(123, path);
+  request.options.max_attempts = 3;
+  const auto result = loader.load(request);
+  TEST_ASSERT_EQ_INT(static_cast<int>(onion::sprx::LoadStatus::RemoteError),
+                     static_cast<int>(result.status));
+  TEST_ASSERT_EQ_INT(1, result.attempts);
+  TEST_ASSERT_EQ_INT(1, runtime.load_calls);
+  TEST_ASSERT_EQ_INT(1, access.prepares);
+  TEST_ASSERT_EQ_INT(1, access.restores);
+  const std::string formatted = onion::sprx::format_load_error(result);
+  TEST_ASSERT_STREQ("remote-error (0x80020063)", formatted.c_str());
+
+  onion::sprx::LoadResult retry_ex{};
+  retry_ex.status = onion::sprx::LoadStatus::RetryExhausted;
+  retry_ex.underlying_status = onion::sprx::LoadStatus::Timeout;
+  const std::string retry_formatted = onion::sprx::format_load_error(retry_ex);
+  TEST_ASSERT_STREQ("retry-exhausted (timeout)", retry_formatted.c_str());
+  unlink(path.c_str());
+  return 0;
+}
+
+int test_access_policy_rewrites_target_path() {
+  std::string path;
+  TEST_ASSERT_TRUE(make_request_file(&path));
+  onion::sprx::TitleIdAllowlist allowlist;
+  TEST_ASSERT_TRUE(allowlist.add_exact("CUSA12345"));
+  FakeRuntime runtime;
+  FakeAccess access;
+  access.rewritten_path = "/download0/.onion_sprx/staged.sprx";
+  onion::sprx::SprxLoader loader(runtime, access, allowlist);
+  const auto result = loader.load(request_for(123, path));
+  TEST_ASSERT_TRUE(result.succeeded());
+  TEST_ASSERT_STREQ("/download0/.onion_sprx/staged.sprx",
+                    runtime.received_path.c_str());
+  unlink(path.c_str());
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_sprx_loader_suite(void) {
@@ -229,5 +281,9 @@ extern "C" int test_sprx_loader_suite(void) {
   failures += onion_test_run("sprx_unresolved_cleanup", test_unresolved_cleanup_stops_retry);
   failures += onion_test_run("sprx_access_prepare_failure",
                              test_access_prepare_failure);
+  failures += onion_test_run("sprx_remote_error_fast_fail",
+                             test_remote_error_fails_fast_and_formats_code);
+  failures += onion_test_run("sprx_access_rewrites_target_path",
+                             test_access_policy_rewrites_target_path);
   return failures;
 }

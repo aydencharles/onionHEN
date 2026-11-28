@@ -16,6 +16,7 @@ struct FakeRuntime final : onion::sprx::IRemoteSprxRuntime {
   size_t index = 0;
   int calls = 0;
   std::string loaded_module;
+  int64_t error_remote_result = -1;
 
   bool find_loaded(pid_t, std::string_view module_name,
                    onion::sprx::ModuleInfo *) const noexcept override {
@@ -32,7 +33,7 @@ struct FakeRuntime final : onion::sprx::IRemoteSprxRuntime {
                         ? responses[index++]
                         : onion::sprx::LoadStatus::Loaded;
     result.underlying_status = result.status;
-    result.remote_result = result.succeeded() ? 0 : -1;
+    result.remote_result = result.succeeded() ? 0 : error_remote_result;
     return result;
   }
 };
@@ -239,6 +240,47 @@ int test_discovery_bind_and_load_now() {
   return 0;
 }
 
+int test_load_now_propagates_remote_error_code() {
+  char dir_tpl[] = "/tmp/onion_sprx_err_XXXXXX";
+  char *dir = mkdtemp(dir_tpl);
+  TEST_ASSERT_TRUE(dir != nullptr);
+
+  const std::string scan_dir(dir);
+  const std::string catalog_path = scan_dir + "/catalog.ini";
+  const std::string mod_path = scan_dir + "/broken.sprx";
+  FILE *fp = std::fopen(mod_path.c_str(), "wb");
+  TEST_ASSERT_TRUE(fp != nullptr);
+  std::fputs("sprx", fp);
+  std::fclose(fp);
+
+  FakeRuntime runtime;
+  runtime.responses = {onion::sprx::LoadStatus::RemoteError,
+                       onion::sprx::LoadStatus::RemoteError};
+  runtime.error_remote_result = static_cast<int32_t>(0x80020063u);
+  FakeAccess access;
+  ToggleableTarget target;
+  onion::sprx::SprxPluginManager manager(runtime, access, target);
+  manager.set_scan_directory(scan_dir);
+  (void)manager.load_catalog(catalog_path);
+
+  const auto unconfigured = manager.load_now("broken");
+  TEST_ASSERT_TRUE(!unconfigured.success);
+  TEST_ASSERT_STREQ("remote-error (0x80020063)", unconfigured.error.c_str());
+
+  TEST_ASSERT_TRUE(
+      manager.bind_target("broken", onion::sprx::SprxTargetScope::CurrentGame)
+          .success);
+  const auto configured = manager.load_now("broken");
+  TEST_ASSERT_TRUE(!configured.success);
+  TEST_ASSERT_STREQ("broken: remote-error (0x80020063)",
+                    configured.error.c_str());
+
+  unlink(catalog_path.c_str());
+  unlink(mod_path.c_str());
+  rmdir(dir);
+  return 0;
+}
+
 } // namespace
 
 extern "C" int test_sprx_plugin_manager_suite(void) {
@@ -249,5 +291,7 @@ extern "C" int test_sprx_plugin_manager_suite(void) {
                              test_inventory_enable_and_remove_lifecycle);
   failures += onion_test_run("sprx_manager_discovery_bind_load_now",
                              test_discovery_bind_and_load_now);
+  failures += onion_test_run("sprx_manager_load_now_remote_error",
+                             test_load_now_propagates_remote_error_code);
   return failures;
 }

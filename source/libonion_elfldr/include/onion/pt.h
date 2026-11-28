@@ -31,6 +31,8 @@ int pt_continue(pid_t pid, int sig);
 
 int pt_getregs(pid_t pid, struct reg *r);
 int pt_setregs(pid_t pid, const struct reg *r);
+int pt_getfpregs(pid_t pid, struct fpreg *r);
+int pt_setfpregs(pid_t pid, const struct fpreg *r);
 
 int pt_copyin(pid_t pid, const void* buf, intptr_t addr, size_t len);
 int pt_copyout(pid_t pid, intptr_t addr, void* buf, size_t len);

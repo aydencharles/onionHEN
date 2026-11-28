@@ -16,6 +16,7 @@
 #include <cstring>
 
 #include "shellui_state.hpp"
+#include "startup_guard.hpp"
 #include <onion/platform.h>
 
 std::string Mono_to_String(MonoString *str);
@@ -127,10 +128,29 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
   }
 
   GamePadData GetData_hook(int deviceIndex) {
-    if (!shellui_hooks_are_ready())
-      return GetData ? GetData(deviceIndex) : GamePadData{};
+    GamePadData result = GetData ? GetData(deviceIndex) : GamePadData{};
 
-    GamePadData result;
+    /*
+     * During startup hook installation and staggered RNPS reloads, return an
+     * idle controller snapshot (after polling the real GetData so underlying
+     * input buffers stay coherent) so user button presses cannot race live
+     * ReactUI teardown/remount.
+     */
+    if (onion::shellui::shellui_startup_should_suppress_input()) {
+      result.Buttons = None;
+      result.ButtonsPrev = None;
+      result.ButtonsDown = None;
+      result.ButtonsUp = None;
+      result.AnalogLeftX = 0.0f;
+      result.AnalogLeftY = 0.0f;
+      result.AnalogRightX = 0.0f;
+      result.AnalogRightY = 0.0f;
+      return result;
+    }
+
+    if (!shellui_hooks_are_ready())
+      return result;
+
     bool cheas_sc_activated = false;
     bool toolbox_sc_activated = false;
   
@@ -145,9 +165,6 @@ bool handle_uri_boot_common(MonoString* uri, int opt, MonoString* titleIdForBoot
     static bool toolbox_pressed = false;
     static std::chrono::steady_clock::time_point toolbox_press_start;
     static bool toolbox_long_press_triggered = false;
-
-  
-    result = GetData(deviceIndex);
 
     // Cheats Shortcut
     if (g_settings.cheats_shortcut_opt != CHEATS_SC_OFF) {

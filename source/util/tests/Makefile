@@ -172,6 +172,7 @@ TEST_CXX_SRCS := \
 	test_plugin_manager.cpp \
 	test_trampoline_arena.cpp \
 	test_hook_lifecycle.cpp \
+	test_startup_guard.cpp \
 	test_hotpatch.cpp \
 	test_x64_relocator.cpp \
 	test_main.cpp
@@ -204,6 +205,7 @@ PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/hotpatch.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/trampoline_arena.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/libonion_detour/x64_relocator.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/hook_lifecycle.o
+PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/startup_guard.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/ps5_settings_ui.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/settings_page_update.o
 PROD_CXX_OBJS += $(BUILD_DIR)/prod/shellui/toolbox_route.o
@@ -388,6 +390,10 @@ $(BUILD_DIR)/prod/shellui/file_browser.o: $(REPO_ROOT)/source/shellui/src/file_b
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/prod/shellui/settings_page_update.o: $(REPO_ROOT)/source/shellui/src/settings_page_update.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/prod/shellui/startup_guard.o: $(REPO_ROOT)/source/shellui/src/startup_guard.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(CXXFLAGS) -c -o $@ $<
 

@@ -427,12 +427,23 @@ void request_reload() {
 #endif
 }
 
-void poll_reload() {
+bool has_pending_reload() {
+#if SHELLUI_CONTROL_CENTER_PATCH == 1
+  return g_reload_pending.load(std::memory_order_acquire);
+#else
+  return false;
+#endif
+}
+
+bool poll_reload() {
 #if SHELLUI_CONTROL_CENTER_PATCH == 1
   if (!g_reload_pending.exchange(false, std::memory_order_acq_rel))
-    return;
+    return false;
   LOG_DEBUG("control_center_sdk: reloading NPXS40003 on UI thread");
   ReloadRNPSApp("NPXS40003");
+  return true;
+#else
+  return false;
 #endif
 }
 

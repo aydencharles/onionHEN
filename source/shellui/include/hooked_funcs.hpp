@@ -175,8 +175,12 @@ void settings_commit(bool reload_main = false, bool reload_util = false);
  * onion_ready files (those are daemon/process handshake only).
  */
 void shellui_request_home_reload(void);
-/** Drain the one-shot Home reload; call only from UI thread after hooks ready. */
-void shellui_poll_home_reload(void);
+/** Return true if a HomeUI (NPXS40002) reload is currently queued. */
+bool shellui_has_pending_home_reload(void);
+/** Drain the one-shot Home reload; returns true if ReloadApp was invoked. */
+bool shellui_poll_home_reload(void);
+/** Drive deferred main-thread startup init and staggered RNPS reloads from OnRender. */
+void shellui_startup_on_render_tick(void);
 
 /** UI-thread ticker for the cheat-download XML progress page. */
 void shellui_poll_cheat_progress(void);

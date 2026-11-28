@@ -28,6 +28,7 @@ along with this program; see the file COPYING. If not, see
 #include "plugin_ui_bridge_client.hpp"
 #include "proc.h"
 #include "ps5/kernel.h"
+#include "startup_guard.hpp"
 #include "toolbox_i18n.hpp"
 
 #include <onion/log.h>
@@ -107,6 +108,11 @@ constexpr uint32_t kFw3xxMaxExclusive = 0x4000042;
 constexpr uint32_t kFw6xxMin = 0x6000000;
 // Same magnitude as the previous sleep(0x100000) keep-alive.
 constexpr unsigned kKeepAliveSleepSec = 0x100000;
+constexpr uint64_t kMainThreadHandoffTimeoutMs = 2000;
+constexpr uint64_t kReloadWaitCapMs = 5000;
+constexpr useconds_t kStartupWaitPollUs = 20 * 1000;
+
+OrbisKernelSwVersion g_boot_sw{};
 
 // XOR key material used for version string + toolbox XML (base64 of "SISTR0_I_SEE_YOU").
 constexpr const char* kXorKeyB64 = "U0lTVFIwX0lfU0VFX1lPVQ==";
@@ -437,7 +443,10 @@ bool resolve_game_container(MonoImage* app_system) {
     return false;
   }
 
-  MonoString* path_arg = mono_string_new(mono_domain_get(), "Game");
+  MonoDomain* dom = (mono_domain_get ? mono_domain_get() : nullptr);
+  if (!dom)
+    dom = Root_Domain;
+  MonoString* path_arg = mono_string_new(dom, "Game");
   void* args[1] = {path_arg};
   MonoObject* exception = nullptr;
   Game = mono_runtime_invoke(find, nullptr, args, &exception);
@@ -517,11 +526,46 @@ bool install_optional_diag(const char* tag, MonoImage* image, const char* ns,
   return true;
 }
 
-bool install_hooks(const ShellImages& img) {
+void probe_hv_bypass() {
   char probe[kMprotectProbeSize];
   has_hv_bypass = (sceKernelMprotect(probe, sizeof(probe), kProtRwx) == 0);
   LOG_DEBUG("has_hv_bypass=%d (mprotect for detours)", has_hv_bypass ? 1 : 0);
+}
 
+bool install_early_guard_hooks() {
+  /*
+   * Arm the input gate (GamePad.GetData) first so controller events are
+   * neutralized while remaining hooks and initial RNPS reloads run.
+   */
+  MonoImage* core_img = getDLLimage("Sce.PlayStation.Core.dll");
+  if (core_img) {
+    (void)install_mono_hook(
+        {"GamePad.GetData", core_img, "Sce.PlayStation.Core.Input", "GamePad",
+         "GetData", 1, reinterpret_cast<void*>(&GetData_hook),
+         reinterpret_cast<void**>(&GetData), false});
+  } else {
+    LOG_WARN("Early guard: Sce.PlayStation.Core.dll unavailable; will retry");
+  }
+
+  /*
+   * Hook PUI.Application.Update early so the UI main thread claims Mono UI
+   * initialization and remaining detours on the next frame instead of racing
+   * the background inject thread.
+   */
+  MonoImage* early_pui = getDLLimage("Sce.PlayStation.PUI.dll");
+  if (!early_pui) {
+    LOG_WARN("Early guard: Sce.PlayStation.PUI.dll unavailable; worker fallback");
+    return false;
+  }
+  pui_img = early_pui;
+  const bool render_hooked = install_mono_hook(
+      {"PUI.Application.Update", early_pui, "Sce.PlayStation.PUI",
+       "Application", "Update", 0, reinterpret_cast<void*>(&OnRender_Hook),
+       reinterpret_cast<void**>(&OnRender_orig), false});
+  return render_hooked && OnRender_orig != nullptr;
+}
+
+bool install_hooks(const ShellImages& img) {
   Patch_Main_thread_Check(img.core);
 
   // --- Native (required) ---
@@ -535,16 +579,20 @@ bool install_hooks(const ShellImages& img) {
                              sceRegMgrGetInt, true))
     return false;
 
+  // Retry GamePad.GetData if Core.Input was not ready during the early pass.
+  if (!GetData) {
+    (void)install_mono_hook(
+        {"GamePad.GetData", img.core, "Sce.PlayStation.Core.Input", "GamePad",
+         "GetData", 1, reinterpret_cast<void*>(&GetData_hook),
+         reinterpret_cast<void**>(&GetData), false});
+  }
+
   // --- Standard mono hooks ---
   // UI3_dec / Settings types use runtime-decoded namespace strings.
   const MonoHookSpec mono_hooks[] = {
       {"OptionMenu.createJson", img.rn_shell, "ReactNative.Modules.ShellUI.HomeUI",
        "OptionMenu", "createJson", 8, reinterpret_cast<void*>(&createJson_hook),
        reinterpret_cast<void**>(&createJson), true},
-      /* Optional: Core.Input may still be loading while we install; missing is non-fatal. */
-      {"GamePad.GetData", img.core, "Sce.PlayStation.Core.Input", "GamePad", "GetData",
-       1, reinterpret_cast<void*>(&GetData_hook), reinterpret_cast<void**>(&GetData),
-       false},
       {"SettingsPlugin.CxmlUri", img.legacy, UI3_dec.c_str(), "SettingsPlugin",
        "CxmlUri", 1, reinterpret_cast<void*>(&CxmlUri_Hook),
        reinterpret_cast<void**>(&CxmlUri), false},
@@ -682,20 +730,21 @@ bool install_hooks(const ShellImages& img) {
   }
 
   /*
-   * Arm the per-frame entry point only after every dependency it can observe is
-   * ready. Keeping this last prevents the UI thread from entering Onion code
-   * while the installer is still compiling and committing other Mono hooks.
+   * PUI.Application.Update is normally installed early for main-thread startup
+   * handoff; install it here only if the early pass skipped or failed it.
    */
-  (void)install_mono_hook(
-      {"PUI.Application.Update", img.pui, "Sce.PlayStation.PUI",
-       "Application", "Update", 0, reinterpret_cast<void*>(&OnRender_Hook),
-       reinterpret_cast<void**>(&OnRender_orig), false});
+  if (!OnRender_orig) {
+    (void)install_mono_hook(
+        {"PUI.Application.Update", img.pui, "Sce.PlayStation.PUI",
+         "Application", "Update", 0, reinterpret_cast<void*>(&OnRender_Hook),
+         reinterpret_cast<void**>(&OnRender_orig), false});
+  }
 
   return true;
 }
 
 // ---------------------------------------------------------------------------
-// Phase 8: process query hooks + keep-alive
+// Phase 8: process query hooks + deferred init + keep-alive
 // ---------------------------------------------------------------------------
 
 void setup_proc_hooks() {
@@ -715,6 +764,38 @@ void setup_proc_hooks() {
       });
 }
 
+bool run_deferred_shellui_init(const char* thread_tag) {
+  LOG_DEBUG("Running ShellUI Mono init & hooks on %s...", thread_tag);
+
+  if (!init_version_string(g_boot_sw))
+    return false;
+
+  ShellImages images;
+  if (!load_shell_images(images))
+    return false;
+  if (!resolve_game_container(images.app_system))
+    return false;
+
+  if (!install_hooks(images))
+    return false;
+
+  LOG_DEBUG("Performing Magic ....");
+  LOG_DEBUG("Performed Magic");
+  setup_proc_hooks();
+
+  toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
+
+  shellui_hooks_publish_ready();
+  onion::control_center::initialize_builtin_control();
+  /*
+   * Home already cached pre-inject state. Display-TID spoof and the top-nav
+   * RNPS patch both need NPXS40002 ReloadApp on the UI thread (OnRender),
+   * staggered ahead of NPXS40003 Control Center reload.
+   */
+  shellui_request_home_reload();
+  return true;
+}
+
 void run_keep_alive() {
   // Publish the initialized SceShellUI process instance.  The daemon keeps
   // this marker so a restart cannot inject a second Toolbox into the same PID.
@@ -727,6 +808,49 @@ void run_keep_alive() {
 }
 
 } // namespace
+
+void shellui_startup_on_render_tick(void) {
+  using namespace onion::shellui;
+  thread_local bool in_startup_tick = false;
+  if (in_startup_tick)
+    return;
+  in_startup_tick = true;
+
+  auto& coordinator = global_startup_coordinator();
+  const uint64_t now_ms = startup_monotonic_ms();
+
+  if (coordinator.try_claim_main_thread_init()) {
+    if (run_deferred_shellui_init("UI main thread")) {
+      const bool need_home = shellui_has_pending_home_reload();
+      const bool need_cc = onion::control_center::has_pending_reload();
+      coordinator.mark_main_thread_init_done(need_home, need_cc, now_ms);
+      LOG_DEBUG("Main-thread init complete (need_home=%d need_cc=%d)",
+                need_home ? 1 : 0, need_cc ? 1 : 0);
+    } else {
+      shellui_hooks_publish_failed();
+      coordinator.mark_failed();
+      LOG_ERROR("Main-thread ShellUI init failed");
+    }
+    in_startup_tick = false;
+    return;
+  }
+
+  const StartupTickAction action = coordinator.tick_ui_frame(now_ms);
+  switch (action) {
+  case StartupTickAction::ReloadHome:
+    LOG_DEBUG("Startup staggered reload: triggering NPXS40002 (HomeUI)");
+    (void)shellui_poll_home_reload();
+    break;
+  case StartupTickAction::ReloadControlCenter:
+    LOG_DEBUG("Startup staggered reload: triggering NPXS40003 (Control Center)");
+    (void)onion::control_center::poll_reload();
+    break;
+  case StartupTickAction::None:
+    break;
+  }
+
+  in_startup_tick = false;
+}
 
 // ---------------------------------------------------------------------------
 // main — orchestration only
@@ -778,6 +902,7 @@ int main(int argc, char const* argv[]) {
 
   OrbisKernelSwVersion sw{};
   sceKernelGetProsperoSystemSwVersion(&sw);
+  g_boot_sw = sw;
   is_3xx = (sw.version < kFw3xxMaxExclusive);
   is_6xx = (sw.version >= kFw6xxMin);
   shellui_configure_debug_settings_route(sw.version);
@@ -806,43 +931,71 @@ int main(int argc, char const* argv[]) {
   LOG_DEBUG("Shellui Root Domain: %p", static_cast<void *>(Root_Domain));
   mono_thread_attach(Root_Domain);
 
-  if (!init_version_string(sw))
-    return -1;
-
-  ShellImages images;
-  if (!load_shell_images(images))
-    return -1;
-  if (!resolve_game_container(images.app_system))
-    return -1;
-
-  LOG_DEBUG("Starting hooking...");
-  shellui_hooks_begin_install();
-  if (!install_hooks(images)) {
-    shellui_hooks_publish_failed();
-    return -1;
-  }
-
-  LOG_DEBUG("Performing Magic ....");
-
-  LOG_DEBUG("Performed Magic");
-  setup_proc_hooks();
-
-  toolbox_i18n::apply_system_or_ui_lang(g_settings.ui_lang);
-
-  shellui_hooks_publish_ready();
   /*
    * Bring the loopback web UI up before registering the built-in control. The
    * control-center tile's popup is a native WebViewPS pointed at web_ui::url(),
-   * so the server has to be listening before the tile is patched in.
+   * so the server has to be listening before the UI thread registers the tile.
    */
   onion::web_ui::start();
-  onion::control_center::initialize_builtin_control();
+
+  probe_hv_bypass();
+  shellui_hooks_begin_install();
+
+  auto& coordinator = onion::shellui::global_startup_coordinator();
+  const uint64_t begin_ms = onion::shellui::startup_monotonic_ms();
+  coordinator.begin(begin_ms);
+
+  const bool render_hooked = install_early_guard_hooks();
+  if (render_hooked) {
+    LOG_DEBUG("Waiting for PUI main thread to run ShellUI init...");
+    while (coordinator.phase() ==
+               onion::shellui::StartupPhase::WaitingForMainThread &&
+           (onion::shellui::startup_monotonic_ms() - begin_ms) <
+               kMainThreadHandoffTimeoutMs) {
+      usleep(kStartupWaitPollUs);
+    }
+  }
+
   /*
-   * Home already cached pre-inject state. Display-TID spoof and the top-nav
-   * RNPS patch both need NPXS40002 ReloadApp on the UI thread (OnRender), not
-   * this inject worker. One pending flag coalesces both reasons.
+   * If PUI.Application.Update could not be hooked or did not tick within the
+   * handoff window (e.g., ShellUI paused behind a game), atomically claim the
+   * worker fallback so boot never stalls.
    */
-  shellui_request_home_reload();
+  if (coordinator.try_claim_worker_fallback_init()) {
+    LOG_WARN("PUI main-thread handoff unavailable/timed out; falling back to "
+             "inject worker");
+    if (run_deferred_shellui_init("inject worker fallback")) {
+      coordinator.mark_worker_fallback_done();
+    } else {
+      shellui_hooks_publish_failed();
+      coordinator.mark_failed();
+      return -1;
+    }
+  }
+
+  /*
+   * Wait until main-thread init and staggered RNPS reloads finish (and the
+   * input suppression gate lifts) before publishing ONION_READY_TOOLBOX.
+   */
+  const uint64_t wait_start_ms = onion::shellui::startup_monotonic_ms();
+  while (!coordinator.is_completed() && !coordinator.is_failed()) {
+    if ((onion::shellui::startup_monotonic_ms() - wait_start_ms) >=
+        kReloadWaitCapMs) {
+      if (coordinator.force_complete_timeout()) {
+        LOG_WARN("Startup RNPS reload wait hit %llu ms cap; releasing input "
+                 "gate and publishing readiness",
+                 static_cast<unsigned long long>(kReloadWaitCapMs));
+        break;
+      }
+    }
+    usleep(kStartupWaitPollUs);
+  }
+
+  if (coordinator.is_failed()) {
+    return -1;
+  }
+
+  LOG_DEBUG("Startup guard complete; publishing Toolbox readiness");
   hooked = true;
   run_keep_alive();
   return 0;

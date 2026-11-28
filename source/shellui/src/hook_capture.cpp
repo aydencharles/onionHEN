@@ -5,6 +5,7 @@
 #include "debug_settings_route_runtime.hpp"
 #include "detour.h"
 #include "ipc.hpp"
+#include "startup_guard.hpp"
 #include <msg.hpp>
 #include <pthread.h>
 #include <sys/stat.h>
@@ -65,6 +66,10 @@ void CaptureScreen_new(MonoObject * inst, int userId, long deviceId, int capType
 }
 
 void OnShareButton(MonoObject * data) {
+  if (onion::shellui::shellui_startup_should_suppress_input()) {
+    return;
+  }
+
   if (!shellui_hooks_are_ready()) {
     if (OnShareButton_orig)
       OnShareButton_orig(data);

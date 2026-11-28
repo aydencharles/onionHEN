@@ -18,6 +18,7 @@ along with this program; see the file COPYING. If not, see
 #include "control_center_patch.hpp"
 #include "homeui_top_nav_patch.hpp"
 #include "settings_bundle_patch.hpp"
+#include "startup_guard.hpp"
 #include "toolbox_i18n.hpp"
 #include <onion/platform.h>
 #include "detour.h"
@@ -169,6 +170,7 @@ int ioctl_hook(int fd, unsigned long request, void *argp) {
       patch_settings_bundle(buffer, args->size);
       patch_homeui_top_nav(buffer, &args->size, args->size);
       patch_control_center(buffer, &args->size, args->size);
+      onion::shellui::shellui_startup_on_rnps_bundle_decrypted();
   }
   return ret;
 }

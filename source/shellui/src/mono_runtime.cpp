@@ -370,8 +370,11 @@ bool SetVersionString(const char *str)
 void ReloadRNPSApp(const char* title_id){
     void (*ReloadApp)(MonoString* tid) = (void(*)(MonoString*))Get_Address_of_Method(react_common_img, "ReactNative.Vsh.Common", "ReactApplicationSceneManager", "ReloadApp", 1);
     if (ReloadApp) {
+        MonoDomain *dom = (mono_domain_get ? mono_domain_get() : nullptr);
+        if (!dom)
+            dom = Root_Domain;
         LOG_DEBUG("Reloading %s scenes", title_id);
-        ReloadApp(mono_string_new(Root_Domain, title_id));
+        ReloadApp(mono_string_new(dom, title_id));
     } else {
         LOG_ERROR("Failed to find reload method, not reloading scene");
     }
@@ -384,10 +387,15 @@ void shellui_request_home_reload(void) {
   LOG_DEBUG("queued NPXS40002 home reload for next UI tick");
 }
 
-void shellui_poll_home_reload(void) {
+bool shellui_has_pending_home_reload(void) {
+  return g_home_reload_pending.load(std::memory_order_acquire);
+}
+
+bool shellui_poll_home_reload(void) {
   if (!g_home_reload_pending.exchange(false, std::memory_order_acq_rel)) {
-    return;
+    return false;
   }
   LOG_DEBUG("applying NPXS40002 home reload on UI thread");
   ReloadRNPSApp("NPXS40002");
+  return true;
 }

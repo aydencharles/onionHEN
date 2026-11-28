@@ -10,6 +10,7 @@
 #include <onion/net.h>
 #include <onion/settings.hpp>
 #include "plugin_progress.hpp"
+#include "startup_guard.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -590,16 +591,19 @@ void update_overlay_metrics(unsigned int idle_tid[kCpuCores], int& current_bank,
 } // namespace
 
 void OnRender_Hook(MonoObject* instance) {
-  if (!shellui_hooks_are_ready()) {
+  shellui_startup_on_render_tick();
+
+  if (!shellui_hooks_are_ready() ||
+      !onion::shellui::global_startup_coordinator().is_completed()) {
     if (OnRender_orig)
       OnRender_orig(instance);
     return;
   }
 
-  /* UI thread: one NPXS40002 reload covers display TIDs and top-nav patch. */
-  shellui_poll_home_reload();
-  /* NPXS40003 reloads are queued by Control Center register/unregister. */
-  onion::control_center::poll_reload();
+  /* Steady-state UI thread reloads: stagger HomeUI and Control Center across frames. */
+  if (!shellui_poll_home_reload()) {
+    (void)onion::control_center::poll_reload();
+  }
 
   static bool inited = false;
   static unsigned int idle_thread_id[kCpuCores] = {};

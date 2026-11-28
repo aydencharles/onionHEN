@@ -133,7 +133,8 @@ const char *result_string(Result result);
 void initialize_builtin_control();
 bool visual_registration(SnapshotEntry *entry);
 void request_reload();
-void poll_reload();
+bool has_pending_reload();
+bool poll_reload();
 
 } // namespace onion::control_center
 

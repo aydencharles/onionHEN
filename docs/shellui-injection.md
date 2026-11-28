@@ -64,20 +64,35 @@ skip it.
 Single-step return detection compares against the private entry stack pointer.
 The invariant is `rsp % 16 == 8` at the remote call boundary.
 
-## Hook installation safety
+## Hook installation & ReactUI reload safety
 
-ShellUI remains active while the payload thread installs hooks. Two mechanisms
-keep callbacks coherent during that window:
+ShellUI remains live after `pt_detach()`, so `shellui.elf` uses a startup
+coordinator (`startup_guard.cpp`) to shield Mono/ReactUI state from user
+controller input and concurrent mutation:
 
 - `TrampolineArena` uses non-fixed mmap hints and page-sized bump allocation.
   Every trampoline has a unique, non-overlapping address within rel32 reach of
   its target. Allocation fails closed when no valid mapping is available.
+- **Input suppression gate**: `GamePad.GetData` and `PUI.Application.Update`
+  are armed first. While initialization and initial RNPS reloads run,
+  `GetData_hook` still polls the real controller state but returns neutral
+  buttons/sticks (and `OnShareButton` is swallowed), with a hard time-cap
+  failsafe so input can never stay locked.
+- **UI main-thread handoff**: Mono UI initialization (`SetVersionString`,
+  `LayerManager.FindContainerSceneByPath`) and all remaining hooks run on the
+  PUI UI main thread inside `OnRender_Hook` rather than racing the UI thread
+  from the inject worker. An atomic fallback runs on the worker only if PUI
+  cannot be hooked or does not tick within the handoff window.
+- **Staggered RNPS reloads & deferred readiness**: `NPXS40002` (HomeUI) and
+  `NPXS40003` (Control Center) `ReloadApp` calls are staggered across separate
+  frames, waiting for `ioctl_hook` (`DECRYPT_RNPS_BUNDLE`) plus settle frames
+  (or a bounded per-phase timeout). Input suppression lifts and
+  `/system_tmp/onionhen/ready/toolbox` is published only after both reloads
+  settle, preventing `apply_startup_destination()` from colliding with a
+  mid-reload HomeUI.
 - Hook callbacks remain pass-through while lifecycle state is `Installing`.
   The payload publishes `Ready` only after all detours and shared dependencies
   are initialized.
-
-Controller, navigation, render, registry, capture, and resource hooks call
-their original functions until the lifecycle barrier reaches `Ready`.
 
 ## Failure behavior
 

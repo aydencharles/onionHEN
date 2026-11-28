@@ -1,0 +1,8 @@
+[plugin.onion_example]
+path=/data/OnionHEN/sprx/onion_example.prx
+# Replace with your target game/homebrew Title ID, or use title_id_prefixes=PPSA
+exact_title_ids=PPSA38500
+enabled=true
+# Recommend false while testing so you can load manually after the game finishes booting
+auto_start=false
+priority=0

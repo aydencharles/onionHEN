@@ -7,6 +7,7 @@
 
 # Build trees / final artifacts (default: repo-root build/)
 /build/
+examples/*/build/
 /.cache/
 /.docker/
 source/build/

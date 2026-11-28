@@ -158,8 +158,13 @@ static int test_minimal_pages_and_routes(void) {
   BrowserListing dir_listing{};
   dir_listing.accessible = true;
   dir_listing.entries = {
-      {"pkgs", FileKind::Directory, 0, false},
-      {"Alpha.pkg", FileKind::Pkg, 2ULL * 1024ULL * 1024ULL * 1024ULL, false},
+      {"pkgs", FileKind::Directory, 0, false, ""},
+      {"Alpha.pkg", FileKind::Pkg, 2ULL * 1024ULL * 1024ULL * 1024ULL, false,
+       ""},
+      {"tool.elf", FileKind::Payload, 48ULL * 1024ULL, false, ""},
+      {"myplug.elf", FileKind::Plugin, 120ULL * 1024ULL, false, "PLUG00001"},
+      {"menu.prx", FileKind::Sprx, 7ULL * 1024ULL, true, ""},
+      {"PPSA00001.xml", FileKind::Patch, 12ULL * 1024ULL, false, ""},
   };
   ps5ui::Page dir_page("id_fb_page_1", "/data");
   fill_file_browser_dir_page(
@@ -167,12 +172,21 @@ static int test_minimal_pages_and_routes(void) {
         return toolbox::file_browser_node_xml(9);
       });
   TEST_ASSERT_TRUE(onion::shellui::settings::valid_live_model(dir_page.root()));
-  // Zero clutter: only the folder link and the file button.
-  TEST_ASSERT_EQ_INT(2, static_cast<int>(dir_page.root().children.size()));
+  TEST_ASSERT_EQ_INT(6, static_cast<int>(dir_page.root().children.size()));
   const std::string dir_xml = dir_page.build();
   TEST_ASSERT_TRUE(dir_xml.find("file=\"fb_9.xml\"") != std::string::npos);
   TEST_ASSERT_TRUE(dir_xml.find("id=\"id_fb_file_1_1\"") != std::string::npos);
-  TEST_ASSERT_TRUE(dir_xml.find("2.00 GB · Install PKG") != std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("2.00 GB · Select to install") !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("confirm_phrase=\"Install,Cancel\"") !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("confirm_phrase=\"Import,Cancel\"") !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("confirm_phrase=\"Replace,Cancel\"") !=
+                   std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("Import %s") == std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("Alpha.pkg") != std::string::npos);
+  TEST_ASSERT_TRUE(dir_xml.find("myplug.elf") != std::string::npos);
 
   const toolbox::ResourceNames names{"payloads.xml", "debug_settings.xml",
                                      "cheats.xml"};

@@ -8,6 +8,7 @@
 #include "usb_payload_importer.hpp"
 
 #include <onion/fs.h>
+#include <onion/plugin_manager.hpp>
 #include <onion/tree.h>
 
 #include <algorithm>
@@ -15,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <dirent.h>
+#include <span>
 #include <sys/stat.h>
 #include <utility>
 
@@ -23,6 +25,7 @@ namespace {
 
 constexpr std::size_t kMaxPatchImportBytes = 4ULL * 1024ULL * 1024ULL;
 constexpr std::size_t kMaxSprxImportBytes = 64ULL * 1024ULL * 1024ULL;
+constexpr std::size_t kMaxPluginInspectBytes = 16ULL * 1024ULL * 1024ULL;
 
 bool ascii_iequals(std::string_view a, std::string_view b) {
   if (a.size() != b.size())
@@ -62,6 +65,8 @@ const std::string *destination_dir_for(FileKind kind,
   switch (kind) {
   case FileKind::Payload:
     return &destinations.payloads;
+  case FileKind::Plugin:
+    return &destinations.plugins;
   case FileKind::Patch:
     return &destinations.cheats;
   case FileKind::Sprx:
@@ -79,8 +84,10 @@ std::string destination_path_for(const std::string &filename, FileKind kind,
   const std::string *dir = destination_dir_for(kind, destinations);
   if (!dir || dir->empty())
     return {};
+  const bool is_elf_target =
+      kind == FileKind::Payload || kind == FileKind::Plugin;
   const std::string target_name =
-      kind == FileKind::Payload ? normalized_payload_name(filename) : filename;
+      is_elf_target ? normalized_payload_name(filename) : filename;
   return join_path(*dir, target_name);
 }
 
@@ -100,19 +107,38 @@ std::string display_system_path_for(const std::string &shellui_path) {
   return shellui_path;
 }
 
+bool inspect_plugin_elf(const std::string &shellui_path,
+                        std::string &plugin_id_out) {
+  std::uint8_t *buffer = nullptr;
+  std::size_t size = 0;
+  if (!read_file_alloc(shellui_path.c_str(), kMaxPluginInspectBytes, &buffer,
+                       &size))
+    return false;
+  const onion::plugin::Inspection inspection = onion::plugin::inspect_elf(
+      std::span<const std::uint8_t>(buffer, size));
+  std::free(buffer);
+  if (!inspection)
+    return false;
+  plugin_id_out = inspection.descriptor.plugin_id;
+  return true;
+}
+
 const char *action_hint_key(FileKind kind, bool already_installed) {
+  if (already_installed && kind != FileKind::Pkg &&
+      kind != FileKind::Directory && kind != FileKind::Other) {
+    return "file_browser.action.already_imported";
+  }
   switch (kind) {
   case FileKind::Pkg:
     return "file_browser.action.install_pkg";
   case FileKind::Payload:
-    return already_installed ? "file_browser.action.replace_payload"
-                             : "file_browser.action.import_payload";
+    return "file_browser.action.import_payload";
+  case FileKind::Plugin:
+    return "file_browser.action.import_plugin";
   case FileKind::Patch:
-    return already_installed ? "file_browser.action.replace_patch"
-                             : "file_browser.action.import_patch";
+    return "file_browser.action.import_patch";
   case FileKind::Sprx:
-    return already_installed ? "file_browser.action.replace_sprx"
-                             : "file_browser.action.import_sprx";
+    return "file_browser.action.import_sprx";
   case FileKind::Directory:
   case FileKind::Other:
     return nullptr;
@@ -128,21 +154,56 @@ std::string format_file_subtitle(const BrowserEntry &entry) {
   return size + " · " + toolbox_i18n::tr(action_key);
 }
 
-std::optional<std::string> confirm_prompt_for(const BrowserEntry &entry) {
-  if (!entry.already_installed)
-    return std::nullopt;
+struct ConfirmSpec {
+  std::optional<std::string> message;
+  std::optional<std::string> phrase;
+};
+
+ConfirmSpec confirm_spec_for(const BrowserEntry &entry) {
+  const char *msg_key = nullptr;
+  const char *phrase_key = nullptr;
   switch (entry.kind) {
-  case FileKind::Payload:
-  case FileKind::Patch:
-  case FileKind::Sprx:
-    return toolbox_i18n::format("file_browser.replace_confirm_fmt",
-                                entry.name.c_str());
-  case FileKind::Directory:
   case FileKind::Pkg:
+    msg_key = "file_browser.confirm.install_pkg_fmt";
+    phrase_key = "file_browser.confirm_phrase.install";
+    break;
+  case FileKind::Payload:
+    msg_key = entry.already_installed
+                  ? "file_browser.confirm.replace_payload_fmt"
+                  : "file_browser.confirm.import_payload_fmt";
+    phrase_key = entry.already_installed
+                     ? "file_browser.confirm_phrase.replace"
+                     : "file_browser.confirm_phrase.import";
+    break;
+  case FileKind::Plugin:
+    msg_key = entry.already_installed
+                  ? "file_browser.confirm.replace_plugin_fmt"
+                  : "file_browser.confirm.import_plugin_fmt";
+    phrase_key = entry.already_installed
+                     ? "file_browser.confirm_phrase.replace"
+                     : "file_browser.confirm_phrase.import";
+    break;
+  case FileKind::Sprx:
+    msg_key = entry.already_installed ? "file_browser.confirm.replace_sprx_fmt"
+                                      : "file_browser.confirm.import_sprx_fmt";
+    phrase_key = entry.already_installed
+                     ? "file_browser.confirm_phrase.replace"
+                     : "file_browser.confirm_phrase.import";
+    break;
+  case FileKind::Patch:
+    msg_key = entry.already_installed
+                  ? "file_browser.confirm.replace_patch_fmt"
+                  : "file_browser.confirm.import_patch_fmt";
+    phrase_key = entry.already_installed
+                     ? "file_browser.confirm_phrase.replace"
+                     : "file_browser.confirm_phrase.import";
+    break;
+  case FileKind::Directory:
   case FileKind::Other:
-    return std::nullopt;
+    return {};
   }
-  return std::nullopt;
+  return {toolbox_i18n::format(msg_key, entry.name.c_str()),
+          std::string(toolbox_i18n::tr(phrase_key))};
 }
 
 } // namespace
@@ -184,7 +245,7 @@ bool matches_filter(FileKind kind, FilterMode mode) {
   case FilterMode::Pkg:
     return kind == FileKind::Pkg;
   case FilterMode::Payload:
-    return kind == FileKind::Payload;
+    return kind == FileKind::Payload || kind == FileKind::Plugin;
   case FilterMode::Patch:
     return kind == FileKind::Patch;
   }
@@ -260,7 +321,7 @@ BrowserListing list_directory(const std::string &shellui_dir, FilterMode mode,
       continue;
     const std::string full_path = join_path(shellui_dir, name);
     struct stat st {};
-    if (::stat(full_path.c_str(), &st) != 0)
+    if (::lstat(full_path.c_str(), &st) != 0)
       continue;
 
     BrowserEntry item;
@@ -269,6 +330,10 @@ BrowserListing list_directory(const std::string &shellui_dir, FilterMode mode,
       item.kind = FileKind::Directory;
     } else if (S_ISREG(st.st_mode)) {
       item.kind = classify_file(name);
+      if (item.kind == FileKind::Payload &&
+          inspect_plugin_elf(full_path, item.plugin_id)) {
+        item.kind = FileKind::Plugin;
+      }
       if (!matches_filter(item.kind, mode))
         continue;
       item.size_bytes =
@@ -327,7 +392,7 @@ ImportStatus import_file_to_destination(const std::string &source_shellui_path,
   if (!mkdir_tree(dest_dir->c_str()))
     return ImportStatus::WriteFailed;
 
-  if (kind == FileKind::Payload) {
+  if (kind == FileKind::Payload || kind == FileKind::Plugin) {
     usb_payloads::Entry entry;
     entry.name = filename;
     entry.source_path = source_shellui_path;
@@ -410,15 +475,12 @@ void fill_file_browser_dir_page(ps5ui::Page &page, std::uint64_t page_token,
                 entry.name + "/", target_xml,
                 toolbox_i18n::tr("file_browser.folder_tag"));
     } else {
-      const auto confirm = confirm_prompt_for(entry);
+      const ConfirmSpec confirm = confirm_spec_for(entry);
       page.button(
           std::string(kFilePrefix) + std::to_string(page_token) + "_" +
               std::to_string(i),
           entry.name, format_file_subtitle(entry), std::nullopt, std::nullopt,
-          ps5ui::Style::None, confirm,
-          confirm ? std::optional<std::string>(
-                        toolbox_i18n::tr("file_browser.confirm_phrase"))
-                  : std::nullopt);
+          ps5ui::Style::None, confirm.message, confirm.phrase);
     }
   }
   if (listing.truncated) {

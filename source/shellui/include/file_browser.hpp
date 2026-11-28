@@ -35,6 +35,7 @@ enum class FileKind : unsigned char {
   Directory = 0,
   Pkg,
   Payload,
+  Plugin,
   Patch,
   Sprx,
   Other,
@@ -50,6 +51,7 @@ struct RootLocation {
 
 struct DestinationDirs {
   std::string payloads = "/user/data/OnionHEN/payloads";
+  std::string plugins = "/user/data/OnionHEN/plugins";
   std::string cheats = "/user/data/OnionHEN/cheats";
   std::string sprx = "/user/data/OnionHEN/sprx";
 };
@@ -59,6 +61,7 @@ struct BrowserEntry {
   FileKind kind = FileKind::Other;
   std::uint64_t size_bytes = 0;
   bool already_installed = false;
+  std::string plugin_id;
 };
 
 struct BrowserListing {

@@ -67,7 +67,7 @@ set(CMAKE_C_FLAGS_RELEASE "-Os -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-Os -DNDEBUG")
 
 target_sources(${PROJECT_NAME} PRIVATE ${SrcFiles})
-add_dependencies(${PROJECT_NAME} shellui_i18n_catalog onion_version onion_ipc onion_settings onion_detour onion_proc onion_platform onion_ready onion_plugin_ui onion_plugin_bridge)
+add_dependencies(${PROJECT_NAME} shellui_i18n_catalog onion_version onion_ipc onion_settings onion_detour onion_proc onion_platform onion_ready onion_plugin_ui onion_plugin_bridge onion_plugin_manager)
 onion_target_debug_define(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE
 	"${D_CWD}/include"
@@ -82,10 +82,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 	"${PROJECT_ROOT}/libonion_fps/include"
 	"${PROJECT_ROOT}/libonion_plugin_ui/include"
 	"${PROJECT_ROOT}/libonion_plugin_bridge/include"
+	"${PROJECT_ROOT}/libonion_plugin_manager/include"
 	"${PROJECT_ROOT}/include"
 )
 target_link_directories	(${PROJECT_NAME} PUBLIC "${ONIONHEN_PS5_STUB_DIR}")
-target_link_libraries	(${PROJECT_NAME} PUBLIC onion_payload onion_detour onion_proc onion_platform onion_ipc onion_settings onion_ready onion_plugin_ui onion_plugin_bridge SceRegMgr SceSystemService SceUserService SceNetCtl)
+target_link_libraries	(${PROJECT_NAME} PUBLIC onion_payload onion_detour onion_proc onion_platform onion_ipc onion_settings onion_ready onion_plugin_ui onion_plugin_bridge onion_plugin_manager SceRegMgr SceSystemService SceUserService SceNetCtl)
 # External in-process PRX modules resolve only the narrow Control Center C ABI.
 target_link_options(${PROJECT_NAME} PRIVATE
 	"-Wl,--export-dynamic-symbol=onion_cc_register"

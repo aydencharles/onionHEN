@@ -37,6 +37,8 @@ struct ActiveDirPage {
   std::map<std::string, std::uint64_t> child_tokens;
 };
 
+constexpr std::size_t kMaxBrowserDepth = 16;
+
 FilterMode g_session_mode = FilterMode::All;
 std::uint64_t g_next_token = 1;
 std::vector<std::uint64_t> g_page_stack; // 0 = root storage list, >0 = dir token
@@ -182,14 +184,13 @@ bool parse_file_button_id(std::string_view id, std::uint64_t *token_out,
   return true;
 }
 
-void notify_import_status(ImportStatus status, const std::string &name,
-                          const std::string &dest_path) {
+void notify_import_status(ImportStatus status, const std::string &name) {
   switch (status) {
   case ImportStatus::Completed:
-    notify("notify.file_browser.imported_fmt", name.c_str(), dest_path.c_str());
+    notify("notify.file_browser.imported_fmt", name.c_str());
     break;
   case ImportStatus::Replaced:
-    notify("notify.file_browser.replaced_fmt", name.c_str(), dest_path.c_str());
+    notify("notify.file_browser.replaced_fmt", name.c_str());
     break;
   case ImportStatus::AlreadySameFile:
     notify("notify.file_browser.already_in_place_fmt", name.c_str());
@@ -218,7 +219,7 @@ void handle_file_action(const DirTarget &target, const BrowserEntry &entry,
   if (entry.kind == FileKind::Other) {
     const std::string size = format_byte_size(entry.size_bytes);
     notify("notify.file_browser.file_info_fmt", entry.name.c_str(),
-           size.c_str(), system_file.c_str());
+           size.c_str());
     return;
   }
 
@@ -237,17 +238,18 @@ void handle_file_action(const DirTarget &target, const BrowserEntry &entry,
       return;
     }
 
-    std::string dest_path;
     const ImportStatus status = import_file_to_destination(
         shellui_file, entry.name, entry.kind, g_destinations,
-        entry.already_installed, &dest_path);
-    if (entry.kind == FileKind::Sprx &&
-        (status == ImportStatus::Completed ||
-         status == ImportStatus::Replaced)) {
-      std::string reload_err;
-      (void)IPC_Client::getInstance(false).ReloadSprx(&reload_err);
+        entry.already_installed);
+    if (status == ImportStatus::Completed || status == ImportStatus::Replaced) {
+      if (entry.kind == FileKind::Sprx) {
+        std::string reload_err;
+        (void)IPC_Client::getInstance(false).ReloadSprx(&reload_err);
+      } else if (entry.kind == FileKind::Plugin && !entry.plugin_id.empty()) {
+        (void)IPC_Client::getInstance(false).ReloadPlugin(entry.plugin_id);
+      }
     }
-    notify_import_status(status, entry.name, dest_path);
+    notify_import_status(status, entry.name);
     settings::refresh(page_instance);
   };
 
@@ -292,7 +294,7 @@ void generate_root_xml(std::string &xml_buffer, std::string_view mode_key) {
 
 void generate_node_xml(std::string &xml_buffer, std::uint64_t token) {
   const auto it = g_targets.find(token);
-  if (it == g_targets.end()) {
+  if (it == g_targets.end() || g_page_stack.size() >= kMaxBrowserDepth) {
     ps5ui::Page page("id_fb_page_" + std::to_string(token),
                      toolbox_i18n::tr("file_browser.title"));
     page.label("id_fb_inaccessible",

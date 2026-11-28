@@ -1,6 +1,8 @@
 /* Copyright (C) 2026 OnionHEN / LightningMods
  *
- * Thin PS5 ShellUI adapter for the reusable file browser core.
+ * Thin PS5 ShellUI adapter for the lightweight file browser.
+ * Uses native Settings page stacking (link -> press Circle to go back) so each
+ * screen contains only storage devices or directory entries with zero clutter.
  */
 #include "file_browser_ui.hpp"
 
@@ -8,75 +10,58 @@
 #include "pkg_installer.hpp"
 #include "settings_page_refresh.hpp"
 #include "toolbox_i18n.hpp"
+#include "toolbox_route.hpp"
 #include "usb_storage.hpp"
 
 #include <onion/ipc_client.hpp>
 
-#include <algorithm>
-#include <array>
-#include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace onion::shellui::file_browser {
 namespace {
 
-constexpr const char *kPageId = "id_file_browser_page";
+struct DirTarget {
+  FilterMode mode = FilterMode::All;
+  RootLocation root;
+  std::string rel_path;
+};
 
-BrowserState g_state;
-std::vector<RootLocation> g_roots;
-BrowserListing g_listing;
+struct ActiveDirPage {
+  DirTarget target;
+  BrowserListing listing;
+  std::map<std::string, std::uint64_t> child_tokens;
+};
+
+FilterMode g_session_mode = FilterMode::All;
+std::uint64_t g_next_token = 1;
+std::vector<std::uint64_t> g_page_stack; // 0 = root storage list, >0 = dir token
+std::map<std::string, std::uint64_t> g_root_tokens;
+std::map<std::uint64_t, DirTarget> g_targets;
+std::map<std::uint64_t, ActiveDirPage> g_active_dirs;
 std::map<unsigned, usb_storage::Device> g_usb_devices;
 const DestinationDirs g_destinations{};
 
-bool parse_index(std::string_view id, std::string_view prefix,
-                 std::size_t *out) {
-  if (!id.starts_with(prefix) || id.size() == prefix.size())
-    return false;
-  const std::string tail(id.substr(prefix.size()));
-  char *end = nullptr;
-  const unsigned long value = std::strtoul(tail.c_str(), &end, 10);
-  if (!end || *end != '\0' || value > 100000)
-    return false;
-  *out = static_cast<std::size_t>(value);
-  return true;
+std::string node_xml_name(std::uint64_t token) {
+  return toolbox::file_browser_node_xml(token);
 }
 
-void add_local_root_if_exists(std::vector<RootLocation> &roots,
-                              const std::string &raw_system_path,
-                              const std::string &label = {}) {
-  const std::string system_path = normalize_pkg_search_path(raw_system_path);
-  if (!pkg_search_path_is_valid(system_path) ||
-      !pkg_search_path_exists(system_path))
-    return;
-  for (const RootLocation &existing : roots) {
-    if (existing.system_path == system_path)
-      return;
-  }
-  RootLocation root;
-  root.label = label.empty() ? system_path : label;
-  root.system_path = system_path;
-  root.shellui_path = pkg_search_path_shellui_view(system_path);
-  root.is_usb = false;
-  roots.push_back(std::move(root));
+std::string root_page_title(FilterMode mode) {
+  return toolbox_i18n::tr(mode == FilterMode::Pkg ? "pkg.installer.custom"
+                                                  : "file_browser.title");
 }
 
-void discover_roots() {
-  g_roots.clear();
+std::vector<RootLocation> discover_storage_roots() {
+  std::vector<RootLocation> roots;
   g_usb_devices.clear();
 
-  static const std::array<const char *, 6> kDefaultLocalRoots = {
-      "/data",
-      "/data/OnionHEN",
-      "/data/OnionHEN/pkgs",
-      "/data/pkg",
-      "/data/downloads",
-      "/mnt/ext0",
-  };
-  for (const char *path : kDefaultLocalRoots) {
-    add_local_root_if_exists(g_roots, path);
+  if (pkg_search_path_exists("/data")) {
+    roots.push_back({toolbox_i18n::tr("file_browser.root.internal"), "/data",
+                     pkg_search_path_shellui_view("/data"), false, 0});
   }
 
   std::vector<usb_storage::Device> devices;
@@ -86,75 +71,114 @@ void discover_roots() {
         if (g_usb_devices.contains(view.usb_index))
           return;
         g_usb_devices.emplace(view.usb_index, device);
-        RootLocation usb;
-        usb.label = toolbox_i18n::format("file_browser.usb_root_fmt",
-                                         static_cast<int>(view.usb_index));
-        usb.system_path = "/mnt/usb" + std::to_string(view.usb_index);
-        usb.shellui_path = view.path;
-        usb.is_usb = true;
-        usb.usb_index = view.usb_index;
-        g_roots.push_back(std::move(usb));
+        roots.push_back({toolbox_i18n::format("file_browser.usb_root_fmt",
+                                              static_cast<int>(view.usb_index)),
+                         "/mnt/usb" + std::to_string(view.usb_index),
+                         view.path, true, view.usb_index});
       });
     }
   }
+
+  if (pkg_search_path_exists("/mnt/ext0")) {
+    roots.push_back({toolbox_i18n::tr("file_browser.root.external"),
+                     "/mnt/ext0", pkg_search_path_shellui_view("/mnt/ext0"),
+                     false, 0});
+  }
+
+  return roots;
 }
 
-void refresh_listing() {
-  g_listing = {};
-  if (!g_state.in_directory())
-    return;
+std::uint64_t ensure_root_token(const RootLocation &root) {
+  auto it = g_root_tokens.find(root.system_path);
+  if (it != g_root_tokens.end()) {
+    g_targets[it->second] = {g_session_mode, root, {}};
+    return it->second;
+  }
+  const std::uint64_t token = g_next_token++;
+  g_root_tokens.emplace(root.system_path, token);
+  g_targets[token] = {g_session_mode, root, {}};
+  return token;
+}
 
-  if (g_state.active_root->is_usb) {
-    const auto it = g_usb_devices.find(g_state.active_root->usb_index);
+std::uint64_t ensure_child_token(ActiveDirPage &page,
+                                 const std::string &child_name) {
+  auto it = page.child_tokens.find(child_name);
+  if (it != page.child_tokens.end())
+    return it->second;
+  const std::uint64_t token = g_next_token++;
+  page.child_tokens.emplace(child_name, token);
+  DirTarget child = page.target;
+  child.rel_path = join_path(page.target.rel_path, child_name);
+  g_targets[token] = std::move(child);
+  return token;
+}
+
+BrowserListing scan_target(const DirTarget &target) {
+  if (target.root.is_usb) {
+    const auto it = g_usb_devices.find(target.root.usb_index);
     if (it == g_usb_devices.end())
-      return;
+      return {};
+    BrowserListing listing{};
     usb_storage::with_device(it->second, [&](const usb_storage::Mapping &view) {
-      if (view.usb_index != g_state.active_root->usb_index)
+      if (view.usb_index != target.root.usb_index)
         return;
-      g_listing = list_directory(g_state.current_shellui_path(view.path),
-                                 g_state.mode, g_destinations);
+      listing = list_directory(join_path(view.path, target.rel_path),
+                               target.mode, g_destinations);
     });
-    return;
+    return listing;
   }
-
-  g_listing =
-      list_directory(g_state.current_shellui_path(), g_state.mode, g_destinations);
+  return list_directory(join_path(target.root.shellui_path, target.rel_path),
+                        target.mode, g_destinations);
 }
 
-std::string page_title() {
-  const char *base_key = "file_browser.title";
-  if (g_state.filter_locked) {
-    switch (g_state.mode) {
-    case FilterMode::Pkg:
-      base_key = "pkg.installer.custom";
-      break;
-    case FilterMode::Payload:
-      base_key = "file_browser.title.payload";
-      break;
-    case FilterMode::Patch:
-      base_key = "file_browser.title.patch";
-      break;
-    case FilterMode::All:
-      base_key = "file_browser.title";
-      break;
-    }
-  }
-  const std::string base = toolbox_i18n::tr(base_key);
-  if (!g_state.in_directory())
-    return base;
-  return base + " · " + g_state.current_system_path();
-}
-
-bool build_model(ps5ui::Node &model) {
-  if (!g_state.in_directory()) {
-    discover_roots();
-    g_listing = {};
-  } else {
-    refresh_listing();
-  }
-  ps5ui::Page page(kPageId, page_title());
-  fill_file_browser_page(page, g_state, g_roots, g_listing);
+bool build_root_model(ps5ui::Node &model) {
+  const std::vector<RootLocation> roots = discover_storage_roots();
+  ps5ui::Page page("id_fb_page_root", root_page_title(g_session_mode));
+  fill_file_browser_root_page(
+      page, roots, [&](std::size_t index, const std::string &) {
+        return node_xml_name(ensure_root_token(roots[index]));
+      });
   model = page.root();
+  return true;
+}
+
+bool build_dir_model(std::uint64_t token, ps5ui::Node &model) {
+  auto page_it = g_active_dirs.find(token);
+  if (page_it == g_active_dirs.end())
+    return false;
+  ActiveDirPage &active = page_it->second;
+  active.listing = scan_target(active.target);
+  const std::string title =
+      join_path(active.target.root.system_path, active.target.rel_path);
+  ps5ui::Page page("id_fb_page_" + std::to_string(token), title);
+  fill_file_browser_dir_page(
+      page, token, active.listing,
+      [&](std::size_t, const std::string &dir_name) {
+        return node_xml_name(ensure_child_token(active, dir_name));
+      });
+  model = page.root();
+  return true;
+}
+
+bool parse_file_button_id(std::string_view id, std::uint64_t *token_out,
+                          std::size_t *index_out) {
+  if (!id.starts_with(kFilePrefix))
+    return false;
+  const std::string_view tail = id.substr(kFilePrefix.size());
+  const std::size_t sep = tail.find('_');
+  if (sep == std::string_view::npos || sep == 0 || sep + 1 >= tail.size())
+    return false;
+  const std::string token_str(tail.substr(0, sep));
+  const std::string index_str(tail.substr(sep + 1));
+  char *end1 = nullptr;
+  char *end2 = nullptr;
+  const unsigned long long token = std::strtoull(token_str.c_str(), &end1, 10);
+  const unsigned long index = std::strtoul(index_str.c_str(), &end2, 10);
+  if (!end1 || *end1 != '\0' || !end2 || *end2 != '\0' || token == 0 ||
+      index > 100000)
+    return false;
+  *token_out = static_cast<std::uint64_t>(token);
+  *index_out = static_cast<std::size_t>(index);
   return true;
 }
 
@@ -185,12 +209,11 @@ void notify_import_status(ImportStatus status, const std::string &name,
   }
 }
 
-void handle_file_action(const BrowserEntry &entry, MonoObject *page_instance) {
-  if (!g_state.in_directory())
-    return;
-
-  const std::string system_file =
-      join_path(g_state.current_system_path(), entry.name);
+void handle_file_action(const DirTarget &target, const BrowserEntry &entry,
+                        MonoObject *page_instance) {
+  const std::string system_dir =
+      join_path(target.root.system_path, target.rel_path);
+  const std::string system_file = join_path(system_dir, entry.name);
 
   if (entry.kind == FileKind::Other) {
     const std::string size = format_byte_size(entry.size_bytes);
@@ -228,86 +251,94 @@ void handle_file_action(const BrowserEntry &entry, MonoObject *page_instance) {
     settings::refresh(page_instance);
   };
 
-  if (g_state.active_root->is_usb) {
-    const auto it = g_usb_devices.find(g_state.active_root->usb_index);
+  if (target.root.is_usb) {
+    const auto it = g_usb_devices.find(target.root.usb_index);
     if (it == g_usb_devices.end()) {
       notify("notify.file_browser.import_failed_fmt", entry.name.c_str());
       return;
     }
     bool ran = false;
     usb_storage::with_device(it->second, [&](const usb_storage::Mapping &view) {
-      if (view.usb_index != g_state.active_root->usb_index)
+      if (view.usb_index != target.root.usb_index)
         return;
       ran = true;
       execute_with_shellui_file(
-          join_path(g_state.current_shellui_path(view.path), entry.name));
+          join_path(join_path(view.path, target.rel_path), entry.name));
     });
     if (!ran)
       notify("notify.file_browser.import_failed_fmt", entry.name.c_str());
     return;
   }
 
-  execute_with_shellui_file(join_path(g_state.current_shellui_path(), entry.name));
+  execute_with_shellui_file(
+      join_path(join_path(target.root.shellui_path, target.rel_path),
+                entry.name));
 }
 
 } // namespace
 
-void generate_xml(std::string &xml_buffer, std::string_view mode_key) {
-  const FilterMode mode = filter_mode_from_key(mode_key);
-  g_state.reset(mode, mode != FilterMode::All);
+void generate_root_xml(std::string &xml_buffer, std::string_view mode_key) {
+  g_session_mode = filter_mode_from_key(mode_key);
+  g_page_stack.clear();
+  g_root_tokens.clear();
+  g_targets.clear();
+  g_active_dirs.clear();
+  g_page_stack.push_back(0);
+
   ps5ui::Node model;
-  build_model(model);
-  xml_buffer = settings::publish(model, build_model);
+  build_root_model(model);
+  xml_buffer = settings::publish(model, build_root_model);
+}
+
+void generate_node_xml(std::string &xml_buffer, std::uint64_t token) {
+  const auto it = g_targets.find(token);
+  if (it == g_targets.end()) {
+    ps5ui::Page page("id_fb_page_" + std::to_string(token),
+                     toolbox_i18n::tr("file_browser.title"));
+    page.label("id_fb_inaccessible",
+               toolbox_i18n::tr("file_browser.inaccessible"));
+    xml_buffer = page.build();
+    return;
+  }
+
+  ActiveDirPage active;
+  active.target = it->second;
+  g_active_dirs[token] = std::move(active);
+  g_page_stack.push_back(token);
+
+  ps5ui::Node model;
+  build_dir_model(token, model);
+  xml_buffer = settings::publish(
+      model, [token](ps5ui::Node &next) { return build_dir_model(token, next); });
+}
+
+bool leave_active_page() {
+  if (g_page_stack.empty())
+    return false;
+  const std::uint64_t leaving = g_page_stack.back();
+  g_page_stack.pop_back();
+  if (leaving != 0)
+    g_active_dirs.erase(leaving);
+  return !g_page_stack.empty();
 }
 
 OnPressResult onpress(OnPressContext &ctx) {
   ctx.dirty = false;
 
-  if (ctx.id == kFilterButtonId) {
-    if (!g_state.filter_locked) {
-      g_state.mode = next_filter_mode(g_state.mode);
-      settings::refresh(ctx.instance);
-    }
-    return OnPressResult::Consumed;
-  }
-
-  if (ctx.id == kUpButtonId) {
-    if (g_state.navigate_up())
-      settings::refresh(ctx.instance);
-    return OnPressResult::Consumed;
-  }
-
-  if (ctx.id == kRefreshButtonId) {
-    settings::refresh(ctx.instance);
-    return OnPressResult::Consumed;
-  }
-
+  std::uint64_t token = 0;
   std::size_t index = 0;
-  if (parse_index(ctx.id, kRootPrefix, &index)) {
-    if (index < g_roots.size() && g_state.enter_root(g_roots[index]))
-      settings::refresh(ctx.instance);
-    return OnPressResult::Consumed;
-  }
+  if (!parse_file_button_id(ctx.id, &token, &index))
+    return OnPressResult::NotMine;
 
-  if (parse_index(ctx.id, kDirPrefix, &index)) {
-    if (index < g_listing.entries.size() &&
-        g_listing.entries[index].kind == FileKind::Directory &&
-        g_state.enter_subdir(g_listing.entries[index].name)) {
-      settings::refresh(ctx.instance);
-    }
+  const auto it = g_active_dirs.find(token);
+  if (it == g_active_dirs.end() || index >= it->second.listing.entries.size())
     return OnPressResult::Consumed;
-  }
 
-  if (parse_index(ctx.id, kFilePrefix, &index)) {
-    if (index < g_listing.entries.size() &&
-        g_listing.entries[index].kind != FileKind::Directory) {
-      const BrowserEntry selected = g_listing.entries[index];
-      handle_file_action(selected, ctx.instance);
-    }
-    return OnPressResult::Consumed;
-  }
-
-  return OnPressResult::NotMine;
+  const DirTarget target = it->second.target;
+  const BrowserEntry entry = it->second.listing.entries[index];
+  if (entry.kind != FileKind::Directory)
+    handle_file_action(target, entry, ctx.instance);
+  return OnPressResult::Consumed;
 }
 
 } // namespace onion::shellui::file_browser

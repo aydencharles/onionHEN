@@ -10,16 +10,13 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <optional>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace onion::shellui::file_browser {
 
-inline constexpr std::string_view kFilterButtonId = "id_fb_filter";
-inline constexpr std::string_view kUpButtonId = "id_fb_up";
-inline constexpr std::string_view kRefreshButtonId = "id_fb_refresh";
 inline constexpr std::string_view kRootPrefix = "id_fb_root_";
 inline constexpr std::string_view kDirPrefix = "id_fb_dir_";
 inline constexpr std::string_view kFilePrefix = "id_fb_file_";
@@ -82,27 +79,11 @@ enum class ImportStatus : unsigned char {
   WriteFailed,
 };
 
-struct BrowserState {
-  FilterMode mode = FilterMode::All;
-  bool filter_locked = false;
-  std::optional<RootLocation> active_root;
-  std::string rel_path;
-
-  bool in_directory() const { return active_root.has_value(); }
-  std::string current_system_path() const;
-  std::string current_shellui_path(
-      std::string_view mounted_root_override = {}) const;
-  std::string parent_system_path() const;
-
-  void reset(FilterMode initial_mode, bool lock_filter);
-  bool enter_root(const RootLocation &root);
-  bool enter_subdir(std::string_view name);
-  bool navigate_up();
-};
+using ChildLinkBuilder =
+    std::function<std::string(std::size_t index, const std::string &name)>;
 
 FileKind classify_file(std::string_view name);
 bool matches_filter(FileKind kind, FilterMode mode);
-FilterMode next_filter_mode(FilterMode mode);
 FilterMode filter_mode_from_key(std::string_view key);
 bool valid_entry_name(std::string_view name);
 
@@ -119,8 +100,12 @@ ImportStatus import_file_to_destination(const std::string &source_shellui_path,
                                         bool replace,
                                         std::string *dest_system_path_out = nullptr);
 
-void fill_file_browser_page(ps5ui::Page &page, const BrowserState &state,
-                            const std::vector<RootLocation> &roots,
-                            const BrowserListing &listing);
+void fill_file_browser_root_page(ps5ui::Page &page,
+                                 const std::vector<RootLocation> &roots,
+                                 const ChildLinkBuilder &link_for_root);
+
+void fill_file_browser_dir_page(ps5ui::Page &page, std::uint64_t page_token,
+                                const BrowserListing &listing,
+                                const ChildLinkBuilder &link_for_dir);
 
 } // namespace onion::shellui::file_browser

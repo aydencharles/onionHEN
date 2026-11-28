@@ -145,9 +145,14 @@ uint64_t GetManifestResourceStream_Hook(uint64_t inst, MonoString *FileName) {
     generate_plugins_xml(new_xml_string);
     break;
   case toolbox::Page::FileBrowser: {
-    std::string mode;
-    toolbox::parse_file_browser_resource(resourceName, &mode);
-    onion::shellui::file_browser::generate_xml(new_xml_string, mode);
+    std::uint64_t token = 0;
+    if (toolbox::parse_file_browser_node_resource(resourceName, &token)) {
+      onion::shellui::file_browser::generate_node_xml(new_xml_string, token);
+    } else {
+      std::string mode;
+      toolbox::parse_file_browser_resource(resourceName, &mode);
+      onion::shellui::file_browser::generate_root_xml(new_xml_string, mode);
+    }
     break;
   }
   case toolbox::Page::Sprx:

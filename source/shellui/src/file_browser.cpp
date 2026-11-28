@@ -100,20 +100,6 @@ std::string display_system_path_for(const std::string &shellui_path) {
   return shellui_path;
 }
 
-const char *filter_label_key(FilterMode mode) {
-  switch (mode) {
-  case FilterMode::All:
-    return "file_browser.filter.all";
-  case FilterMode::Pkg:
-    return "file_browser.filter.pkg";
-  case FilterMode::Payload:
-    return "file_browser.filter.payload";
-  case FilterMode::Patch:
-    return "file_browser.filter.patch";
-  }
-  return "file_browser.filter.all";
-}
-
 const char *action_hint_key(FileKind kind, bool already_installed) {
   switch (kind) {
   case FileKind::Pkg:
@@ -205,20 +191,6 @@ bool matches_filter(FileKind kind, FilterMode mode) {
   return false;
 }
 
-FilterMode next_filter_mode(FilterMode mode) {
-  switch (mode) {
-  case FilterMode::All:
-    return FilterMode::Pkg;
-  case FilterMode::Pkg:
-    return FilterMode::Payload;
-  case FilterMode::Payload:
-    return FilterMode::Patch;
-  case FilterMode::Patch:
-    return FilterMode::All;
-  }
-  return FilterMode::All;
-}
-
 FilterMode filter_mode_from_key(std::string_view key) {
   if (key == "pkg")
     return FilterMode::Pkg;
@@ -263,74 +235,6 @@ std::string join_path(std::string_view base, std::string_view child) {
     out.push_back('/');
   out.append(child.data(), child.size());
   return out;
-}
-
-std::string BrowserState::current_system_path() const {
-  if (!active_root)
-    return {};
-  return join_path(active_root->system_path, rel_path);
-}
-
-std::string BrowserState::current_shellui_path(
-    std::string_view mounted_root_override) const {
-  if (!active_root)
-    return {};
-  const std::string_view base = mounted_root_override.empty()
-                                    ? std::string_view(active_root->shellui_path)
-                                    : mounted_root_override;
-  return join_path(base, rel_path);
-}
-
-std::string BrowserState::parent_system_path() const {
-  if (!active_root || rel_path.empty())
-    return {};
-  const std::size_t slash = rel_path.rfind('/');
-  if (slash == std::string::npos)
-    return active_root->system_path;
-  return join_path(active_root->system_path,
-                   std::string_view(rel_path).substr(0, slash));
-}
-
-void BrowserState::reset(FilterMode initial_mode, bool lock_filter) {
-  mode = initial_mode;
-  filter_locked = lock_filter;
-  active_root.reset();
-  rel_path.clear();
-}
-
-bool BrowserState::enter_root(const RootLocation &root) {
-  if (root.system_path.empty())
-    return false;
-  active_root = root;
-  rel_path.clear();
-  return true;
-}
-
-bool BrowserState::enter_subdir(std::string_view name) {
-  if (!active_root || !valid_entry_name(name))
-    return false;
-  if (rel_path.empty())
-    rel_path.assign(name.data(), name.size());
-  else {
-    rel_path.push_back('/');
-    rel_path.append(name.data(), name.size());
-  }
-  return true;
-}
-
-bool BrowserState::navigate_up() {
-  if (!active_root)
-    return false;
-  if (rel_path.empty()) {
-    active_root.reset();
-    return true;
-  }
-  const std::size_t slash = rel_path.rfind('/');
-  if (slash == std::string::npos)
-    rel_path.clear();
-  else
-    rel_path.erase(slash);
-  return true;
 }
 
 BrowserListing list_directory(const std::string &shellui_dir, FilterMode mode,
@@ -467,72 +371,59 @@ ImportStatus import_file_to_destination(const std::string &source_shellui_path,
   return existed ? ImportStatus::Replaced : ImportStatus::Completed;
 }
 
-void fill_file_browser_page(ps5ui::Page &page, const BrowserState &state,
-                            const std::vector<RootLocation> &roots,
-                            const BrowserListing &listing) {
-  if (!state.filter_locked) {
-    page.button(std::string(kFilterButtonId),
-                toolbox_i18n::format("file_browser.filter_fmt",
-                                     toolbox_i18n::tr(filter_label_key(state.mode))),
-                toolbox_i18n::tr("file_browser.filter_sub"));
-  }
-
-  if (!state.in_directory()) {
-    if (roots.empty()) {
-      page.label("id_fb_empty", toolbox_i18n::tr("file_browser.no_roots"));
-    } else {
-      for (std::size_t i = 0; i < roots.size(); ++i) {
-        const RootLocation &root = roots[i];
-        page.button(std::string(kRootPrefix) + std::to_string(i), root.label,
-                    root.system_path,
-                    toolbox_i18n::tr("file_browser.open_folder_help"));
-      }
-    }
-    page.button(std::string(kRefreshButtonId),
-                toolbox_i18n::tr("file_browser.refresh"),
-                toolbox_i18n::tr("file_browser.refresh_sub"));
+void fill_file_browser_root_page(ps5ui::Page &page,
+                                 const std::vector<RootLocation> &roots,
+                                 const ChildLinkBuilder &link_for_root) {
+  if (roots.empty()) {
+    page.label("id_fb_empty", toolbox_i18n::tr("file_browser.no_roots"));
     return;
   }
+  for (std::size_t i = 0; i < roots.size(); ++i) {
+    const RootLocation &root = roots[i];
+    const std::string target_xml =
+        link_for_root ? link_for_root(i, root.system_path) : std::string();
+    page.link(std::string(kRootPrefix) + std::to_string(i), root.label,
+              target_xml, root.system_path);
+  }
+}
 
-  const std::string parent = state.parent_system_path();
-  page.button(std::string(kUpButtonId), toolbox_i18n::tr("file_browser.up"),
-              parent.empty() ? std::string(toolbox_i18n::tr("file_browser.roots_title"))
-                             : parent,
-              toolbox_i18n::tr("file_browser.up_help"));
-
+void fill_file_browser_dir_page(ps5ui::Page &page, std::uint64_t page_token,
+                                const BrowserListing &listing,
+                                const ChildLinkBuilder &link_for_dir) {
   if (!listing.accessible) {
     page.label("id_fb_inaccessible",
                toolbox_i18n::tr("file_browser.inaccessible"));
-  } else if (listing.entries.empty()) {
+    return;
+  }
+  if (listing.entries.empty()) {
     page.label("id_fb_empty", toolbox_i18n::tr("file_browser.empty"));
-  } else {
-    for (std::size_t i = 0; i < listing.entries.size(); ++i) {
-      const BrowserEntry &entry = listing.entries[i];
-      if (entry.kind == FileKind::Directory) {
-        page.button(std::string(kDirPrefix) + std::to_string(i),
-                    entry.name + "/",
-                    toolbox_i18n::tr("file_browser.folder_tag"),
-                    toolbox_i18n::tr("file_browser.open_folder_help"));
-      } else {
-        const auto confirm = confirm_prompt_for(entry);
-        page.button(
-            std::string(kFilePrefix) + std::to_string(i), entry.name,
-            format_file_subtitle(entry),
-            toolbox_i18n::tr("file_browser.file_help"), std::nullopt,
-            ps5ui::Style::None, confirm,
-            confirm ? std::optional<std::string>(
-                          toolbox_i18n::tr("file_browser.confirm_phrase"))
-                    : std::nullopt);
-      }
-    }
-    if (listing.truncated) {
-      page.label("id_fb_truncated", toolbox_i18n::tr("file_browser.truncated"));
-    }
+    return;
   }
 
-  page.button(std::string(kRefreshButtonId),
-              toolbox_i18n::tr("file_browser.refresh"),
-              toolbox_i18n::tr("file_browser.refresh_sub"));
+  for (std::size_t i = 0; i < listing.entries.size(); ++i) {
+    const BrowserEntry &entry = listing.entries[i];
+    if (entry.kind == FileKind::Directory) {
+      const std::string target_xml =
+          link_for_dir ? link_for_dir(i, entry.name) : std::string();
+      page.link(std::string(kDirPrefix) + std::to_string(page_token) + "_" +
+                    std::to_string(i),
+                entry.name + "/", target_xml,
+                toolbox_i18n::tr("file_browser.folder_tag"));
+    } else {
+      const auto confirm = confirm_prompt_for(entry);
+      page.button(
+          std::string(kFilePrefix) + std::to_string(page_token) + "_" +
+              std::to_string(i),
+          entry.name, format_file_subtitle(entry), std::nullopt, std::nullopt,
+          ps5ui::Style::None, confirm,
+          confirm ? std::optional<std::string>(
+                        toolbox_i18n::tr("file_browser.confirm_phrase"))
+                  : std::nullopt);
+    }
+  }
+  if (listing.truncated) {
+    page.label("id_fb_truncated", toolbox_i18n::tr("file_browser.truncated"));
+  }
 }
 
 } // namespace onion::shellui::file_browser

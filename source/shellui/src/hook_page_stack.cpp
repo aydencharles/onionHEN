@@ -15,6 +15,7 @@
 #include "remote_play.hpp"
 #include "shellui_state.hpp"
 #include "dynamic_ui_runtime.hpp"
+#include "file_browser_ui.hpp"
 #include "settings_page_refresh.hpp"
 #include "toolbox_route.hpp"
 
@@ -41,6 +42,13 @@ void SettingPageStackOnPopping_Hook(MonoObject *instance,
         g_ui.leave_page(toolbox::Page::DynamicPlugin);
       LOG_DEBUG("dynamic_plugin_xml: page popped; dynamic_parent=%d",
                 dynamic_parent ? 1 : 0);
+    } else if (g_ui.active_page == toolbox::Page::FileBrowser) {
+      const bool browser_parent =
+          onion::shellui::file_browser::leave_active_page();
+      if (!browser_parent)
+        g_ui.leave_page(toolbox::Page::FileBrowser);
+      LOG_DEBUG("file_browser_xml: page popped; browser_parent=%d",
+                browser_parent ? 1 : 0);
     } else if (toolbox::restores_parent_on_pop(g_ui.active_page)) {
       const toolbox::Page child = g_ui.active_page;
       g_ui.leave_page(child);

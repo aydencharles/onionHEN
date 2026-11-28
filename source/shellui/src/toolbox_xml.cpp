@@ -693,10 +693,6 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
          toolbox_i18n::tr("payloads.link.sub"), kIconPlugins)
       .link("id_plugins", toolbox_i18n::tr("plugins.link"), "plugins.xml",
             toolbox_i18n::tr("plugins.link.sub"), kIconPlugins)
-      .link("id_file_browser_payload",
-            toolbox_i18n::tr("file_browser.title.payload"),
-            "file_browser_payload.xml",
-            toolbox_i18n::tr("file_browser.payload.sub"), kIconPlugins)
       .link("id_sprx", toolbox_i18n::tr("sprx.link"), "sprx.xml",
             toolbox_i18n::tr("sprx.link.sub"), kIconPlugins);
 }
@@ -704,10 +700,6 @@ void append_toolbox_payloads_group(ps5ui::Group& g) {
 void append_toolbox_game_group(ps5ui::Group& g) {
   g.link("id_cheats", toolbox_i18n::tr("cheats.link"), "cheats.xml",
          toolbox_i18n::tr("cheats.link.sub"), kIconCheats)
-      .link("id_file_browser_patch",
-            toolbox_i18n::tr("file_browser.title.patch"),
-            "file_browser_patch.xml",
-            toolbox_i18n::tr("file_browser.patch.sub"), kIconCheats)
       .button("id_download_cheats", toolbox_i18n::tr("cheats.repo.download"),
               toolbox_i18n::tr("cheats.repo.download.desc"), std::nullopt,
               kIconDownload, ps5ui::Style::None,

@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -124,6 +125,7 @@ inline constexpr std::string_view kExternalPluginXmlPrefix = "plugin_";
 inline constexpr std::string_view kSprxConfigXmlPrefix = "sprx_";
 inline constexpr std::string_view kPayloadConfigXmlPrefix = "payload_";
 inline constexpr std::string_view kOverlayMetricXmlPrefix = "overlay_";
+inline constexpr std::string_view kFileBrowserNodeXmlPrefix = "fb_";
 
 inline bool settings_plugins_relative(std::string_view resource,
                                       std::string_view *out) {
@@ -267,8 +269,40 @@ inline std::string overlay_metric_xml(std::string_view id) {
   return std::string(kOverlayMetricXmlPrefix) + std::string(id) + ".xml";
 }
 
+inline std::string file_browser_node_xml(std::uint64_t token) {
+  return std::string(kFileBrowserNodeXmlPrefix) + std::to_string(token) +
+         ".xml";
+}
+
+inline bool parse_file_browser_node_resource(std::string_view resource,
+                                             std::uint64_t *out_token) {
+  std::string_view relative;
+  if (!settings_plugins_relative(resource, &relative))
+    return false;
+  std::string id;
+  if (!parse_prefixed_xml(relative, kFileBrowserNodeXmlPrefix, &id) ||
+      id.size() > 18)
+    return false;
+  std::uint64_t value = 0;
+  for (char c : id) {
+    if (c < '0' || c > '9')
+      return false;
+    value = value * 10 + static_cast<std::uint64_t>(c - '0');
+  }
+  if (value == 0)
+    return false;
+  if (out_token)
+    *out_token = value;
+  return true;
+}
+
 inline bool parse_file_browser_resource(std::string_view resource,
                                         std::string *out_mode) {
+  if (parse_file_browser_node_resource(resource, nullptr)) {
+    if (out_mode)
+      *out_mode = "node";
+    return true;
+  }
   std::string_view mode;
   if (resource == kFileBrowserXml)
     mode = "all";
